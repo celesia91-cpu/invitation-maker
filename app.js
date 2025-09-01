@@ -648,10 +648,9 @@ function handleWorkResize() {
 
 function setupAuthUI() {
   const loginForm = document.getElementById('loginForm');
-  const skipLogin = document.getElementById('skipLogin');
   const authModal = document.getElementById('authModal');
 
-  if (!loginForm || !skipLogin || !authModal) {
+  if (!loginForm || !authModal) {
     return;
   }
 
@@ -685,16 +684,6 @@ function setupAuthUI() {
     } finally {
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;
-    }
-  });
-
-  skipLogin.addEventListener('click', () => {
-    authModal.style.display = 'none';
-    
-    const statusText = document.getElementById('statusText');
-    if (statusText) {
-      statusText.textContent = 'Working offline';
-      setTimeout(() => statusText.textContent = '', 2000);
     }
   });
 }
