@@ -1,21 +1,45 @@
 // share-manager.js - Fixed sharing functionality
 
 import { encodeState, decodeState, toast } from './utils.js';
-import { buildProject, applyProject, historyState, setIsViewer } from './state-manager.js';
+import { 
+  buildProject, 
+  applyProject, 
+  historyState, 
+  setIsViewer,
+  setCurrentProjectId // <-- ensure this exists (we added it in state-manager)
+} from './state-manager.js';
 
-// Prepare project data for sharing (remove large images)
+// Prefer a canonical viewer origin in production so shared links always open the public viewer.
+// Fallback to current origin if you're already on the viewer.
+const CANONICAL_VIEWER_ORIGIN = 'https://celesia.app';
+function getViewerOrigin() {
+  try {
+    const here = location.origin;
+    // If we're already on the canonical domain (or a preview of it), keep it.
+    if (here === CANONICAL_VIEWER_ORIGIN || here.endsWith('.celesia.app')) return here;
+    return CANONICAL_VIEWER_ORIGIN;
+  } catch {
+    return CANONICAL_VIEWER_ORIGIN;
+  }
+}
+
+// Prepare project data for sharing (trim huge inline images, keep remote URLs)
 export function safeProjectForShare() {
   const p = buildProject();
-  p.slides = (p.slides || []).map(s => {
+  p.slides = (p.slides || []).map((s) => {
     const img = s.image ? { ...s.image } : null;
     if (img) {
-      const hasRemoteSrc = /^https?:\/\//i.test(img.src || '');
-      const smallRemote = hasRemoteSrc && (img.src.length < 800); // allow short remote URLs
-      if (!smallRemote) {
-        // Strip only the large full-res data URL but keep transformations
+      const src = img.src || '';
+      const isRemote = /^https?:\/\//i.test(src);
+      const isDataUrl = /^data:/i.test(src);
+
+      // Keep remote URLs always (R2, CDN, etc.). Strip only data URLs to avoid giant hashes.
+      if (isDataUrl) {
         img.src = null;
       }
-      // Ensure thumb and transformations stay
+
+      // Don't touch thumb/transformations — viewer needs these.
+      // If both src and thumb end up null, the viewer will just show no image for that slide.
     }
     return { ...s, image: img };
   });
@@ -25,33 +49,38 @@ export function safeProjectForShare() {
 // Build viewer URL with encoded project data
 export function buildViewerUrl() {
   const payload = encodeState(safeProjectForShare());
-  const url = new URL(location.href);
+
+  // Build against canonical viewer origin so links are shareable from anywhere (localhost, Pages, etc.)
+  const url = new URL('/', getViewerOrigin());
   url.searchParams.set('view', '1');
   url.hash = 'd=' + payload;
+
+  // (Optional) warn if the URL is huge (e.g., many slides or lots of text)
+  if (url.toString().length > 3500) {
+    console.warn('Share URL is quite long (~' + url.toString().length + ' chars). Consider reducing slide content.');
+  }
   return url.toString();
 }
 
-// FIXED: Share current project with proper state capture
+// Share current project with proper state capture
 export async function shareCurrent() {
   try {
-    // CRITICAL FIX: Ensure current DOM state is captured before sharing
+    // Ensure current DOM state is captured before sharing
     const { writeCurrentSlide } = await import('./slide-manager.js');
     writeCurrentSlide();
-    
-    // Small delay to ensure state is written
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    // Build viewer URL with current state
+
+    // Small delay allows layout/state microtasks to flush
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     const url = buildViewerUrl();
-    
     const shareData = {
       title: 'Invitation',
-      text: 'You\'re invited! Open the link to view the invitation.',
+      text: "You're invited! Open the link to view the invitation.",
       url
     };
-    
-    console.log('Sharing URL:', url); // Debug log
-    
+
+    console.log('Sharing URL:', url);
+
     if (navigator.share) {
       await navigator.share(shareData);
     } else if (navigator.clipboard && window.isSecureContext) {
@@ -77,52 +106,67 @@ export async function shareCurrent() {
 export function applyViewerFromUrl() {
   const params = new URLSearchParams(location.search);
   const isViewer = params.has('view') || params.get('mode') === 'view';
-  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
-  const encoded = hash.get('d');
 
-  console.log('Applying viewer from URL:', { isViewer, encoded: !!encoded }); // Debug log
+  // Support both "#d=..." and "?d=..." encodings
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const encoded = hash.get('d') || params.get('d');
+
+  console.log('Applying viewer from URL:', { isViewer, encoded: !!encoded });
 
   if (isViewer) {
     setIsViewer(true);
+    setCurrentProjectId(null); // hard reset; prevents any backend saves with stale ids
     const body = document.body;
     body.classList.add('viewer');
-    
-    // Import UI manager functions
-    import('./ui-manager.js').then(({ syncTopbarHeight, enterPreview }) => {
-      syncTopbarHeight(); // recalc to 0
-      enterPreview(); // hide editor affordances
+
+    // Disable editor-centric shortcuts in viewer
+    window.addEventListener('keydown', (e) => {
+      const k = e.key?.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && (k === 's' || k === 'z' || k === 'y')) {
+        e.preventDefault();
+      }
     });
-    
-    [...document.querySelectorAll('.layer')].forEach(el => el.setAttribute('contenteditable', 'false'));
+
+    // Hide editor affordances
+    import('./ui-manager.js').then(({ syncTopbarHeight, enterPreview }) => {
+      try { syncTopbarHeight(); } catch {}
+      try { enterPreview(); } catch {}
+    });
+
+    // Ensure any present layers are not editable
+    [...document.querySelectorAll('.layer')].forEach((el) =>
+      el.setAttribute('contenteditable', 'false')
+    );
   }
-  
+
   if (encoded) {
     try {
       const data = decodeState(encoded);
-      console.log('Decoded shared data:', data); // Debug log
-      
+      console.log('Decoded shared data:', data);
+
       historyState.lock = true;
       applyProject(data);
-      
-      // CRITICAL FIX: Ensure slides are properly loaded after applying project
+
+      // Ensure slides render after applying project
       if (data.slides && data.slides.length > 0) {
         import('./slide-manager.js').then(async ({ loadSlideIntoDOM, updateSlidesUI }) => {
           try {
             const activeIndex = Math.max(0, Math.min(data.activeIndex || 0, data.slides.length - 1));
             await loadSlideIntoDOM(data.slides[activeIndex]);
             updateSlidesUI();
-            
+
             if (isViewer) {
-              [...document.querySelectorAll('.layer')].forEach(el => el.setAttribute('contenteditable', 'false'));
+              [...document.querySelectorAll('.layer')].forEach((el) =>
+                el.setAttribute('contenteditable', 'false')
+              );
             }
           } catch (error) {
             console.error('Error loading shared slide:', error);
           }
         });
       }
-      
+
       historyState.lock = false;
-      
     } catch (error) {
       console.warn('Failed to decode shared state:', error);
       toast('Invalid share link');
@@ -138,14 +182,12 @@ export function setupShareHandler() {
   }
 }
 
-// Enhanced project building with better state capture
+// (Optional) helper if you want to capture again elsewhere before sharing
 export function buildProjectForShare() {
   try {
-    // Import current slide writer to ensure state is captured
     import('./slide-manager.js').then(({ writeCurrentSlide }) => {
       writeCurrentSlide();
     });
-    
     return buildProject();
   } catch (error) {
     console.error('Error building project for share:', error);
