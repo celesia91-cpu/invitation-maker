@@ -1,4 +1,4 @@
-// share-manager.js - Share functionality and URL handling
+// share-manager.js - Fixed sharing functionality
 
 import { encodeState, decodeState, toast } from './utils.js';
 import { buildProject, applyProject, historyState, setIsViewer } from './state-manager.js';
@@ -12,11 +12,10 @@ export function safeProjectForShare() {
       const hasRemoteSrc = /^https?:\/\//i.test(img.src || '');
       const smallRemote = hasRemoteSrc && (img.src.length < 800); // allow short remote URLs
       if (!smallRemote) {
-        // Strip only the large full-res data URL
+        // Strip only the large full-res data URL but keep transformations
         img.src = null;
       }
-      // Ensure thumb stays (we added it in writeCurrentSlide)
-      // no-op if it's already there
+      // Ensure thumb and transformations stay
     }
     return { ...s, image: img };
   });
@@ -32,30 +31,45 @@ export function buildViewerUrl() {
   return url.toString();
 }
 
-// Ensure current DOM state (image/text) is written to slides before exporting
-await (await import('./slide-manager.js')).writeCurrentSlide();
-
-
-// Share current project
+// FIXED: Share current project with proper state capture
 export async function shareCurrent() {
-  const url = buildViewerUrl();
-  const shareData = {
-    title: 'Invitation',
-    text: 'You\'re invited! Open the link to view the invitation.',
-    url
-  };
-  
   try {
+    // CRITICAL FIX: Ensure current DOM state is captured before sharing
+    const { writeCurrentSlide } = await import('./slide-manager.js');
+    writeCurrentSlide();
+    
+    // Small delay to ensure state is written
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Build viewer URL with current state
+    const url = buildViewerUrl();
+    
+    const shareData = {
+      title: 'Invitation',
+      text: 'You\'re invited! Open the link to view the invitation.',
+      url
+    };
+    
+    console.log('Sharing URL:', url); // Debug log
+    
     if (navigator.share) {
       await navigator.share(shareData);
     } else if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(url);
       toast('Link copied ✓');
     } else {
-      prompt('Copy this viewer link:', url);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      toast('Link copied ✓');
     }
-  } catch (e) {
-    // Silently handle share cancellation
+  } catch (error) {
+    console.error('Share failed:', error);
+    toast('Share failed');
   }
 }
 
@@ -65,6 +79,8 @@ export function applyViewerFromUrl() {
   const isViewer = params.has('view') || params.get('mode') === 'view';
   const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
   const encoded = hash.get('d');
+
+  console.log('Applying viewer from URL:', { isViewer, encoded: !!encoded }); // Debug log
 
   if (isViewer) {
     setIsViewer(true);
@@ -83,15 +99,33 @@ export function applyViewerFromUrl() {
   if (encoded) {
     try {
       const data = decodeState(encoded);
+      console.log('Decoded shared data:', data); // Debug log
+      
       historyState.lock = true;
       applyProject(data);
+      
+      // CRITICAL FIX: Ensure slides are properly loaded after applying project
+      if (data.slides && data.slides.length > 0) {
+        import('./slide-manager.js').then(async ({ loadSlideIntoDOM, updateSlidesUI }) => {
+          try {
+            const activeIndex = Math.max(0, Math.min(data.activeIndex || 0, data.slides.length - 1));
+            await loadSlideIntoDOM(data.slides[activeIndex]);
+            updateSlidesUI();
+            
+            if (isViewer) {
+              [...document.querySelectorAll('.layer')].forEach(el => el.setAttribute('contenteditable', 'false'));
+            }
+          } catch (error) {
+            console.error('Error loading shared slide:', error);
+          }
+        });
+      }
+      
       historyState.lock = false;
       
-      if (isViewer) {
-        [...document.querySelectorAll('.layer')].forEach(el => el.setAttribute('contenteditable', 'false'));
-      }
-    } catch (e) {
-      console.warn('Failed to decode shared state', e);
+    } catch (error) {
+      console.warn('Failed to decode shared state:', error);
+      toast('Invalid share link');
     }
   }
 }
@@ -99,5 +133,22 @@ export function applyViewerFromUrl() {
 // Setup share button handler
 export function setupShareHandler() {
   const shareBtn = document.getElementById('shareBtn');
-  shareBtn.addEventListener('click', shareCurrent);
+  if (shareBtn) {
+    shareBtn.addEventListener('click', shareCurrent);
+  }
+}
+
+// Enhanced project building with better state capture
+export function buildProjectForShare() {
+  try {
+    // Import current slide writer to ensure state is captured
+    import('./slide-manager.js').then(({ writeCurrentSlide }) => {
+      writeCurrentSlide();
+    });
+    
+    return buildProject();
+  } catch (error) {
+    console.error('Error building project for share:', error);
+    return buildProject(); // fallback
+  }
 }

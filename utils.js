@@ -1,4 +1,4 @@
-// utils.js - Utility functions and helpers
+// Enhanced utils.js with better encoding for sharing
 
 // Math and validation utilities
 export const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -58,16 +58,103 @@ export function getUrlHash() {
   return new URLSearchParams(location.hash.replace(/^#/, ''));
 }
 
-// Encoding/decoding for share functionality
+// ENHANCED: Better encoding/decoding with compression and error handling
 export function encodeState(obj) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+  try {
+    const json = JSON.stringify(obj);
+    console.log('Encoding object, JSON length:', json.length);
+    
+    // Try to compress by removing unnecessary whitespace and optimizing data
+    const compressed = compressProjectData(obj);
+    const compressedJson = JSON.stringify(compressed);
+    console.log('Compressed JSON length:', compressedJson.length);
+    
+    // Use the compressed version if significantly smaller
+    const finalJson = compressedJson.length < json.length * 0.8 ? compressedJson : json;
+    const encoded = btoa(unescape(encodeURIComponent(finalJson)));
+    
+    console.log('Final encoded length:', encoded.length);
+    return encoded;
+  } catch (error) {
+    console.error('Encoding failed:', error);
+    // Fallback to basic encoding
+    try {
+      return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    } catch (fallbackError) {
+      console.error('Fallback encoding failed:', fallbackError);
+      throw new Error('Failed to encode project data');
+    }
+  }
 }
 
 export function decodeState(encoded) {
-  return JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  try {
+    const decoded = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    console.log('Successfully decoded project data');
+    return decoded;
+  } catch (error) {
+    console.error('Decoding failed:', error);
+    throw new Error('Invalid or corrupted share link');
+  }
 }
 
-// DOM element getters
+// Compress project data for sharing
+function compressProjectData(project) {
+  const compressed = {
+    v: project.v,
+    slides: project.slides?.map(slide => ({
+      // Keep essential data only
+      image: slide.image ? {
+        // Remove src for data URLs, keep remote URLs
+        src: (slide.image.src && slide.image.src.startsWith('http')) ? slide.image.src : null,
+        thumb: slide.image.thumb,
+        cx: Math.round(slide.image.cx * 100) / 100, // Round to 2 decimal places
+        cy: Math.round(slide.image.cy * 100) / 100,
+        scale: Math.round(slide.image.scale * 1000) / 1000, // Round to 3 decimal places
+        angle: Math.round(slide.image.angle * 100) / 100,
+        flip: slide.image.flip,
+        fadeInMs: slide.image.fadeInMs,
+        fadeOutMs: slide.image.fadeOutMs
+      } : null,
+      layers: slide.layers?.map(layer => ({
+        text: layer.text,
+        left: Math.round(layer.left),
+        top: Math.round(layer.top),
+        width: layer.width,
+        fontSize: layer.fontSize,
+        fontFamily: layer.fontFamily,
+        color: layer.color,
+        fontWeight: layer.fontWeight === 'normal' ? undefined : layer.fontWeight, // Remove defaults
+        fontStyle: layer.fontStyle === 'normal' ? undefined : layer.fontStyle,
+        textDecoration: layer.textDecoration === 'none' ? undefined : layer.textDecoration,
+        padding: layer.padding === '4px 6px' ? undefined : layer.padding, // Remove default
+        fadeInMs: layer.fadeInMs,
+        fadeOutMs: layer.fadeOutMs
+      })) || [],
+      workSize: slide.workSize,
+      durationMs: slide.durationMs
+    })) || [],
+    activeIndex: project.activeIndex,
+    defaults: project.defaults,
+    rsvp: project.rsvp === 'none' ? undefined : project.rsvp, // Remove default
+    mapQuery: project.mapQuery || undefined
+  };
+  
+  // Remove undefined values to reduce size
+  return JSON.parse(JSON.stringify(compressed));
+}
+
+// Check if URL would be too long
+export function checkUrlLength(url) {
+  const maxLength = 2048; // Safe length for most browsers
+  if (url.length > maxLength) {
+    console.warn(`URL length (${url.length}) exceeds safe limit (${maxLength})`);
+    return false;
+  }
+  return true;
+}
+
+// DOM element getters (unchanged)
 export function getElements() {
   return {
     body: document.body,
