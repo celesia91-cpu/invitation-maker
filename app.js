@@ -842,15 +842,15 @@ function setupEventHandlers() {
   // Image management handlers
   const imgScale = document.getElementById('imgScale');
   const imgRotate = document.getElementById('imgRotate');
-  const imgFlipBtn = document.getElementById('imgFlip');
-  const imgDeleteBtn = document.getElementById('imgDelete');
+  const imgFlip = document.getElementById('imgFlip');
+  const imgDelete = document.getElementById('imgDelete');
   const uploadBgBtn = document.getElementById('uploadBgBtn');
   const bgFileInput = document.getElementById('bgFileInput');
 
   imgScale?.addEventListener('input', (e) => handleImageScale(e.target.value));
   imgRotate?.addEventListener('input', (e) => handleImageRotate(e.target.value));
-  imgFlipBtn?.addEventListener('click', handleImageFlip);
-  imgDeleteBtn?.addEventListener('click', deleteImage);
+  imgFlip?.addEventListener('click', handleImageFlip);
+  imgDelete?.addEventListener('click', deleteImage);
   
   uploadBgBtn?.addEventListener('click', () => bgFileInput?.click());
   bgFileInput?.addEventListener('change', (e) => {
@@ -999,7 +999,7 @@ function setupImageDragHandlers() {
       const dy = e.clientY - dragState.startY;
       
       if (dragState.handleType === 'rotate') {
-        // Rotation handle: convert radians to degrees for consistency
+        // Rotation handle: keep radians (renderer expects radians)
         const angleRad = Math.atan2(e.clientY - dragState.centerY, e.clientX - dragState.centerX);
         imgState.angle = angleRad;
       } else {
@@ -1032,7 +1032,8 @@ function setupImageDragHandlers() {
 async function init() {
   try {
     // If purchased design mode is active, let it handle initialization
-    if (purchasedDesignEditor) {
+    if (isPurchasedDesign) {
+      purchasedDesignEditor = new PurchasedDesignEditor(token);
       await purchasedDesignEditor.init();
       return;
     }
@@ -1074,6 +1075,7 @@ async function init() {
     // Observe work area for responsive scaling
     const work = document.querySelector('#work');
     if (work) {
+      const workRO = new ResizeObserver(() => handleWorkResize());
       workRO.observe(work);
     }
     
@@ -1122,13 +1124,6 @@ async function init() {
       statusText.textContent = 'Failed to load editor';
     }
   }
-}
-
-// -----------------------
-// Instantiate purchased design editor AFTER class definition
-// -----------------------
-if (isPurchasedDesign) {
-  purchasedDesignEditor = new PurchasedDesignEditor(token);
 }
 
 // -----------------------
