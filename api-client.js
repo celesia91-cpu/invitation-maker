@@ -1,4 +1,4 @@
-// api-client.js - Complete API client for invitation maker backend
+// api-client.js - Fixed version without localStorage (Claude-compatible)
 
 class APIClient {
   constructor(baseURL) {
@@ -23,9 +23,15 @@ class APIClient {
     this.setupInterceptors();
     this.isRetrying = false;
     this._debug = false;
+    
+    // FIXED: In-memory session storage for tokens
+    this._sessionData = {
+      token: null,
+      user: null,
+      lastActivity: null
+    };
   }
 
-  // Setup method (was called but not defined)
   setupInterceptors() {
     // Store original fetch for potential restoration
     this._originalFetch = window.fetch;
@@ -34,50 +40,93 @@ class APIClient {
     this._log('API Client initialized with base URL:', this.baseURL);
   }
 
-  // Enhanced token management
+  // FIXED: In-memory token management instead of localStorage
   loadToken() {
     try {
-      const token = localStorage.getItem('auth_token');
-      // Validate token format
-      if (token && typeof token === 'string' && token.length > 10) {
-        return token;
+      // Try to restore from session data first
+      if (this._sessionData && this._sessionData.token) {
+        // Check if session is still valid (24 hour limit)
+        const lastActivity = this._sessionData.lastActivity;
+        if (lastActivity && (Date.now() - lastActivity) < 24 * 60 * 60 * 1000) {
+          this._log('Token restored from session');
+          return this._sessionData.token;
+        }
       }
+      
+      // If no valid session, return null
       return null;
     } catch (error) {
-      console.warn('Failed to load token from localStorage:', error);
+      console.warn('Failed to load token from session:', error);
       return null;
     }
   }
 
+  // FIXED: Save token to in-memory session
   saveToken(token) {
     try {
       if (token && typeof token === 'string') {
-        localStorage.setItem('auth_token', token);
+        this._sessionData.token = token;
+        this._sessionData.lastActivity = Date.now();
         this.token = token;
-        this._log('Token saved successfully');
+        this._log('Token saved to session successfully');
       } else {
         this.clearToken();
       }
     } catch (error) {
-      console.warn('Failed to save token to localStorage:', error);
-      // Continue without localStorage if it fails
+      console.warn('Failed to save token to session:', error);
+      // Still set token even if session fails
       this.token = token;
     }
   }
 
+  // FIXED: Clear token from in-memory session
   clearToken() {
     try {
-      localStorage.removeItem('auth_token');
-      this._log('Token cleared from localStorage');
+      this._sessionData.token = null;
+      this._sessionData.user = null;
+      this._sessionData.lastActivity = null;
+      this._log('Token cleared from session');
     } catch (error) {
-      console.warn('Failed to clear token from localStorage:', error);
+      console.warn('Failed to clear token from session:', error);
     }
     this.token = null;
   }
 
-  // Enhanced request method with better error handling
+  // NEW: Session management methods
+  isSessionValid() {
+    if (!this._sessionData.token) return false;
+    if (!this._sessionData.lastActivity) return false;
+    
+    // Session expires after 24 hours of inactivity
+    const sessionAge = Date.now() - this._sessionData.lastActivity;
+    return sessionAge < 24 * 60 * 60 * 1000;
+  }
+
+  refreshSession() {
+    if (this._sessionData.token) {
+      this._sessionData.lastActivity = Date.now();
+    }
+  }
+
+  // NEW: Save user data to session
+  saveUser(user) {
+    if (user && typeof user === 'object') {
+      this._sessionData.user = user;
+      this._sessionData.lastActivity = Date.now();
+    }
+  }
+
+  // NEW: Get user data from session
+  getUser() {
+    return this._sessionData.user;
+  }
+
+  // Enhanced request method with session refresh
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    
+    // Refresh session activity on each request
+    this.refreshSession();
     
     const config = {
       headers: {
@@ -87,8 +136,8 @@ class APIClient {
       ...options
     };
 
-    // Add authorization header if token exists and not already set
-    if (this.token && !config.headers.Authorization) {
+    // Add authorization header if token exists and session is valid
+    if (this.token && this.isSessionValid() && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${this.token}`;
     }
 
@@ -150,7 +199,7 @@ class APIClient {
     }
   }
 
-  // HTTP method helpers (these were missing!)
+  // HTTP method helpers (unchanged)
   async get(endpoint, params = {}) {
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `${endpoint}?${queryString}` : endpoint;
@@ -176,13 +225,16 @@ class APIClient {
     return this.request(endpoint, { method: 'DELETE' });
   }
 
-  // Enhanced authentication methods
+  // Enhanced authentication methods with session management
   async register(userData) {
     this.isRetrying = true;
     try {
       const response = await this.post('/auth/register', userData);
       if (response.token) {
         this.saveToken(response.token);
+      }
+      if (response.user) {
+        this.saveUser(response.user);
       }
       return response;
     } finally {
@@ -197,6 +249,9 @@ class APIClient {
       if (response.token) {
         this.saveToken(response.token);
       }
+      if (response.user) {
+        this.saveUser(response.user);
+      }
       return response;
     } finally {
       this.isRetrying = false;
@@ -210,10 +265,21 @@ class APIClient {
   }
 
   async getCurrentUser() {
-    return this.get('/auth/me');
+    // Try session first, then API
+    const sessionUser = this.getUser();
+    if (sessionUser && this.isSessionValid()) {
+      return { user: sessionUser };
+    }
+    
+    // Fallback to API call
+    const response = await this.get('/auth/me');
+    if (response.user) {
+      this.saveUser(response.user);
+    }
+    return response;
   }
 
-  // Project management endpoints
+  // Project management endpoints (unchanged)
   async getProjects() {
     return this.get('/projects');
   }
@@ -234,7 +300,7 @@ class APIClient {
     return this.delete(`/projects/${projectId}`);
   }
 
-  // Enhanced image upload with better error handling
+  // Enhanced image upload with better error handling (unchanged)
   async uploadImage(file) {
     if (!file) {
       throw new Error('No file provided');
@@ -253,7 +319,7 @@ class APIClient {
     }
 
     // Check if user is authenticated
-    if (!this.token) {
+    if (!this.token || !this.isSessionValid()) {
       throw new Error('Authentication required for image upload');
     }
 
@@ -274,7 +340,7 @@ class APIClient {
     }
   }
 
-  // Purchased design editor endpoints
+  // Purchased design editor endpoints (unchanged)
   async loadCustomerDesign(token) {
     return this.get(`/editor/${token}`);
   }
@@ -287,17 +353,17 @@ class APIClient {
     return this.get(`/editor/${token}/rsvps`);
   }
 
-  // RSVP endpoints
+  // RSVP endpoints (unchanged)
   async submitRSVP(rsvpData) {
     return this.post('/rsvp/submit', rsvpData);
   }
 
   // Utility methods
   isAuthenticated() {
-    return !!this.token;
+    return !!(this.token && this.isSessionValid());
   }
 
-  // Enhanced error handling helper
+  // Enhanced error handling helper (unchanged)
   handleError(error) {
     console.error('API Error:', error);
     
@@ -340,7 +406,7 @@ class APIClient {
     return errorMessage;
   }
 
-  // Enhanced retry mechanism
+  // Enhanced retry mechanism (unchanged)
   async retryRequest(requestFn, maxRetries = 3, delay = 1000) {
     let lastError;
     
@@ -369,7 +435,7 @@ class APIClient {
     throw lastError;
   }
 
-  // Batch upload for multiple images
+  // Batch upload for multiple images (unchanged)
   async uploadImages(files) {
     const uploads = Array.from(files).map(file => this.uploadImage(file));
     
@@ -380,7 +446,7 @@ class APIClient {
     }
   }
 
-  // Configuration methods
+  // Configuration methods (unchanged)
   setBaseURL(url) {
     this.baseURL = url;
     this._log('Base URL updated to:', url);
@@ -390,7 +456,7 @@ class APIClient {
     return this.baseURL;
   }
 
-  // Health check with timeout
+  // Health check with timeout (unchanged)
   async healthCheck() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
@@ -410,13 +476,14 @@ class APIClient {
     }
   }
 
-  // Debug helper
+  // Debug helper (unchanged)
   debug(enabled = true) {
     this._debug = enabled;
     if (enabled) {
       console.log('API Client Debug Mode Enabled');
       console.log('Base URL:', this.baseURL);
       console.log('Token:', this.token ? 'Present' : 'Not set');
+      console.log('Session Valid:', this.isSessionValid());
     }
   }
 
