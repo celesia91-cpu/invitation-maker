@@ -1,4 +1,4 @@
-// ui-manager.js - Updated with fixed RSVP system
+// ui-manager.js - Updated with fixed RSVP system + preview image rehydrate
 
 import { setTransforms } from './image-manager.js';
 import { resetOpacities } from './slide-manager.js';
@@ -17,8 +17,8 @@ export function setMobileTopbarCollapsed(collapsed) {
   const topbarToggle = document.getElementById('topbarToggle');
   
   body.classList.toggle('mb-topbar-collapsed', collapsed);
-  topbarToggle.setAttribute('aria-expanded', String(!collapsed));
-  topbarToggle.textContent = collapsed ? '▾' : '▴';
+  topbarToggle?.setAttribute('aria-expanded', String(!collapsed));
+  if (topbarToggle) topbarToggle.textContent = collapsed ? '▾' : '▴';
   syncTopbarHeight();
 }
 
@@ -27,7 +27,7 @@ export function initializeResponsive() {
   window.addEventListener('resize', syncTopbarHeight);
   
   const topbarToggle = document.getElementById('topbarToggle');
-  topbarToggle.addEventListener('click', () => {
+  topbarToggle?.addEventListener('click', () => {
     const body = document.body;
     const collapsed = !body.classList.contains('mb-topbar-collapsed');
     setMobileTopbarCollapsed(collapsed);
@@ -53,7 +53,7 @@ export function openPanel() {
   body.classList.add('panel-open');
   togglePanelBtn?.setAttribute('aria-expanded', 'true');
   previewBtn?.setAttribute('aria-pressed', 'false');
-  previewBtn && (previewBtn.textContent = 'Preview');
+  if (previewBtn) previewBtn.textContent = 'Preview';
   setTransforms();
 }
 
@@ -79,13 +79,18 @@ export function enterPreview() {
   const body = document.body;
   const previewBtn = document.getElementById('previewBtn');
   const work = document.querySelector('#work');
+
+  // Persist any pending changes before hiding editor UI (prevents state loss)
+  import('./slide-manager.js')
+    .then(({ writeCurrentSlide }) => writeCurrentSlide())
+    .catch(() => {});
   
   body.classList.add('preview');
   closePanel();
   hideGuides();
   previewBtn?.setAttribute('aria-pressed', 'true');
-  previewBtn && (previewBtn.textContent = 'Exit Preview');
-  [...work.querySelectorAll('.layer')].forEach(l => l.style.outline = '');
+  if (previewBtn) previewBtn.textContent = 'Exit Preview';
+  [...(work?.querySelectorAll('.layer') || [])].forEach(l => l.style.outline = '');
   setTransforms();
 }
 
@@ -95,9 +100,33 @@ export function exitPreview() {
   
   body.classList.remove('preview');
   previewBtn?.setAttribute('aria-pressed', 'false');
-  previewBtn && (previewBtn.textContent = 'Preview');
+  if (previewBtn) previewBtn.textContent = 'Preview';
   setTransforms();
   resetOpacities();
+
+  // ---- SAFEGUARD: if the image element lost its src, rehydrate from slide data ----
+  (async () => {
+    const userBg = document.getElementById('userBg');
+    if (userBg && !userBg.src) {
+      try {
+        const [{ getSlides, getActiveIndex }, { loadSlideIntoDOM }, { imgState }] = await Promise.all([
+          import('./state-manager.js'),
+          import('./slide-manager.js'),
+          import('./image-manager.js'),
+        ]);
+        const s = getSlides();
+        const current = s[getActiveIndex()];
+        if (current?.image && (current.image.src || current.image.thumb)) {
+          // Force the normal loader path so width/height/transform are reapplied
+          imgState.has = false;
+          await loadSlideIntoDOM(current);
+          setTransforms();
+        }
+      } catch (err) {
+        console.warn('Image rehydrate failed after exiting preview:', err);
+      }
+    }
+  })().catch(() => {});
 }
 
 export function togglePreview() {
@@ -113,15 +142,15 @@ export function togglePreview() {
 export function showGuides({ v = false, h = false } = {}) {
   const vGuide = document.getElementById('vGuide');
   const hGuide = document.getElementById('hGuide');
-  vGuide.style.display = v ? 'block' : 'none';
-  hGuide.style.display = h ? 'block' : 'none';
+  if (vGuide) vGuide.style.display = v ? 'block' : 'none';
+  if (hGuide) hGuide.style.display = h ? 'block' : 'none';
 }
 
 export function hideGuides() {
   const vGuide = document.getElementById('vGuide');
   const hGuide = document.getElementById('hGuide');
-  vGuide.style.display = 'none';
-  hGuide.style.display = 'none';
+  if (vGuide) vGuide.style.display = 'none';
+  if (hGuide) hGuide.style.display = 'none';
 }
 
 // Event handlers setup
@@ -132,7 +161,7 @@ export function setupUIEventHandlers() {
   
   togglePanelBtn?.addEventListener('click', togglePanel);
   previewBtn?.addEventListener('click', togglePreview);
-  backdrop.addEventListener('click', closePanel);
+  backdrop?.addEventListener('click', closePanel);
   
   // Keyboard shortcuts
   window.addEventListener('keydown', (e) => {
