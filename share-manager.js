@@ -3,8 +3,7 @@
 import { encodeState, decodeState, toast } from './utils.js';
 import { 
   buildProject, 
-  applyProject, 
-  historyState, 
+  applyProject,
   setIsViewer,
   setCurrentProjectId // <-- ensure this exists (we added it in state-manager)
 } from './state-manager.js';
