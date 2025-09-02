@@ -2,6 +2,7 @@
 
 // Import all managers and utilities
 import { workSize } from './utils.js';
+import { initializeRsvpSystem } from './fixed-rsvp-system.js';
 import { 
   loadProject, 
   saveProjectDebounced, 
@@ -1061,7 +1062,7 @@ async function init() {
     // Initialize UI components
     initializeResponsive();
     setupUIEventHandlers();
-    setupRsvpHandlers();
+    initializeRsvpSystem();
     setupMapHandlers();
     setupShareHandler();
     initializeForMode();

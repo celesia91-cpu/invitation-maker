@@ -1,7 +1,8 @@
-// ui-manager.js - UI state management and responsive behavior
+// ui-manager.js - Updated with fixed RSVP system
 
 import { setTransforms } from './image-manager.js';
 import { resetOpacities } from './slide-manager.js';
+import { initializeRsvpSystem } from './fixed-rsvp-system.js';
 
 // Top bar and mobile responsiveness
 export function syncTopbarHeight() {
@@ -163,86 +164,96 @@ export function initializeForMode() {
       }
     } else {
       closePanel();
+      // CRITICAL FIX: Ensure RSVP bar is visible and positioned in viewer mode
+      setupViewerRsvp();
     }
   });
   
   setMobileTopbarCollapsed(false);
 }
 
-// RSVP UI management
-export function setupRsvpHandlers() {
-  const rsvpYes = document.getElementById('rsvpYes');
-  const rsvpMaybe = document.getElementById('rsvpMaybe');
-  const rsvpNo = document.getElementById('rsvpNo');
-  const rsvpMap = document.getElementById('rsvpMap');
-  const mapGroup = document.getElementById('mapGroup');
-  const mapInput = document.getElementById('mapInput');
-  
-  import('./state-manager.js').then(({ handleRsvpChoice, getMapQuery, handleMapQuery, getMapUrl }) => {
-    rsvpYes.addEventListener('click', () => handleRsvpChoice('yes'));
-    rsvpMaybe.addEventListener('click', () => handleRsvpChoice('maybe'));
-    rsvpNo.addEventListener('click', () => handleRsvpChoice('no'));
-    
-    rsvpMap.addEventListener('click', () => {
-      const q = (getMapQuery() || '').trim();
-      if (!q) {
-        openPanel();
-        setTimeout(() => {
-          mapGroup?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          mapInput?.focus();
-        }, 50);
-        return;
-      }
-      window.open(getMapUrl(), '_blank', 'noopener,noreferrer');
-    });
-  });
+// FIXED: Setup RSVP for viewer mode
+function setupViewerRsvp() {
+  const rsvpBar = document.getElementById('rsvpBar');
+  if (rsvpBar) {
+    // Ensure RSVP bar is visible in viewer mode
+    rsvpBar.style.display = 'flex';
+    rsvpBar.style.position = 'fixed';
+    rsvpBar.style.bottom = 'max(12px, env(safe-area-inset-bottom))';
+    rsvpBar.style.left = 'max(12px, env(safe-area-inset-left))';
+    rsvpBar.style.right = 'max(12px, env(safe-area-inset-right))';
+    rsvpBar.style.zIndex = '1200';
+    rsvpBar.style.pointerEvents = 'auto';
+    console.log('RSVP bar setup for viewer mode');
+  }
 }
 
-// Map controls
+// UPDATED: Setup RSVP handlers with new system
+export function setupRsvpHandlers() {
+  // Use the new RSVP system
+  initializeRsvpSystem();
+}
+
+// Map controls (unchanged but improved error handling)
 export function setupMapHandlers() {
   const mapInput = document.getElementById('mapInput');
   const mapOpenBtn = document.getElementById('mapOpenBtn');
   const mapCopyBtn = document.getElementById('mapCopyBtn');
   
+  if (!mapInput || !mapOpenBtn || !mapCopyBtn) {
+    console.warn('Map elements not found');
+    return;
+  }
+  
   import('./state-manager.js').then(({ handleMapQuery, getMapUrl }) => {
-    mapInput?.addEventListener('input', (e) => handleMapQuery(e.target.value));
+    mapInput.addEventListener('input', (e) => handleMapQuery(e.target.value));
     
-    mapOpenBtn?.addEventListener('click', () => {
-      const q = (mapInput.value || '').trim();
-      if (!q) {
+    mapOpenBtn.addEventListener('click', () => {
+      const query = (mapInput.value || '').trim();
+      if (!query) {
         mapInput.focus();
         return;
       }
-      handleMapQuery(q);
+      handleMapQuery(query);
       window.open(getMapUrl(), '_blank', 'noopener,noreferrer');
     });
     
-    mapCopyBtn?.addEventListener('click', async () => {
-      const q = (mapInput.value || '').trim();
-      if (!q) {
+    mapCopyBtn.addEventListener('click', async () => {
+      const query = (mapInput.value || '').trim();
+      if (!query) {
         mapInput.focus();
         return;
       }
-      handleMapQuery(q);
+      handleMapQuery(query);
       const url = getMapUrl();
+      
       try {
         await navigator.clipboard.writeText(url);
-        const old = mapCopyBtn.textContent;
+        const originalText = mapCopyBtn.textContent;
         mapCopyBtn.textContent = 'Copied!';
-        setTimeout(() => mapCopyBtn.textContent = old, 900);
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        document.body.appendChild(ta);
-        ta.select();
+        setTimeout(() => mapCopyBtn.textContent = originalText, 1200);
+      } catch (clipboardError) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = url;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '-1000px';
+        document.body.appendChild(textArea);
+        textArea.select();
         document.execCommand('copy');
-        document.body.removeChild(ta);
+        document.body.removeChild(textArea);
+        
+        const originalText = mapCopyBtn.textContent;
+        mapCopyBtn.textContent = 'Copied!';
+        setTimeout(() => mapCopyBtn.textContent = originalText, 1200);
       }
     });
+  }).catch(error => {
+    console.error('Failed to setup map handlers:', error);
   });
 }
 
-// Fullscreen functionality for viewer mode
+// Fullscreen functionality for viewer mode (enhanced)
 export function initializeViewerFullscreen() {
   const body = document.body;
   const isViewer = body.classList.contains('viewer');
@@ -276,7 +287,8 @@ export function initializeViewerFullscreen() {
       if (docEl.requestFullscreen) await docEl.requestFullscreen();
       else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
       hideOverlay();
-    } catch (e) {
+    } catch (error) {
+      console.warn('Fullscreen request failed:', error);
       showOverlay();
     }
   }
