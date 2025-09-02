@@ -1,4 +1,4 @@
-// app.js - Main application entry point with purchased design integration
+// app.js - Main application entry point with purchased design integration (bug-fixed)
 
 // Import all managers and utilities
 import { workSize } from './utils.js';
@@ -67,30 +67,45 @@ import {
 } from './share-manager.js';
 import { apiClient } from './api-client.js';
 
-// Check for purchased design mode
-let purchasedDesignEditor = null;
+// -----------------------
+// Utilities
+// -----------------------
+const esc = (s = '') => String(s).replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[c]));
+
+// -----------------------
+// Purchased design token parsing
+// -----------------------
 const urlPath = window.location.pathname;
 const urlParams = new URLSearchParams(window.location.search);
-const token = urlParams.get('token') || urlPath.split('/').pop();
+const pathLast = urlPath.replace(/\/+$/,'').split('/').pop() || '';
+const token = urlParams.get('token') || pathLast;
+const isPurchasedDesign = /^acc_[A-Za-z0-9_-]+$/.test(token);
 
-// Check if this is a purchased design access (token starts with 'acc_')
-const isPurchasedDesign = token && token.startsWith('acc_');
+// Instance placeholder (instantiate AFTER class definition)
+let purchasedDesignEditor = null;
 
-if (isPurchasedDesign) {
-  // Initialize purchased design mode
-  purchasedDesignEditor = new PurchasedDesignEditor(token);
-}
-
+// -----------------------
 // Purchased Design Editor Class
+// -----------------------
 class PurchasedDesignEditor {
   constructor(token) {
     this.token = token;
     this.customer = null;
     this.customization = null;
     this.autoSaveInterval = null;
+    this.isInitialized = false;
+    this.unloadHandler = null;
+    // save de-dupe
+    this._saving = false;
+    this._saveQueued = false;
+    this._savedTimer = null;
   }
 
   async init() {
+    if (this.isInitialized) return;
+
     try {
       const data = await this.loadCustomerDesign();
       this.customer = data.customer;
@@ -99,11 +114,14 @@ class PurchasedDesignEditor {
       this.updateUIForPurchasedDesign();
       await this.loadPurchasedDesign();
       this.setupAutoSave();
-      this.setupRSVPTracking();
+      // Removed duplicate setupRSVPHandlers call here; it is invoked in addRSVPPanel()
       this.showAccessStatus();
+
+      this.isInitialized = true;
       
     } catch (error) {
-      this.showAccessError(error.message);
+      console.error('Failed to initialize purchased design editor:', error);
+      this.showAccessError(esc(error.message || 'Failed to initialize'));
     }
   }
 
@@ -120,50 +138,48 @@ class PurchasedDesignEditor {
 
   updateUIForPurchasedDesign() {
     // Update page title
-    document.title = `Customize ${this.customer.designTitle} - Invitation Editor`;
+    document.title = `Customize ${this.customer?.designTitle || ''} - Invitation Editor`;
     
-    // Update status text
+    // Update status text (escaped)
     const statusText = document.getElementById('statusText');
-    if (statusText) {
+    if (statusText && this.customer) {
       statusText.innerHTML = `
-        <span style="color: #10b981;">${this.customer.designTitle}</span> • 
-        <span style="color: #6b7280;">${this.customer.daysRemaining} days left</span>
+        <span style="color:#10b981;">${esc(this.customer.designTitle)}</span> • 
+        <span style="color:#6b7280;">${esc(String(this.customer.daysRemaining))} days left</span>
       `;
     }
     
-    // Add customer info panel
+    // Add customer info & RSVP panel
     this.addCustomerInfoPanel();
-    
-    // Add RSVP tracking panel
     this.addRSVPPanel();
   }
 
   addCustomerInfoPanel() {
     const sidepanel = document.querySelector('.sidepanel .panel-body');
-    if (!sidepanel) return;
+    if (!sidepanel || !this.customer) return;
 
     const customerSection = document.createElement('section');
     customerSection.className = 'group';
     customerSection.innerHTML = `
       <div class="group-title">Your Design</div>
       <div class="customer-info-card">
-        <div class="design-title">${this.customer.designTitle}</div>
+        <div class="design-title">${esc(this.customer.designTitle)}</div>
         <div class="design-meta">
           <div class="meta-item">
             <span class="label">Category:</span>
-            <span class="value">${this.customer.designCategory}</span>
+            <span class="value">${esc(this.customer.designCategory)}</span>
           </div>
           <div class="meta-item">
             <span class="label">Purchased:</span>
-            <span class="value">${new Date(this.customer.purchasedAt).toLocaleDateString()}</span>
+            <span class="value">${esc(new Date(this.customer.purchasedAt).toLocaleDateString())}</span>
           </div>
           <div class="meta-item">
             <span class="label">Access expires:</span>
-            <span class="value ${this.customer.daysRemaining < 30 ? 'expiring' : ''}">${new Date(this.customer.expiresAt).toLocaleDateString()}</span>
+            <span class="value ${this.customer.daysRemaining < 30 ? 'expiring' : ''}">${esc(new Date(this.customer.expiresAt).toLocaleDateString())}</span>
           </div>
           <div class="meta-item">
             <span class="label">Last saved:</span>
-            <span class="value">${this.customization.lastSaved ? new Date(this.customization.lastSaved).toLocaleString() : 'Never'}</span>
+            <span class="value">${this.customization?.lastSaved ? esc(new Date(this.customization.lastSaved).toLocaleString()) : 'Never'}</span>
           </div>
         </div>
       </div>
@@ -182,7 +198,7 @@ class PurchasedDesignEditor {
       <div class="group-title">Event & RSVPs</div>
       <div class="row">
         <label for="eventTitle">Event Title</label>
-        <input type="text" id="eventTitle" placeholder="e.g., Sarah & John's Wedding">
+        <input type="text" id="eventTitle" placeholder="e.g., Sarah &amp; John's Wedding">
       </div>
       <div class="row">
         <label for="eventDate">Event Date</label>
@@ -225,7 +241,7 @@ class PurchasedDesignEditor {
     const eventLocation = document.getElementById('eventLocation');
 
     // Load existing event details
-    if (this.customization.eventDetails) {
+    if (this.customization?.eventDetails) {
       const details = this.customization.eventDetails;
       if (eventTitle) eventTitle.value = details.title || '';
       if (eventDate) eventDate.value = details.date || '';
@@ -263,14 +279,14 @@ class PurchasedDesignEditor {
 
   async loadPurchasedDesign() {
     try {
-      const slides = this.customization.slides;
+      const slides = this.customization.slides || [];
       
-      // Apply slides to state management
-      const { setSlides, setActiveIndex, applyProject } = await import('./state-manager.js');
+      // Dynamically import state management functions
+      const { applyProject } = await import('./state-manager.js');
       
       const project = {
         v: 62,
-        slides: slides,
+        slides,
         activeIndex: 0,
         defaults: {
           fontFamily: 'Dancing Script, cursive',
@@ -278,15 +294,18 @@ class PurchasedDesignEditor {
           fontColor: '#ffffff'
         },
         rsvp: 'none',
-        mapQuery: this.customization.eventDetails?.location || ''
+        mapQuery: this.customization?.eventDetails?.location || ''
       };
 
       applyProject(project);
       
-      // Load first slide
+      // Load first slide if available
       if (slides.length > 0) {
+        const { loadSlideIntoDOM } = await import('./slide-manager.js');
         await loadSlideIntoDOM(slides[0]);
       }
+      
+      const { updateSlidesUI } = await import('./slide-manager.js');
       updateSlidesUI();
 
     } catch (error) {
@@ -296,17 +315,33 @@ class PurchasedDesignEditor {
   }
 
   setupAutoSave() {
+    // Clear existing interval if any
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+    }
+    
     this.autoSaveInterval = setInterval(() => {
       this.saveCustomization();
     }, 30000);
 
-    window.addEventListener('beforeunload', () => {
+    // Save on page unload
+    const handleUnload = () => {
       this.saveCustomization();
-    });
+    };
+    
+    window.addEventListener('beforeunload', handleUnload);
+    
+    // Store reference to remove listener if needed
+    this.unloadHandler = handleUnload;
   }
 
   async saveCustomization() {
+    if (!this.isInitialized) return;
+    if (this._saving) { this._saveQueued = true; return; }
+    this._saving = true;
+    
     try {
+      // Dynamically import to avoid circular dependencies
       const { getSlides } = await import('./state-manager.js');
       const slides = getSlides();
 
@@ -323,19 +358,34 @@ class PurchasedDesignEditor {
       });
 
       if (response.ok) {
-        const statusText = document.getElementById('statusText');
-        if (statusText) {
-          const originalContent = statusText.innerHTML;
-          statusText.innerHTML = originalContent + ' <span style="color: #10b981;">• Saved</span>';
-          setTimeout(() => {
-            statusText.innerHTML = originalContent;
-          }, 2000);
-        }
+        this.showSaveSuccess();
+      } else {
+        const error = await response.json().catch(() => ({}));
+        console.error('Save failed:', error);
       }
 
     } catch (error) {
       console.error('Auto-save failed:', error);
+    } finally {
+      this._saving = false;
+      if (this._saveQueued) { this._saveQueued = false; this.saveCustomization(); }
     }
+  }
+
+  showSaveSuccess() {
+    const statusText = document.getElementById('statusText');
+    if (!statusText) return;
+
+    let badge = document.getElementById('savedBadge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.id = 'savedBadge';
+      badge.style.cssText = 'margin-left:6px;color:#10b981;';
+      statusText.appendChild(badge);
+    }
+    badge.textContent = '• Saved';
+    clearTimeout(this._savedTimer);
+    this._savedTimer = setTimeout(() => { badge?.remove(); }, 1500);
   }
 
   async saveEventDetails() {
@@ -347,7 +397,7 @@ class PurchasedDesignEditor {
 
     try {
       const { getSlides } = await import('./state-manager.js');
-      const response = await fetch(`/api/editor/${this.token}/save`, {
+      await fetch(`/api/editor/${this.token}/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slides: getSlides(), eventDetails })
@@ -363,9 +413,9 @@ class PurchasedDesignEditor {
       const data = await response.json();
       
       if (response.ok) {
-        document.getElementById('totalRsvps').textContent = data.stats.total;
-        document.getElementById('yesCount').textContent = data.stats.yes;
-        document.getElementById('totalGuests').textContent = data.stats.totalGuests;
+        document.getElementById('totalRsvps').textContent = String(data.stats.total);
+        document.getElementById('yesCount').textContent = String(data.stats.yes);
+        document.getElementById('totalGuests').textContent = String(data.stats.totalGuests);
       }
 
     } catch (error) {
@@ -379,7 +429,7 @@ class PurchasedDesignEditor {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Failed to load RSVPs');
       }
       
       const modal = document.createElement('div');
@@ -393,24 +443,24 @@ class PurchasedDesignEditor {
           </div>
           <div class="modal-body">
             <div class="rsvp-summary">
-              <div class="response-count yes">Yes: ${data.stats.yes}</div>
-              <div class="response-count no">No: ${data.stats.no}</div>
-              <div class="response-count maybe">Maybe: ${data.stats.maybe}</div>
-              <div class="response-count total">Total Guests: ${data.stats.totalGuests}</div>
+              <div class="response-count yes">Yes: ${esc(data.stats.yes)}</div>
+              <div class="response-count no">No: ${esc(data.stats.no)}</div>
+              <div class="response-count maybe">Maybe: ${esc(data.stats.maybe)}</div>
+              <div class="response-count total">Total Guests: ${esc(data.stats.totalGuests)}</div>
             </div>
             
             <div class="rsvp-list">
               ${data.rsvps.map(rsvp => `
                 <div class="rsvp-item">
                   <div class="guest-name">
-                    ${rsvp.guest_name}
-                    <span class="guest-response ${rsvp.response}">${rsvp.response}</span>
+                    ${esc(rsvp.guest_name)}
+                    <span class="guest-response ${esc(rsvp.response)}">${esc(rsvp.response)}</span>
                   </div>
-                  ${rsvp.guest_email ? `<div class="guest-email">${rsvp.guest_email}</div>` : ''}
-                  ${rsvp.plus_one_count > 0 ? `<div class="plus-ones">+${rsvp.plus_one_count} guest(s)</div>` : ''}
-                  ${rsvp.dietary_restrictions ? `<div class="dietary">Dietary: ${rsvp.dietary_restrictions}</div>` : ''}
-                  ${rsvp.message ? `<div class="message">"${rsvp.message}"</div>` : ''}
-                  <div class="submitted-date">${new Date(rsvp.submitted_at).toLocaleDateString()}</div>
+                  ${rsvp.guest_email ? `<div class="guest-email">${esc(rsvp.guest_email)}</div>` : ''}
+                  ${rsvp.plus_one_count > 0 ? `<div class="plus-ones">+${esc(String(rsvp.plus_one_count))} guest(s)</div>` : ''}
+                  ${rsvp.dietary_restrictions ? `<div class="dietary">Dietary: ${esc(rsvp.dietary_restrictions)}</div>` : ''}
+                  ${rsvp.message ? `<div class="message">"${esc(rsvp.message)}"</div>` : ''}
+                  <div class="submitted-date">${esc(new Date(rsvp.submitted_at).toLocaleDateString())}</div>
                 </div>
               `).join('')}
             </div>
@@ -429,7 +479,7 @@ class PurchasedDesignEditor {
       });
 
     } catch (error) {
-      this.showError('Failed to load RSVPs: ' + error.message);
+      this.showError('Failed to load RSVPs: ' + esc(error.message));
     }
   }
 
@@ -455,11 +505,13 @@ class PurchasedDesignEditor {
         this.showSuccess('Invitation link copied to clipboard!');
       });
     } else {
+      // eslint-disable-next-line no-alert
       prompt('Copy this invitation link to share with your guests:', shareUrl);
     }
   }
 
   showAccessStatus() {
+    if (!this.customer) return;
     if (this.customer.daysRemaining < 30) {
       const warning = document.createElement('div');
       warning.className = 'access-warning';
@@ -477,11 +529,13 @@ class PurchasedDesignEditor {
       `;
       warning.innerHTML = `
         <strong>Access Expiring Soon!</strong>
-        Your access expires in ${this.customer.daysRemaining} days (${new Date(this.customer.expiresAt).toLocaleDateString()}).
+        Your access expires in ${esc(String(this.customer.daysRemaining))} days (${esc(new Date(this.customer.expiresAt).toLocaleDateString())}).
         Make sure to complete and share your invitation before then.
+        <button id="dismissAccessWarn" style="margin-left:10px; padding:2px 6px; border:none; border-radius:4px; cursor:pointer;">✕</button>
       `;
       
       document.body.appendChild(warning);
+      warning.querySelector('#dismissAccessWarn')?.addEventListener('click', () => warning.remove());
     }
   }
 
@@ -490,7 +544,7 @@ class PurchasedDesignEditor {
       <div style="position: fixed; inset: 0; background: linear-gradient(135deg, #0f1a2d, #1a2332); display: flex; align-items: center; justify-content: center; padding: 2rem;">
         <div style="background: white; border-radius: 18px; padding: 3rem; max-width: 500px; text-align: center;">
           <h1 style="color: #1f2937; margin-bottom: 1rem;">Access Expired or Invalid</h1>
-          <p style="color: #6b7280; margin-bottom: 2rem;">${message}</p>
+          <p style="color: #6b7280; margin-bottom: 2rem;">${esc(message)}</p>
           <p style="color: #6b7280; font-size: 14px;">
             If you believe this is an error, please contact support with your purchase details.
           </p>
@@ -513,11 +567,21 @@ class PurchasedDesignEditor {
   cleanup() {
     if (this.autoSaveInterval) {
       clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
     }
+    
+    if (this.unloadHandler) {
+      window.removeEventListener('beforeunload', this.unloadHandler);
+      this.unloadHandler = null;
+    }
+    
+    this.isInitialized = false;
   }
 }
 
+// -----------------------
 // CSS for purchased design features
+// -----------------------
 const purchasedDesignCSS = `
 .customer-info-card {
   background: rgba(37, 99, 235, 0.05);
@@ -595,8 +659,11 @@ if (isPurchasedDesign) {
   document.head.appendChild(style);
 }
 
+// -----------------------
 // Responsive scaling functionality
+// -----------------------
 let lastWorkW = null;
+let resizeSaveT = null;
 const workRO = new ResizeObserver(() => handleWorkResize());
 
 function scaleAll(f) {
@@ -635,17 +702,20 @@ function handleWorkResize() {
   if (Math.abs(f - 1) > 0.001) {
     scaleAll(f);
     lastWorkW = w;
-    if (purchasedDesignEditor) {
-      purchasedDesignEditor.saveCustomization();
-    } else {
-      saveProjectDebounced();
-    }
+    clearTimeout(resizeSaveT);
+    resizeSaveT = setTimeout(() => {
+      if (purchasedDesignEditor?.isInitialized) {
+        purchasedDesignEditor.saveCustomization();
+      } else {
+        saveProjectDebounced();
+      }
+    }, 400);
   }
 }
 
-// Keep all your existing functions (setupImageDragHandlers, setupEventHandlers, etc.)
-// ... [Include all your existing functions here - they remain unchanged] ...
-
+// -----------------------
+// Auth UI
+// -----------------------
 function setupAuthUI() {
   const loginForm = document.getElementById('loginForm');
   const authModal = document.getElementById('authModal');
@@ -680,7 +750,7 @@ function setupAuthUI() {
       }
     } catch (error) {
       console.error('Login failed:', error);
-      alert('Login failed: ' + error.message);
+      alert('Login failed: ' + (error.message || 'Unknown error'));
     } finally {
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;
@@ -695,8 +765,9 @@ function showAuthModal() {
   }
 }
 
-// Add these missing functions to your app.js file
-
+// -----------------------
+// Event Handlers
+// -----------------------
 function setupEventHandlers() {
   // Undo/Redo handlers
   const undoBtn = document.getElementById('undoBtn');
@@ -721,7 +792,7 @@ function setupEventHandlers() {
   addSlideBtn?.addEventListener('click', addSlide);
   dupSlideBtn?.addEventListener('click', duplicateSlide);
   delSlideBtn?.addEventListener('click', deleteSlide);
-  slideDur?.addEventListener('input', (e) => handleSlideDurationChange(e.target.value));
+  slideDur?.addEventListener('input', (e) => handleSlideDurationChange(Number(e.target.value) || 0));
 
   // Text management handlers
   const addTextBtn = document.getElementById('addTextBtn');
@@ -814,12 +885,16 @@ function setupEventHandlers() {
       if (e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         doUndo();
-      } else if (e.key === 'z' && e.shiftKey || e.key === 'y') {
+      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
         e.preventDefault();
         doRedo();
       } else if (e.key === 's') {
         e.preventDefault();
-        saveProjectDebounced();
+        if (purchasedDesignEditor?.isInitialized) {
+          purchasedDesignEditor.saveCustomization();
+        } else {
+          saveProjectDebounced();
+        }
       }
     }
   });
@@ -868,7 +943,11 @@ function setupImageDragHandlers() {
   work.addEventListener('pointerup', (e) => {
     if (dragState?.type === 'image') {
       dragState = null;
-      saveProjectDebounced();
+      if (purchasedDesignEditor?.isInitialized) {
+        purchasedDesignEditor.saveCustomization();
+      } else {
+        saveProjectDebounced();
+      }
     } else {
       endTextDrag();
     }
@@ -919,9 +998,9 @@ function setupImageDragHandlers() {
       const dy = e.clientY - dragState.startY;
       
       if (dragState.handleType === 'rotate') {
-        // Rotation handle
-        const angle = Math.atan2(e.clientY - dragState.centerY, e.clientX - dragState.centerX);
-        imgState.angle = angle;
+        // Rotation handle: convert radians to degrees for consistency
+        const angleRad = Math.atan2(e.clientY - dragState.centerY, e.clientX - dragState.centerX);
+        imgState.angle = angleRad * (180 / Math.PI);
       } else {
         // Scale handles
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -936,69 +1015,121 @@ function setupImageDragHandlers() {
   bgBox.addEventListener('pointerup', () => {
     if (dragState?.type === 'handle') {
       dragState = null;
-      saveProjectDebounced();
+      if (purchasedDesignEditor?.isInitialized) {
+        purchasedDesignEditor.saveCustomization();
+      } else {
+        saveProjectDebounced();
+      }
     }
   });
 }
 
+// -----------------------
 // Main initialization
+// -----------------------
 async function init() {
-  // If purchased design mode is active, let it handle initialization
-  if (purchasedDesignEditor) {
-    await purchasedDesignEditor.init();
-    return;
-  }
+  try {
+    // If purchased design mode is active, let it handle initialization
+    if (purchasedDesignEditor) {
+      await purchasedDesignEditor.init();
+      return;
+    }
 
-  // Regular editor initialization
-  applyViewerFromUrl();
-  
-  initializeResponsive();
-  setupUIEventHandlers();
-  setupRsvpHandlers();
-  setupMapHandlers();
-  setupShareHandler();
-  initializeForMode();
-  initializeViewerFullscreen();
-  
-  setupEventHandlers();
-  setupImageDragHandlers();
-  setupAuthUI();
-  
-  const work = document.querySelector('#work');
-  workRO.observe(work);
-  
-  const restored = await loadProject();
-  updateSlidesUI();
-  
-  if (!restored) {
-    await loadSlideIntoDOM({ image: null, layers: [], workSize: workSize(), durationMs: 3000 });
-    addTextLayer("You're invited!");
-    lastWorkW = workSize().w;
-  } else {
-    lastWorkW = workSize().w;
-  }
-  
-  initializeHistory();
-  preloadSlideImageAt(1);
-  
-  const fxVideo = document.querySelector('#fxVideo');
-  fxVideo?.play?.().catch(() => {});
+    // Import functions dynamically to avoid circular dependencies
+    const { applyViewerFromUrl } = await import('./share-manager.js');
+    const { 
+      initializeResponsive, 
+      setupUIEventHandlers, 
+      setupRsvpHandlers, 
+      setupMapHandlers, 
+      initializeForMode, 
+      initializeViewerFullscreen 
+    } = await import('./ui-manager.js');
+    const { setupShareHandler } = await import('./share-manager.js');
+    const { loadProject } = await import('./state-manager.js');
+    const { updateSlidesUI, loadSlideIntoDOM } = await import('./slide-manager.js');
+    const { addTextLayer } = await import('./text-manager.js');
+    const { initializeHistory } = await import('./state-manager.js');
+    const { preloadSlideImageAt } = await import('./image-manager.js');
 
-  // Show auth modal only for regular editor
-  if (!apiClient.token && !document.body.classList.contains('viewer')) {
-    setTimeout(() => {
-      showAuthModal();
-    }, 500);
+    // Apply viewer mode from URL
+    applyViewerFromUrl();
+    
+    // Initialize UI components
+    initializeResponsive();
+    setupUIEventHandlers();
+    setupRsvpHandlers();
+    setupMapHandlers();
+    setupShareHandler();
+    initializeForMode();
+    initializeViewerFullscreen();
+    
+    // Setup event handlers
+    setupEventHandlers();
+    setupImageDragHandlers();
+    setupAuthUI();
+    
+    // Observe work area for responsive scaling
+    const work = document.querySelector('#work');
+    if (work) {
+      workRO.observe(work);
+    }
+    
+    // Load or create project
+    const restored = await loadProject();
+    updateSlidesUI();
+    
+    if (!restored) {
+      await loadSlideIntoDOM({ 
+        image: null, 
+        layers: [], 
+        workSize: workSize(), 
+        durationMs: 3000 
+      });
+      addTextLayer("You're invited!");
+      lastWorkW = workSize().w;
+    } else {
+      lastWorkW = workSize().w;
+    }
+    
+    // Initialize history and preload
+    initializeHistory();
+    preloadSlideImageAt(1);
+    
+    // Start background video
+    const fxVideo = document.querySelector('#fxVideo');
+    if (fxVideo && fxVideo.play) {
+      fxVideo.play().catch(() => {
+        console.log('Background video autoplay blocked');
+      });
+    }
+
+    // Show auth modal for regular editor if not logged in
+    if (!apiClient.token && !document.body.classList.contains('viewer')) {
+      setTimeout(() => {
+        showAuthModal();
+      }, 500);
+    }
+    
+  } catch (error) {
+    console.error('Failed to initialize application:', error);
+    
+    // Show error state
+    const statusText = document.getElementById('statusText');
+    if (statusText) {
+      statusText.textContent = 'Failed to load editor';
+    }
   }
 }
 
-// Override save function for purchased designs
-if (purchasedDesignEditor) {
-  window.originalSaveProjectDebounced = saveProjectDebounced;
-  window.saveProjectDebounced = () => {
-    purchasedDesignEditor.saveCustomization();
-  };
+// -----------------------
+// Instantiate purchased design editor AFTER class definition
+// -----------------------
+if (isPurchasedDesign) {
+  purchasedDesignEditor = new PurchasedDesignEditor(token);
 }
 
+// -----------------------
 // Start the application
+// -----------------------
 init();
