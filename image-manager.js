@@ -431,7 +431,27 @@ export function handleImageScale(value) {
   imgState.scale = clamp(parseInt(value, 10) / 100, 0.05, 10);
   enforceImageBounds();
   setTransforms();
-    import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveProjectDebounced();
+}
+
+// NEW: rotate handler (UI slider gives degrees; we store radians)
+export function handleImageRotate(value) {
+  if (!imgState.has) return;
+  const deg = parseInt(value, 10) || 0;
+  imgState.angle = deg * Math.PI / 180; // store in radians
+  enforceImageBounds();
+  setTransforms();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveProjectDebounced();
+}
+
+// NEW: flip handler
+export function handleImageFlip() {
+  if (!imgState.has) return;
+  imgState.flip = !imgState.flip;
+  setTransforms();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
