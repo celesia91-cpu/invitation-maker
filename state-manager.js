@@ -166,6 +166,18 @@ export async function saveProject() {
     }
   };
 
+// If our currentProjectId no longer exists on the server, reset so we create a new one.
+try {
+  if (apiClient.token && currentProjectId) {
+    await apiClient.getProject(currentProjectId);
+  }
+} catch (err) {
+  if (err && (err.status === 404 || /404|Not Found/i.test(String(err.message)))) {
+    currentProjectId = null;
+  }
+}
+
+
   // Try to save to backend first
   try {
     if (apiClient.token) {
