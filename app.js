@@ -943,11 +943,12 @@ function setupImageDragHandlers() {
   work.addEventListener('pointerup', (e) => {
     if (dragState?.type === 'image') {
       dragState = null;
-      if (purchasedDesignEditor?.isInitialized) {
-        purchasedDesignEditor.saveCustomization();
-      } else {
-        saveProjectDebounced();
-      }
+      import('./slide-manager.js').then(({ writeCurrentSlide }) => {
+        writeCurrentSlide();
+        if (purchasedDesignEditor?.isInitialized) {
+          purchasedDesignEditor.saveCustomization();
+        }
+    });
     } else {
       endTextDrag();
     }
@@ -998,9 +999,9 @@ function setupImageDragHandlers() {
       const dy = e.clientY - dragState.startY;
       
       if (dragState.handleType === 'rotate') {
-        // Rotation handle: convert radians to degrees for consistency
+        // Rotation handle: keep radians (renderer expects radians)
         const angleRad = Math.atan2(e.clientY - dragState.centerY, e.clientX - dragState.centerX);
-        imgState.angle = angleRad * (180 / Math.PI);
+        imgState.angle = angleRad;
       } else {
         // Scale handles
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1015,11 +1016,14 @@ function setupImageDragHandlers() {
   bgBox.addEventListener('pointerup', () => {
     if (dragState?.type === 'handle') {
       dragState = null;
-      if (purchasedDesignEditor?.isInitialized) {
-        purchasedDesignEditor.saveCustomization();
-      } else {
-        saveProjectDebounced();
-      }
+      import('./slide-manager.js').then(({ writeCurrentSlide }) => {
+        writeCurrentSlide();
+        if (purchasedDesignEditor?.isInitialized) {
+          purchasedDesignEditor.saveCustomization();
+        } else {
+          saveProjectDebounced();
+        }
+      });
     }
   });
 }

@@ -348,6 +348,7 @@ export function deleteImage() {
   syncImageControls();
   highlightPreset('none');
   updateImageFadeUI();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
@@ -430,6 +431,7 @@ export function handleImageScale(value) {
   imgState.scale = clamp(parseInt(value, 10) / 100, 0.05, 10);
   enforceImageBounds();
   setTransforms();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
@@ -439,6 +441,7 @@ export function handleImageRotate(value) {
   imgState.angle = deg * Math.PI / 180;
   enforceImageBounds();
   setTransforms();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
@@ -446,6 +449,7 @@ export function handleImageFlip() {
   if (!imgState.has) return;
   imgState.flip = !imgState.flip;
   setTransforms();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
