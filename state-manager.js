@@ -18,7 +18,7 @@ export let currentProjectId = null;
 // History state for undo/redo
 export const historyState = { stack: [], idx: -1, lock: false };
 
-// State setters
+// ---------- State setters ----------
 export function setIsViewer(value) { IS_VIEWER = value; }
 export function setRsvpChoice(choice) { rsvpChoice = choice; }
 export function setMapQuery(query) { mapQuery = query; }
@@ -28,8 +28,9 @@ export function setActiveLayer(layer) { activeLayer = layer; }
 export function setPlaying(isPlaying) { playing = isPlaying; }
 export function setRafId(id) { rafId = id; }
 export function setSlideStartTs(ts) { slideStartTs = ts; }
+export function setCurrentProjectId(id) { currentProjectId = id; } // <- handy for viewer mode
 
-// State getters
+// ---------- State getters ----------
 export function getIsViewer() { return IS_VIEWER; }
 export function getRsvpChoice() { return rsvpChoice; }
 export function getMapQuery() { return mapQuery; }
@@ -40,12 +41,12 @@ export function getPlaying() { return playing; }
 export function getRafId() { return rafId; }
 export function getSlideStartTs() { return slideStartTs; }
 
-// RSVP management
+// ---------- RSVP ----------
 export function updateRsvpUI() {
   const rsvpYes = document.getElementById('rsvpYes');
   const rsvpMaybe = document.getElementById('rsvpMaybe');
   const rsvpNo = document.getElementById('rsvpNo');
-  
+  if (!rsvpYes || !rsvpMaybe || !rsvpNo) return;
   rsvpYes.classList.toggle('active', rsvpChoice === 'yes');
   rsvpMaybe.classList.toggle('active', rsvpChoice === 'maybe');
   rsvpNo.classList.toggle('active', rsvpChoice === 'no');
@@ -57,7 +58,7 @@ export function handleRsvpChoice(choice) {
   saveProjectDebounced();
 }
 
-// Map management
+// ---------- Map ----------
 export function getMapUrl() {
   const q = (mapQuery || '').trim();
   return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q || 'event venue');
@@ -68,31 +69,30 @@ export function handleMapQuery(query) {
   saveProjectDebounced();
 }
 
-// Project structure building
+// ---------- Build a serializable project ----------
 export function buildProject() {
   const fontFamilySelect = document.querySelector('#fontFamily');
   const fontSizeInput = document.querySelector('#fontSize');
   const fontColorInput = document.querySelector('#fontColor');
-  
   return {
     v: 62,
     slides,
     activeIndex,
     defaults: {
-      fontFamily: fontFamilySelect.value,
-      fontSize: parseInt(fontSizeInput.value, 10) || 28,
-      fontColor: fontColorInput.value
+      fontFamily: fontFamilySelect?.value || 'system-ui',
+      fontSize: parseInt(fontSizeInput?.value, 10) || 28,
+      fontColor: fontColorInput?.value || '#ffffff'
     },
     rsvp: rsvpChoice || 'none',
     mapQuery: mapQuery || ''
   };
 }
 
-// History management for undo/redo
+// ---------- Undo/Redo ----------
 export function updateUndoRedoUI() {
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
-  
+  if (!undoBtn || !redoBtn) return;
   undoBtn.disabled = !(historyState.idx > 0);
   redoBtn.disabled = !(historyState.idx >= 0 && historyState.idx < historyState.stack.length - 1);
 }
@@ -117,7 +117,7 @@ export function pushHistory() {
 
 export const pushHistoryDebounced = debounce(pushHistory, 350);
 
-// Project application from loaded data
+// ---------- Apply a loaded project ----------
 export function applyProject(p) {
   const fontFamilySelect = document.querySelector('#fontFamily');
   const fontSizeInput = document.querySelector('#fontSize');
@@ -131,7 +131,7 @@ export function applyProject(p) {
     const slide = {
       image: p.image || null,
       layers: p.layers || [],
-      workSize: { w: 800, h: 450 }, // fallback workSize
+      workSize: { w: 800, h: 450 },
       durationMs: 3000
     };
     slides = [slide];
@@ -139,9 +139,9 @@ export function applyProject(p) {
   }
   
   if (p.defaults) {
-    if (p.defaults.fontFamily) fontFamilySelect.value = p.defaults.fontFamily;
-    if (p.defaults.fontSize) fontSizeInput.value = p.defaults.fontSize;
-    if (p.defaults.fontColor) fontColorInput.value = p.defaults.fontColor;
+    if (fontFamilySelect && p.defaults.fontFamily) fontFamilySelect.value = p.defaults.fontFamily;
+    if (fontSizeInput && p.defaults.fontSize) fontSizeInput.value = p.defaults.fontSize;
+    if (fontColorInput && p.defaults.fontColor) fontColorInput.value = p.defaults.fontColor;
   }
   
   rsvpChoice = p.rsvp || 'none';
@@ -150,10 +150,11 @@ export function applyProject(p) {
   if (mapInput) mapInput.value = mapQuery;
 }
 
+// ---------- Save ----------
 export async function saveProject() {
-  // Build the project data
+  // Build the project payload
   const projectData = {
-    title: 'My Invitation', // You can make this editable later
+    title: 'My Invitation',
     slides: getSlides(),
     settings: {
       defaults: {
@@ -166,27 +167,49 @@ export async function saveProject() {
     }
   };
 
-// If our currentProjectId no longer exists on the server, reset so we create a new one.
-try {
-  if (apiClient.token && currentProjectId) {
-    await apiClient.getProject(currentProjectId);
+  // 👉 Viewer mode: never hit the backend
+  if (IS_VIEWER) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buildProject()));
+    } catch (err) {
+      console.error('Local storage save failed in viewer mode:', err);
+    }
+    pushHistoryDebounced();
+    return;
   }
-} catch (err) {
-  if (err && (err.status === 404 || /404|Not Found/i.test(String(err.message)))) {
-    currentProjectId = null;
+
+  // Preflight: if our currentProjectId no longer exists on the server, reset so we create a new one.
+  try {
+    if (apiClient.token && currentProjectId) {
+      await apiClient.getProject(currentProjectId);
+    }
+  } catch (err) {
+    if (err && (err.status === 404 || /404|Not Found/i.test(String(err.message)))) {
+      currentProjectId = null;
+    }
   }
-}
 
-
-  // Try to save to backend first
+  // Try to save to backend
   try {
     if (apiClient.token) {
       if (currentProjectId) {
-        await apiClient.updateProject(currentProjectId, projectData);
-        toast('Project updated');
+        try {
+          await apiClient.updateProject(currentProjectId, projectData);
+          toast('Project updated');
+        } catch (err) {
+          const isNotFound = (err && (err.status === 404 || /404|Not Found/i.test(String(err.message))));
+          if (isNotFound) {
+            currentProjectId = null;
+            const response = await apiClient.saveProject(projectData); // POST new
+            if (response?.projectId) currentProjectId = response.projectId;
+            toast('Project re-created in cloud');
+          } else {
+            throw err;
+          }
+        }
       } else {
-        const response = await apiClient.saveProject(projectData);
-        currentProjectId = response.projectId;
+        const response = await apiClient.saveProject(projectData); // POST new
+        if (response?.projectId) currentProjectId = response.projectId;
         toast('Project saved to cloud');
       }
     }
@@ -195,12 +218,12 @@ try {
     toast('Saved locally only');
   }
   
-  // Always save locally as backup
+  // Always keep a local backup
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(buildProject()));
   } catch (err) {
     console.error('Local storage save failed:', err);
-    // Try to save without images if storage is full
+    // Try to save without images if storage quota is tight
     try {
       const p = buildProject();
       p.slides = p.slides.map(s => ({
@@ -218,6 +241,7 @@ try {
 
 export const saveProjectDebounced = debounce(saveProject, 300);
 
+// ---------- Load ----------
 export async function loadProject() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -239,7 +263,7 @@ export async function loadProject() {
   return true;
 }
 
-// Undo/Redo functionality
+// ---------- Undo/Redo ops ----------
 export function applySnapshot(snap) {
   try {
     const p = JSON.parse(snap);
@@ -265,7 +289,7 @@ export function doRedo() {
   }
 }
 
-// Initialize history
+// ---------- Initialize history ----------
 export function initializeHistory() {
   historyState.lock = true;
   historyState.stack = [JSON.stringify(buildProject())];
