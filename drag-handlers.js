@@ -8,12 +8,17 @@ export class DragHandlersManager {
   constructor() {
     this.isInitialized = false;
     this.dragState = null;
-    
+
     // Bind methods to preserve context
     this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handlePointerMove = this.handlePointerMove.bind(this);
     this.handlePointerUp = this.handlePointerUp.bind(this);
     this.handleWorkClick = this.handleWorkClick.bind(this);
+
+    // Store bound transform handlers for add/remove operations
+    this.onTransformPointerDown = this.handleTransformPointerDown.bind(this);
+    this.onTransformPointerMove = this.handleTransformPointerMove.bind(this);
+    this.onTransformPointerUp = this.handleTransformPointerUp.bind(this);
   }
 
   /**
@@ -64,9 +69,9 @@ export class DragHandlersManager {
       return;
     }
 
-    bgBox.addEventListener('pointerdown', this.handleTransformPointerDown.bind(this));
-    bgBox.addEventListener('pointermove', this.handleTransformPointerMove.bind(this));
-    bgBox.addEventListener('pointerup', this.handleTransformPointerUp.bind(this));
+    bgBox.addEventListener('pointerdown', this.onTransformPointerDown);
+    bgBox.addEventListener('pointermove', this.onTransformPointerMove);
+    bgBox.addEventListener('pointerup', this.onTransformPointerUp);
   }
 
   /**
@@ -458,9 +463,9 @@ export class DragHandlersManager {
 
     const bgBox = document.getElementById('bgBox');
     if (bgBox) {
-      bgBox.removeEventListener('pointerdown', this.handleTransformPointerDown);
-      bgBox.removeEventListener('pointermove', this.handleTransformPointerMove);
-      bgBox.removeEventListener('pointerup', this.handleTransformPointerUp);
+      bgBox.removeEventListener('pointerdown', this.onTransformPointerDown);
+      bgBox.removeEventListener('pointermove', this.onTransformPointerMove);
+      bgBox.removeEventListener('pointerup', this.onTransformPointerUp);
     }
     
     // Reset state
