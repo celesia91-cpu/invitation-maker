@@ -1,11 +1,12 @@
 // share-manager.js - Fixed sharing functionality
 
 import { encodeState, decodeState, toast } from './utils.js';
-import { 
-  buildProject, 
+import {
+  buildProject,
   applyProject,
   setIsViewer,
-  setCurrentProjectId // <-- ensure this exists (we added it in state-manager)
+  setCurrentProjectId,
+  historyState // <-- ensure this exists (we added it in state-manager)
 } from './state-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
