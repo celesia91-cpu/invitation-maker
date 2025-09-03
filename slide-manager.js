@@ -1,4 +1,4 @@
-// slide-manager.js - Fixed version with better async handling and race condition prevention
+// slide-manager.js - Simplified version with reliable concurrency control
 
 import { 
   getSlides, setSlides, getActiveIndex, setActiveIndex, 
@@ -13,12 +13,106 @@ import {
   imgState, setTransforms, updateImageFadeUI 
 } from './image-manager.js';
 
-// Enhanced state tracking
-let isSwitchingSlides = false;
-let currentSwitchId = 0; // Unique ID for each switch operation
-let pendingSwitchQueue = []; // Queue for pending switches instead of just one
+/**
+ * Simplified Slide Switching Manager
+ * Uses a single Promise-based queue to prevent race conditions
+ */
+class SlideSwitchManager {
+  constructor() {
+    this.currentSwitch = null; // Single active switch promise
+    this.isDestroyed = false;
+  }
 
-/* ----------------------------- Helpers ---------------------------------- */
+  /**
+   * Switch to target slide with automatic queuing
+   */
+  async switchToSlide(targetIndex) {
+    // Normalize target index
+    const slides = getSlides();
+    const normalizedIndex = clamp(targetIndex, 0, slides.length - 1);
+    
+    // If already at target slide, do nothing
+    if (normalizedIndex === getActiveIndex()) {
+      return;
+    }
+
+    // If there's an active switch, wait for it to complete
+    if (this.currentSwitch) {
+      try {
+        await this.currentSwitch;
+      } catch (error) {
+        console.warn('Previous slide switch failed:', error);
+      }
+    }
+
+    // Start new switch
+    this.currentSwitch = this.performSlideSwitch(normalizedIndex);
+    
+    try {
+      await this.currentSwitch;
+    } finally {
+      this.currentSwitch = null;
+    }
+  }
+
+  /**
+   * Perform the actual slide switch
+   */
+  async performSlideSwitch(targetIndex) {
+    if (this.isDestroyed) return;
+
+    try {
+      // Save current slide state
+      writeCurrentSlide();
+      
+      // Small delay to ensure DOM updates complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      // Update active index
+      setActiveIndex(targetIndex);
+      
+      // Load new slide content
+      const slides = getSlides();
+      await loadSlideIntoDOM(slides[targetIndex]);
+      
+      // Update UI
+      updateSlidesUI();
+      
+    } catch (error) {
+      console.error('Slide switch failed:', error);
+      // Attempt recovery by updating UI anyway
+      updateSlidesUI();
+      throw error;
+    }
+  }
+
+  /**
+   * Check if currently switching
+   */
+  isSwitching() {
+    return !!this.currentSwitch;
+  }
+
+  /**
+   * Force clear any pending switches (for cleanup)
+   */
+  clearPendingSwitches() {
+    this.currentSwitch = null;
+  }
+
+  /**
+   * Destroy the manager
+   */
+  destroy() {
+    this.isDestroyed = true;
+    this.clearPendingSwitches();
+  }
+}
+
+// Create singleton switch manager
+const switchManager = new SlideSwitchManager();
+
+/* ----------------------------- Helper Functions ---------------------------------- */
 
 function getEls() {
   return {
@@ -53,168 +147,193 @@ function ensureSlide(idx) {
   }
 }
 
-/* --------------------------- Enhanced Image Loading ----------------------------- */
+/* --------------------------- Image Loading with Cancellation ----------------------------- */
 
-// Store current image load operation to cancel if needed
-let currentImageLoad = null;
-
-function cancelCurrentImageLoad() {
-  if (currentImageLoad) {
-    currentImageLoad.cancelled = true;
-    currentImageLoad = null;
-  }
-}
-
-async function loadSlideImageSafely(slide, switchId) {
-  const { userBg, work } = getEls();
-  
-  // Cancel any previous image load
-  cancelCurrentImageLoad();
-  
-  const chosenSrc = slide?.image?.src || slide?.image?.thumb || '';
-  if (!chosenSrc) {
-    imgState.has = false;
-    userBg.src = '';
-    setTransforms();
-    return Promise.resolve();
+/**
+ * Cancellable image loader
+ */
+class ImageLoader {
+  constructor() {
+    this.currentLoad = null;
   }
 
-  return new Promise((resolve) => {
-    // Create load operation tracker
-    const loadOp = { cancelled: false, switchId };
-    currentImageLoad = loadOp;
+  /**
+   * Load slide image with cancellation support
+   */
+  async loadSlideImage(slide) {
+    // Cancel any previous load
+    this.cancelCurrentLoad();
+    
+    const { userBg, work } = getEls();
+    const chosenSrc = slide?.image?.src || slide?.image?.thumb || '';
+    
+    if (!chosenSrc) {
+      imgState.has = false;
+      userBg.src = '';
+      setTransforms();
+      return;
+    }
 
-    const onLoad = () => {
-      // Check if this load was cancelled or superseded
-      if (loadOp.cancelled || switchId !== currentSwitchId) {
-        resolve(); // Resolve but don't apply changes
-        return;
-      }
+    return new Promise((resolve) => {
+      const loadOperation = {
+        cancelled: false,
+        resolve,
+        userBg,
+        chosenSrc
+      };
+      
+      this.currentLoad = loadOperation;
 
-      try {
-        imgState.natW = userBg.naturalWidth;
-        imgState.natH = userBg.naturalHeight;
-        imgState.has = true;
-        
-        // CRITICAL FIX: Only use defaults if values are actually undefined/null
-        const workRect = work.getBoundingClientRect();
-        const centerX = workRect.width / 2;
-        const centerY = workRect.height / 2;
-        
-        // Check if slide has saved image state, otherwise calculate defaults
-        if (slide.image && typeof slide.image.scale === 'number') {
-          // Use saved values
-          imgState.scale = slide.image.scale;
-          imgState.angle = slide.image.angle || 0;
-          imgState.flip = !!slide.image.flip;
-          imgState.cx = slide.image.cx || centerX;
-          imgState.cy = slide.image.cy || centerY;
-        } else {
-          // Calculate initial size for new images
-          const defaultScale = Math.min(
-            workRect.width * 0.95 / imgState.natW, 
-            workRect.height * 0.95 / imgState.natH
-          );
-          imgState.scale = defaultScale;
-          imgState.angle = 0;
-          imgState.flip = false;
-          imgState.cx = centerX;
-          imgState.cy = centerY;
+      const onLoad = () => {
+        if (loadOperation.cancelled) {
+          resolve();
+          return;
+        }
+
+        try {
+          imgState.natW = userBg.naturalWidth;
+          imgState.natH = userBg.naturalHeight;
+          imgState.has = true;
+          
+          const workRect = work.getBoundingClientRect();
+          const centerX = workRect.width / 2;
+          const centerY = workRect.height / 2;
+          
+          // Use saved values or calculate defaults
+          if (slide.image && typeof slide.image.scale === 'number') {
+            imgState.scale = slide.image.scale;
+            imgState.angle = slide.image.angle || 0;
+            imgState.flip = !!slide.image.flip;
+            imgState.cx = slide.image.cx || centerX;
+            imgState.cy = slide.image.cy || centerY;
+          } else {
+            const defaultScale = Math.min(
+              workRect.width * 0.95 / imgState.natW, 
+              workRect.height * 0.95 / imgState.natH
+            );
+            imgState.scale = defaultScale;
+            imgState.angle = 0;
+            imgState.flip = false;
+            imgState.cx = centerX;
+            imgState.cy = centerY;
+          }
+          
+          setTransforms();
+        } catch (error) {
+          console.warn('Image processing error:', error);
+          imgState.has = false;
+          setTransforms();
         }
         
-        setTransforms();
-      } catch (error) {
-        console.warn('Image load error:', error);
-        imgState.has = false;
-        setTransforms();
-      }
-      resolve();
-    };
+        resolve();
+      };
 
-    const onError = () => {
-      if (!loadOp.cancelled && switchId === currentSwitchId) {
-        imgState.has = false;
-        setTransforms();
-      }
-      resolve();
-    };
+      const onError = () => {
+        if (!loadOperation.cancelled) {
+          imgState.has = false;
+          setTransforms();
+        }
+        resolve();
+      };
 
-    userBg.onload = onLoad;
-    userBg.onerror = onError;
-    userBg.src = chosenSrc;
-  });
+      userBg.onload = onLoad;
+      userBg.onerror = onError;
+      userBg.src = chosenSrc;
+    });
+  }
+
+  /**
+   * Cancel current image load
+   */
+  cancelCurrentLoad() {
+    if (this.currentLoad) {
+      this.currentLoad.cancelled = true;
+      this.currentLoad = null;
+    }
+  }
+
+  /**
+   * Cleanup
+   */
+  destroy() {
+    this.cancelCurrentLoad();
+  }
 }
 
-/* --------------------------- Enhanced Slide Loading ----------------------------- */
+// Create singleton image loader
+const imageLoader = new ImageLoader();
 
-export async function loadSlideIntoDOM(s, switchId = null) {
+/* --------------------------- Simplified Slide Loading ----------------------------- */
+
+export async function loadSlideIntoDOM(slide) {
   const { work } = getEls();
   
-  // Set work dimensions
-  work.style.setProperty('--work-w', (s?.workSize?.w || 800) + 'px');
-  work.style.setProperty('--work-h', (s?.workSize?.h || 450) + 'px');
+  try {
+    // Set work dimensions
+    work.style.setProperty('--work-w', (slide?.workSize?.w || 800) + 'px');
+    work.style.setProperty('--work-h', (slide?.workSize?.h || 450) + 'px');
 
-  // Clear existing text layers
-  [...work.querySelectorAll('.layer')].forEach(n => n.remove());
-  
-  // Reset image state first
-  imgState.has = false;
-  
-  // Load text layers
-  loadLayersIntoDOM(s?.layers || []);
+    // Clear existing text layers
+    [...work.querySelectorAll('.layer')].forEach(n => n.remove());
+    
+    // Reset image state
+    imgState.has = false;
+    
+    // Load text layers
+    loadLayersIntoDOM(slide?.layers || []);
 
-  // Load image with cancellation support
-  await loadSlideImageSafely(s, switchId);
+    // Load image
+    await imageLoader.loadSlideImage(slide);
+    
+  } catch (error) {
+    console.error('Error loading slide into DOM:', error);
+    // Continue anyway with partial load
+  }
 }
 
-/* --------------------------- Improved Write Current Slide ----------------------------- */
+/* --------------------------- Write Current Slide ----------------------------- */
 
 export function writeCurrentSlide() {
   ensureSlide();
-  const s = getSlides();
-  const i = getActiveIndex();
+  const slides = getSlides();
+  const activeIndex = getActiveIndex();
 
-  // Ensure we have a valid slide index
-  if (i < 0 || i >= s.length) return;
+  if (activeIndex < 0 || activeIndex >= slides.length) return;
 
   try {
-    // Build text layers from DOM
     const layers = buildLayersFromDOM();
-
-    // Build image object from current state - CRITICAL FIX: Always preserve current imgState
     const { userBg } = getEls();
+    
+    // Build image object
     let image = null;
     if (imgState.has && userBg?.src) {
-      // Always use current imgState values to preserve user transformations
       image = {
         src: userBg.src,
-        thumb: makeThumbFromImgEl(userBg),
-        cx: imgState.cx,           // Current position
-        cy: imgState.cy,           // Current position  
-        scale: imgState.scale,     // Current scale
-        angle: imgState.angle,     // Current rotation
-        flip: !!imgState.flip,     // Current flip state
-        // Preserve existing fade settings if they exist
-        fadeInMs: s[i]?.image?.fadeInMs || 0,
-        fadeOutMs: s[i]?.image?.fadeOutMs || 0,
+        thumb: makeThumb(userBg),
+        cx: imgState.cx,
+        cy: imgState.cy,
+        scale: imgState.scale,
+        angle: imgState.angle,
+        flip: !!imgState.flip,
+        fadeInMs: slides[activeIndex]?.image?.fadeInMs || 0,
+        fadeOutMs: slides[activeIndex]?.image?.fadeOutMs || 0,
       };
     }
 
-    // Preserve duration + workSize from existing slide
-    const prev = s[i] || {};
-    s[i] = {
+    // Preserve duration + workSize
+    const prev = slides[activeIndex] || {};
+    slides[activeIndex] = {
       image,
       layers,
       workSize: prev.workSize || { w: 800, h: 450 },
       durationMs: prev.durationMs || DEFAULT_DUR
     };
     
-    setSlides([...s]); // Create new array to ensure reactivity
+    setSlides([...slides]);
     
-    // Only save and update UI if not in the middle of switching
-    if (!isSwitchingSlides) {
+    // Only save if not switching (prevent recursive saves)
+    if (!switchManager.isSwitching()) {
       saveProjectDebounced();
-      updateSlidesUI();
     }
     
   } catch (error) {
@@ -222,8 +341,8 @@ export function writeCurrentSlide() {
   }
 }
 
-// Make thumbnail with better error handling
-function makeThumbFromImgEl(imgEl, maxW = 640, maxH = 640, quality = 0.72) {
+// Simplified thumbnail generation
+function makeThumb(imgEl, maxW = 640, maxH = 640, quality = 0.72) {
   try {
     const src = String(imgEl?.src || '');
     if (!src.startsWith('data:')) return null;
@@ -250,71 +369,22 @@ function makeThumbFromImgEl(imgEl, maxW = 640, maxH = 640, quality = 0.72) {
   }
 }
 
-/* --------------------------- Enhanced Slide Switching ----------------------------- */
+/* --------------------------- Simplified Navigation Functions ----------------------------- */
 
 export async function setActiveSlide(targetIndex) {
-  // Normalize target index
   ensureSlide();
-  const slides = getSlides();
-  const normalizedIndex = clamp(targetIndex, 0, slides.length - 1);
-  
-  // If already at target slide, do nothing
-  if (normalizedIndex === getActiveIndex() && !isSwitchingSlides) {
-    return;
-  }
+  await switchManager.switchToSlide(targetIndex);
+}
 
-  // If currently switching, queue this request
-  if (isSwitchingSlides) {
-    // Remove any existing queued request for the same index
-    pendingSwitchQueue = pendingSwitchQueue.filter(idx => idx !== normalizedIndex);
-    pendingSwitchQueue.push(normalizedIndex);
-    return;
-  }
-  
-  // Generate unique switch ID
-  currentSwitchId += 1;
-  const switchId = currentSwitchId;
-  
-  isSwitchingSlides = true;
-  
-  try {
-    // CRITICAL FIX: Always save current slide state before switching, even during playback
-    // This ensures image transformations are preserved
-    writeCurrentSlide();
-    
-    // Small delay to ensure writeCurrentSlide completes
-    await new Promise(resolve => setTimeout(resolve, 10));
-    
-    // Update active index
-    setActiveIndex(normalizedIndex);
-    
-    // Get fresh slide data after writing current state
-    const updatedSlides = getSlides();
-    
-    // Load new slide content with cancellation support
-    await loadSlideIntoDOM(updatedSlides[normalizedIndex], switchId);
-    
-    // Only update UI if this switch wasn't superseded
-    if (switchId === currentSwitchId) {
-      updateSlidesUI();
-    }
-    
-  } catch (error) {
-    console.error('Error switching slides:', error);
-  } finally {
-    // Only clear switching state if this is the latest switch
-    if (switchId === currentSwitchId) {
-      isSwitchingSlides = false;
-      
-      // Process any queued switch requests
-      if (pendingSwitchQueue.length > 0) {
-        const nextIndex = pendingSwitchQueue.pop(); // Get the latest request
-        pendingSwitchQueue = []; // Clear queue
-        // Use setTimeout to avoid deep recursion
-        setTimeout(() => setActiveSlide(nextIndex), 0);
-      }
-    }
-  }
+export async function previousSlide() {
+  const currentIndex = getActiveIndex();
+  await setActiveSlide(Math.max(0, currentIndex - 1));
+}
+
+export async function nextSlide() {
+  const slides = getSlides();
+  const currentIndex = getActiveIndex();
+  await setActiveSlide(Math.min(slides.length - 1, currentIndex + 1));
 }
 
 /* --------------------------- UI Updates ----------------------------- */
@@ -337,8 +407,14 @@ export function updateSlidesUI() {
     button.setAttribute('role', 'tab');
     button.setAttribute('aria-selected', i === active ? 'true' : 'false');
     
-    // Use arrow function to capture index properly
-    button.addEventListener('click', () => setActiveSlide(i));
+    // Use async click handler
+    button.addEventListener('click', async () => {
+      try {
+        await setActiveSlide(i);
+      } catch (error) {
+        console.error('Failed to switch to slide:', error);
+      }
+    });
     
     if (i === active) {
       button.classList.add('primary');
@@ -367,23 +443,10 @@ export function updateSlidesUI() {
   updateImageFadeUI();
 }
 
-/* --------------------------- Navigation Functions ----------------------------- */
-
-export async function previousSlide() {
-  const currentIndex = getActiveIndex();
-  await setActiveSlide(Math.max(0, currentIndex - 1));
-}
-
-export async function nextSlide() {
-  const slides = getSlides();
-  const currentIndex = getActiveIndex();
-  await setActiveSlide(Math.min(slides.length - 1, currentIndex + 1));
-}
-
 /* --------------------------- Slide CRUD Operations ----------------------------- */
 
 export function addSlide() {
-  writeCurrentSlide(); // Save current state
+  writeCurrentSlide();
   const slides = getSlides();
   const currentIndex = getActiveIndex();
   
@@ -396,36 +459,34 @@ export function addSlide() {
   
   slides.splice(currentIndex + 1, 0, newSlide);
   setSlides([...slides]);
-  setActiveSlide(currentIndex + 1);
+  setActiveSlide(currentIndex + 1); // Use async slide switching
 }
 
 export function duplicateSlide() {
-  writeCurrentSlide(); // Save current state
+  writeCurrentSlide();
   const slides = getSlides();
   const currentIndex = getActiveIndex();
   const currentSlideData = slides[currentIndex];
   
   if (!currentSlideData) return;
   
-  // Deep clone the current slide
   const duplicatedSlide = JSON.parse(JSON.stringify(currentSlideData));
   slides.splice(currentIndex + 1, 0, duplicatedSlide);
   setSlides([...slides]);
-  setActiveSlide(currentIndex + 1);
+  setActiveSlide(currentIndex + 1); // Use async slide switching
 }
 
 export function deleteSlide() {
   const slides = getSlides();
   const currentIndex = getActiveIndex();
   
-  if (slides.length <= 1) return; // Don't delete the last slide
+  if (slides.length <= 1) return;
   
   slides.splice(currentIndex, 1);
   setSlides([...slides]);
   
-  // Move to previous slide if we deleted the last one, otherwise stay at same index
   const newIndex = currentIndex >= slides.length ? slides.length - 1 : currentIndex;
-  setActiveSlide(newIndex);
+  setActiveSlide(newIndex); // Use async slide switching
 }
 
 export function handleSlideDurationChange(value) {
@@ -497,13 +558,19 @@ async function stepFrame(ts) {
     userBgWrap.style.opacity = String(opacity);
   }
 
-  // Check if we should advance to the next slide
+  // Advance to next slide
   if (elapsed >= duration) {
     const nextIndex = (currentIndex + 1) % slides.length;
     setActiveIndex(nextIndex);
     setSlideStartTs(ts);
-    await loadSlideIntoDOM(slides[nextIndex]);
-    updateSlidesUI();
+    
+    // Use simplified slide loading during playback
+    try {
+      await loadSlideIntoDOM(slides[nextIndex]);
+      updateSlidesUI();
+    } catch (error) {
+      console.error('Error during playback slide switch:', error);
+    }
   }
 
   // Continue animation
@@ -522,7 +589,6 @@ function startPlay() {
     playBtn.textContent = 'Stop';
   }
   
-  // Disable CSS transition to let JS control fade durations precisely
   if (userBgWrap) {
     userBgWrap.style.transition = 'opacity 0ms linear';
   }
@@ -560,15 +626,16 @@ export function togglePlay() {
   }
 }
 
-/* --------------------------- Cleanup ----------------------------- */
+/* --------------------------- Cleanup Functions ----------------------------- */
 
-// Cleanup function to call when the module is being destroyed
 export function cleanup() {
-  cancelCurrentImageLoad();
+  console.log('🧹 Cleaning up slide manager...');
+  
   stopPlay();
-  isSwitchingSlides = false;
-  pendingSwitchQueue = [];
-  currentSwitchId = 0;
+  switchManager.destroy();
+  imageLoader.destroy();
+  
+  console.log('✅ Slide manager cleaned up');
 }
 
 /* --------------------------- Initialization ----------------------------- */
