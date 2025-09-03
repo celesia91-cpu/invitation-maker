@@ -48,6 +48,10 @@ class ApplicationStateManager {
     // State change listeners
     this.listeners = new Map();
     
+    // Create debounced methods
+    this.saveDebounced = debounce(() => this.save(), 300);
+    this.pushHistoryDebounced = debounce(() => this.pushHistory(), 350);
+    
     // Bind methods to preserve context
     this.setState = this.setState.bind(this);
     this.getState = this.getState.bind(this);
@@ -652,9 +656,17 @@ class ApplicationStateManager {
 // Create singleton instance
 const stateManager = new ApplicationStateManager();
 
-// Create debounced versions of frequently called methods
-const saveProjectDebounced = debounce(() => stateManager.save(), 300);
-const pushHistoryDebounced = debounce(() => stateManager.pushHistory(), 350);
+// Create debounced versions using the instance methods
+const saveProjectDebounced = () => stateManager.saveDebounced();
+const pushHistoryDebounced = () => stateManager.pushHistoryDebounced();
+
+// Backward compatibility - expose history state
+export const historyState = {
+  get stack() { return stateManager.history.stack; },
+  get idx() { return stateManager.history.index; },
+  get lock() { return stateManager.history.isLocked; },
+  set lock(value) { stateManager.lockHistory(value); }
+};
 
 // Backward compatibility exports (maintain existing API)
 export const buildProject = () => stateManager.buildProject();
