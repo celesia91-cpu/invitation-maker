@@ -71,11 +71,16 @@ export class ResponsiveManager {
 
   /**
    * Initialize work width tracking
-   */
+  */
   initializeWorkWidth() {
     const { w } = workSize();
-    this.lastWorkWidth = w;
-    console.log('📐 Initial work width:', w);
+    if (w > 0) {
+      this.lastWorkWidth = w;
+      console.log('📐 Initial work width:', w);
+    } else {
+      console.warn('Work element not found or has zero width');
+      this.lastWorkWidth = null;
+    }
   }
 
   /**
@@ -83,14 +88,14 @@ export class ResponsiveManager {
    */
   handleWorkResize() {
     const { w } = workSize();
-    
+
     if (w <= 0) return;
-    
-    if (this.lastWorkWidth == null) {
+
+    if (!(this.lastWorkWidth > 0)) {
       this.lastWorkWidth = w;
       return;
     }
-    
+
     const scaleFactor = w / this.lastWorkWidth;
     
     if (Math.abs(scaleFactor - 1) > 0.001) {
@@ -240,9 +245,9 @@ export class ResponsiveManager {
       console.warn('ResponsiveManager not initialized');
       return;
     }
-    
+
     const { w } = workSize();
-    if (this.lastWorkWidth && w > 0) {
+    if (this.lastWorkWidth > 0 && w > 0) {
       const resetFactor = 1 / (w / this.lastWorkWidth);
       this.scaleAllElements(resetFactor);
       this.lastWorkWidth = w;
@@ -260,7 +265,9 @@ export class ResponsiveManager {
    * Set last work width (useful for initialization)
    */
   setLastWorkWidth(width) {
-    this.lastWorkWidth = width;
+    if (width > 0) {
+      this.lastWorkWidth = width;
+    }
   }
 
   /**
@@ -268,7 +275,7 @@ export class ResponsiveManager {
    */
   getCurrentScaleFactor() {
     const { w } = workSize();
-    if (this.lastWorkWidth && w > 0) {
+    if (this.lastWorkWidth > 0 && w > 0) {
       return w / this.lastWorkWidth;
     }
     return 1;

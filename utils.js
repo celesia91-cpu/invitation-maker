@@ -29,6 +29,10 @@ export function isBold(cs) {
 // DOM utilities
 export function workSize() {
   const work = document.querySelector('#work');
+  if (!work) {
+    console.warn('workSize: #work element not found');
+    return { w: 0, h: 0 };
+  }
   const r = work.getBoundingClientRect();
   return { w: r.width, h: r.height };
 }
