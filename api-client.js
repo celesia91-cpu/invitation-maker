@@ -1,13 +1,13 @@
 // api-client.js - Fixed version without localStorage (Claude-compatible)
 
 class APIClient {
-  constructor(baseURL) {
+  constructor(baseURL, fetchImpl) {
     // Auto-detect environment if no baseURL provided
     if (!baseURL) {
       if (typeof window !== 'undefined') {
-        const isDev = window.location.hostname === 'localhost' || 
+        const isDev = window.location.hostname === 'localhost' ||
                      window.location.hostname === '127.0.0.1';
-        
+
         if (isDev) {
           baseURL = 'http://localhost:3001/api';
         } else {
@@ -16,6 +16,16 @@ class APIClient {
       } else {
         baseURL = 'http://localhost:3001/api';
       }
+    }
+
+    // Determine fetch implementation based on environment
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      this.fetch = window.fetch.bind(window);
+    } else {
+      this.fetch = fetchImpl || (typeof globalThis !== 'undefined' &&
+        typeof globalThis.fetch === 'function'
+          ? globalThis.fetch.bind(globalThis)
+          : undefined);
     }
 
     this.baseURL = baseURL;
@@ -35,7 +45,7 @@ class APIClient {
   }
 
   setupInterceptors() {
-    if (typeof window !== 'undefined' && window.fetch) {
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
       // Store original fetch for potential restoration in browsers
       this._originalFetch = window.fetch;
 
@@ -43,9 +53,7 @@ class APIClient {
       this._log('API Client initialized with base URL:', this.baseURL);
     } else {
       // Fallback for non-browser environments (e.g., Node.js)
-      this._originalFetch = (typeof globalThis !== 'undefined' && globalThis.fetch)
-        ? globalThis.fetch
-        : undefined;
+      this._originalFetch = this.fetch;
       this._log('API Client initialized without browser environment:', this.baseURL);
     }
   }
@@ -167,7 +175,7 @@ class APIClient {
     this._log('Making request:', config.method || 'GET', url);
 
     try {
-      const response = await fetch(url, config);
+      const response = await this.fetch(url, config);
       
       // Handle different response types
       const contentType = response.headers.get('content-type') || '';
