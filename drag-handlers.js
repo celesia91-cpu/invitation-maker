@@ -252,6 +252,13 @@ export class DragHandlersManager {
       const work = document.getElementById('work');
       const rect = work.getBoundingClientRect();
       
+      const centerX = rect.left + imgState.cx;
+      const centerY = rect.top + imgState.cy;
+      const startPointerAngle = Math.atan2(
+        e.clientY - centerY,
+        e.clientX - centerX
+      );
+
       this.dragState = {
         type: 'handle',
         handleType,
@@ -259,8 +266,9 @@ export class DragHandlersManager {
         startY: e.clientY,
         startScale: imgState.scale,
         startAngle: imgState.angle,
-        centerX: rect.left + imgState.cx,
-        centerY: rect.top + imgState.cy
+        centerX,
+        centerY,
+        startPointerAngle
       };
       
       e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -280,14 +288,17 @@ export class DragHandlersManager {
       
       const dx = e.clientX - this.dragState.startX;
       const dy = e.clientY - this.dragState.startY;
-      
+
       if (this.dragState.handleType === 'rotate') {
-        // Rotation handle: calculate angle from center
-        const angleRad = Math.atan2(
-          e.clientY - this.dragState.centerY, 
+        // Rotation handle: calculate angle relative to start
+        const currentAngle = Math.atan2(
+          e.clientY - this.dragState.centerY,
           e.clientX - this.dragState.centerX
         );
-        imgState.angle = angleRad;
+        imgState.angle =
+          this.dragState.startAngle +
+          currentAngle -
+          this.dragState.startPointerAngle;
       } else {
         // Scale handles: calculate distance-based scaling
         const distance = Math.sqrt(dx * dx + dy * dy);
