@@ -23,3 +23,7 @@ const decoded = decodeState(encoded);
 
 assert.strictEqual(decoded.slides[0].layers[0].text, 'こんにちは世界🌍');
 console.log('encodeState/decodeState round-trip non-ASCII text successfully');
+
+// Invalid data should throw a clear error
+assert.throws(() => decodeState('not_base64!'), /Invalid or corrupted/);
+console.log('decodeState rejects malformed input');
