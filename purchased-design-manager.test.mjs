@@ -33,3 +33,10 @@ assert.ok(!document.body.innerHTML.includes('<img'));
 assert.strictEqual(globalThis.hacked, undefined);
 
 console.log('showAccessError escapes message HTML');
+
+// Directly verify escapeHtml behavior
+assert.strictEqual(
+  manager.escapeHtml('<b>bold & "quotes"</b>'),
+  '&lt;b&gt;bold &amp; &quot;quotes&quot;&lt;/b&gt;'
+);
+console.log('escapeHtml safely encodes special characters');
