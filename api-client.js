@@ -130,17 +130,30 @@ class APIClient {
     // Refresh session activity on each request
     this.refreshSession();
     
+    const headers = { ...(options.headers || {}) };
+
+    // Apply default Content-Type only when not sending FormData and no header provided
+    const hasContentType = Object.keys(headers).some(
+      h => h.toLowerCase() === 'content-type'
+    );
+    const isFormData =
+      typeof FormData !== 'undefined' && options.body instanceof FormData;
+    if (!hasContentType && !isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
+      headers,
       ...options
     };
 
     // Add authorization header if token exists and session is valid
-    if (this.token && this.isSessionValid() && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${this.token}`;
+    if (
+      this.token &&
+      this.isSessionValid() &&
+      !Object.keys(headers).some(h => h.toLowerCase() === 'authorization')
+    ) {
+      headers.Authorization = `Bearer ${this.token}`;
     }
 
     this._log('Making request:', config.method || 'GET', url);
@@ -329,12 +342,9 @@ class APIClient {
     formData.append('image', file);
 
     try {
+      // Authorization handled automatically in request(); browser sets multipart boundary
       return await this.request('/images/upload', {
         method: 'POST',
-        headers: {
-          // Remove Content-Type header to let browser set boundary for FormData
-          Authorization: `Bearer ${this.token}`
-        },
         body: formData
       });
     } catch (error) {
