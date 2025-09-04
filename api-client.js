@@ -35,11 +35,19 @@ class APIClient {
   }
 
   setupInterceptors() {
-    // Store original fetch for potential restoration
-    this._originalFetch = window.fetch;
-    
-    // Could add request/response interceptors here if needed
-    this._log('API Client initialized with base URL:', this.baseURL);
+    if (typeof window !== 'undefined' && window.fetch) {
+      // Store original fetch for potential restoration in browsers
+      this._originalFetch = window.fetch;
+
+      // Could add request/response interceptors here if needed
+      this._log('API Client initialized with base URL:', this.baseURL);
+    } else {
+      // Fallback for non-browser environments (e.g., Node.js)
+      this._originalFetch = (typeof globalThis !== 'undefined' && globalThis.fetch)
+        ? globalThis.fetch
+        : undefined;
+      this._log('API Client initialized without browser environment:', this.baseURL);
+    }
   }
 
   // FIXED: In-memory token management instead of localStorage
