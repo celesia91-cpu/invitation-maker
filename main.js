@@ -281,6 +281,8 @@ class InvitationMakerApp {
 
 // Global app instance
 let appInstance = null;
+// Export a live binding so other modules can access the current instance
+export { appInstance };
 
 /**
  * Initialize the application
@@ -331,4 +333,3 @@ initializeApp().catch(error => {
 
 // Export for module systems
 export { InvitationMakerApp, initializeApp };
-export default initializeApp;
