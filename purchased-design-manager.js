@@ -59,7 +59,7 @@ export class PurchasedDesignManager {
       
     } catch (error) {
       console.error('❌ Failed to initialize purchased design manager:', error);
-      this.showAccessError(this.escapeHtml(error.message || 'Failed to initialize'));
+      this.showAccessError(error.message || 'Failed to initialize');
       throw error;
     }
   }
@@ -578,11 +578,12 @@ export class PurchasedDesignManager {
    * Show access error (expired/invalid token)
    */
   showAccessError(message) {
+    const safeMessage = this.escapeHtml(message);
     document.body.innerHTML = `
       <div style="position: fixed; inset: 0; background: linear-gradient(135deg, #0f1a2d, #1a2332); display: flex; align-items: center; justify-content: center; padding: 2rem;">
         <div style="background: white; border-radius: 18px; padding: 3rem; max-width: 500px; text-align: center;">
           <h1 style="color: #1f2937; margin-bottom: 1rem;">Access Expired or Invalid</h1>
-          <p style="color: #6b7280; margin-bottom: 2rem;">${message}</p>
+          <p style="color: #6b7280; margin-bottom: 2rem;">${safeMessage}</p>
           <p style="color: #6b7280; font-size: 14px;">
             If you believe this is an error, please contact support with your purchase details.
           </p>
