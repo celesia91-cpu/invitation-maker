@@ -17,19 +17,21 @@ class APIClient {
         baseURL = 'http://localhost:3001/api';
       }
     }
-    
+
     this.baseURL = baseURL;
-    this.token = this.loadToken();
-    this.setupInterceptors();
-    this.isRetrying = false;
-    this._debug = false;
-    
+
     // FIXED: In-memory session storage for tokens
     this._sessionData = {
       token: null,
       user: null,
       lastActivity: null
     };
+
+    // Initialize token after session data is ready
+    this.token = this.loadToken();
+    this.setupInterceptors();
+    this.isRetrying = false;
+    this._debug = false;
   }
 
   setupInterceptors() {
