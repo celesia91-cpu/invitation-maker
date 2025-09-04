@@ -328,4 +328,4 @@ initializeApp().catch(error => {
 
 // Export for module systems
 export { InvitationMakerApp, initializeApp };
-export default InvitationMakerApp;
+export default initializeApp;
