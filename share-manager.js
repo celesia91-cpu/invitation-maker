@@ -84,22 +84,35 @@ export async function shareCurrent() {
     if (navigator.share) {
       await navigator.share(shareData);
     } else if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(url);
-      toast('Link copied ✓');
+      try {
+        const perm = await navigator.permissions?.query({ name: 'clipboard-write' });
+        if (!perm || perm.state === 'granted' || perm.state === 'prompt') {
+          await navigator.clipboard.writeText(url);
+          toast('Link copied ✓');
+        } else {
+          manualCopy(url);
+        }
+      } catch (err) {
+        console.warn('Clipboard write failed:', err);
+        manualCopy(url);
+      }
     } else {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = url;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      toast('Link copied ✓');
+      manualCopy(url);
     }
   } catch (error) {
     console.error('Share failed:', error);
     toast('Share failed');
   }
+}
+
+function manualCopy(url) {
+  console.warn('Prompting user to copy link manually.');
+  try {
+    window.prompt('Copy this link:', url);
+  } catch (err) {
+    console.warn('Prompt failed:', err);
+  }
+  toast('Copy the link manually');
 }
 
 // Apply viewer mode from URL parameters
