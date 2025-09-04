@@ -7,7 +7,7 @@ import {
   saveProjectDebounced, updateUndoRedoUI
 } from './state-manager.js';
 
-import { clamp, DEFAULT_DUR } from './utils.js';
+import { clamp, DEFAULT_DUR, fmtSec } from './utils.js';
 import { buildLayersFromDOM, loadLayersIntoDOM, updateTextFadeUI } from './text-manager.js';
 import { 
   imgState, setTransforms, updateImageFadeUI 
@@ -131,10 +131,6 @@ function currentSlide() {
   const s = getSlides();
   const i = getActiveIndex();
   return s[i];
-}
-
-function fmtSec(ms) {
-  return ((ms || 0) / 1000).toFixed(1) + 's';
 }
 
 function ensureSlide(idx) {
