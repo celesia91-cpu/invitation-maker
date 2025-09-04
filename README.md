@@ -28,3 +28,13 @@ Then navigate to the provided local URL to explore the app.
 - Follow existing code style and write clear commit messages.
 - Run any available tests before submitting.
 
+## Module Usage
+To interact with the app from other modules, import the named exports:
+
+```javascript
+import { initializeApp, appInstance } from './main.js';
+
+await initializeApp();
+// `appInstance` is a live binding to the running application
+```
+
