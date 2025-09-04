@@ -56,3 +56,12 @@ assert.strictEqual(elements.bgBox.listenerCount('pointerup'), 0);
 
 console.log('cleanup removes listeners successfully');
 
+// Verify handlePointerUp handles transform handles
+const manager2 = new DragHandlersManager();
+let transformEnded = false;
+manager2.handleTransformPointerUp = async () => { transformEnded = true; };
+manager2.dragState = { type: 'handle' };
+await manager2.handlePointerUp();
+assert.strictEqual(transformEnded, true);
+console.log('handlePointerUp handles transform handles successfully');
+

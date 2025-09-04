@@ -176,6 +176,8 @@ export class DragHandlersManager {
   async handlePointerUp(e) {
     if (this.dragState?.type === 'image') {
       await this.endImageDrag();
+    } else if (this.dragState?.type === 'handle') {
+      await this.handleTransformPointerUp();
     } else {
       await this.endTextDrag();
     }
