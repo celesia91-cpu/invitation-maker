@@ -6,7 +6,7 @@ import {
   applyProject,
   setIsViewer,
   setCurrentProjectId,
-  historyState // <-- ensure this exists (we added it in state-manager)
+  historyState
 } from './state-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
