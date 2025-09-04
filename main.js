@@ -178,17 +178,20 @@ class InvitationMakerApp {
 
   /**
    * Create default project for new users
-   */
+  */
   async createDefaultProject() {
-    await loadSlideIntoDOM({ 
-      image: null, 
-      layers: [], 
-      workSize: workSize(), 
-      durationMs: 3000 
+    const size = workSize();
+    await loadSlideIntoDOM({
+      image: null,
+      layers: [],
+      workSize: size,
+      durationMs: 3000
     });
-    
+
     addTextLayer("You're invited!");
-    this.managers.responsive?.setLastWorkWidth(workSize().w);
+    if (size.w > 0) {
+      this.managers.responsive?.setLastWorkWidth(size.w);
+    }
   }
 
   /**
