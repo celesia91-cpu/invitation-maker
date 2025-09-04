@@ -60,34 +60,30 @@ export function getUrlHash() {
 
 // ENHANCED: Better encoding/decoding with compression and error handling
 // Helpers for Base64 encoding/decoding that handle Unicode correctly in
-// both browser and Node environments.
-function toBase64(str) {
-  try {
-    if (typeof Buffer !== 'undefined') {
-      // Node.js environment
-      return Buffer.from(str, 'utf-8').toString('base64');
-    }
-  } catch {
-    /* ignore */
-  }
+// both browser and Node environments using TextEncoder/TextDecoder.
+function base64Encode(str) {
   const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary);
+  if (typeof btoa === 'function') {
+    let binary = '';
+    for (const b of bytes) binary += String.fromCharCode(b);
+    return btoa(binary);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
+  throw new Error('No base64 encoder available');
 }
 
-function fromBase64(base64) {
-  let binary;
-  try {
-    if (typeof Buffer !== 'undefined') {
-      // Node.js environment
-      return Buffer.from(base64, 'base64').toString('utf-8');
-    }
-  } catch {
-    /* ignore */
+function base64Decode(base64) {
+  let bytes;
+  if (typeof atob === 'function') {
+    const binary = atob(base64);
+    bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  } else if (typeof Buffer !== 'undefined') {
+    bytes = Buffer.from(base64, 'base64');
+  } else {
+    throw new Error('No base64 decoder available');
   }
-  binary = atob(base64);
-  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
 
@@ -103,7 +99,7 @@ export function encodeState(obj) {
 
     // Use the compressed version if significantly smaller
     const finalJson = compressedJson.length < json.length * 0.8 ? compressedJson : json;
-    const encoded = toBase64(finalJson);
+    const encoded = base64Encode(finalJson);
 
     console.log('Final encoded length:', encoded.length);
     return encoded;
@@ -111,7 +107,7 @@ export function encodeState(obj) {
     console.error('Encoding failed:', error);
     // Fallback to basic encoding
     try {
-      return toBase64(JSON.stringify(obj));
+      return base64Encode(JSON.stringify(obj));
     } catch (fallbackError) {
       console.error('Fallback encoding failed:', fallbackError);
       throw new Error('Failed to encode project data');
@@ -121,7 +117,7 @@ export function encodeState(obj) {
 
 export function decodeState(encoded) {
   try {
-    const json = fromBase64(encoded);
+    const json = base64Decode(encoded);
     const decoded = JSON.parse(json);
     console.log('Successfully decoded project data');
     return decoded;
