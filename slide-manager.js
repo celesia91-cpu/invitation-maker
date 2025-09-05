@@ -580,7 +580,7 @@ async function stepFrame(ts) {
   setRafId(rafId);
 }
 
-function startPlay() {
+export function startPlay() {
   if (getPlaying()) return;
   
   setPlaying(true);

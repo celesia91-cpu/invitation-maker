@@ -162,13 +162,14 @@ export function applyViewerFromUrl() {
 
       // Ensure slides render after applying project
       if (data.slides && data.slides.length > 0) {
-        import('./slide-manager.js').then(async ({ loadSlideIntoDOM, updateSlidesUI }) => {
+        import('./slide-manager.js').then(async ({ loadSlideIntoDOM, updateSlidesUI, startPlay }) => {
           try {
             const activeIndex = Math.max(0, Math.min(data.activeIndex || 0, data.slides.length - 1));
             await loadSlideIntoDOM(data.slides[activeIndex]);
             updateSlidesUI();
 
             if (isViewer) {
+              startPlay();
               [...document.querySelectorAll('.layer')].forEach((el) =>
                 el.setAttribute('contenteditable', 'false')
               );
