@@ -588,7 +588,7 @@ class ApplicationStateManager {
   // ===================
 
   /**
-   * Deep merge objects
+   * Deep merge objects (FIXED)
    */
   deepMerge(target, source) {
     const result = { ...target };
@@ -596,14 +596,10 @@ class ApplicationStateManager {
     for (const key in source) {
       const value = source[key];
 
-
       // Don't recurse into DOM nodes or non-plain objects
       if (typeof Node !== 'undefined' && value instanceof Node) {
         result[key] = value;
-      } else if (value && value.constructor === Object) {
-        result[key] = this.deepMerge(target[key] || {}, value);
-
-      if (Array.isArray(value)) {
+      } else if (Array.isArray(value)) {
         // Shallow-copy arrays to avoid reference sharing
         result[key] = [...value];
       } else if (
@@ -615,7 +611,6 @@ class ApplicationStateManager {
         result[key] = this.deepMerge(target[key] || {}, value);
       } else {
         // Functions, class instances, primitives, etc.
-
         result[key] = value;
       }
     }
