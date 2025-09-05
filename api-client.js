@@ -311,6 +311,10 @@ class APIClient {
   }
 
   // Project management endpoints (unchanged)
+  async getUserDesigns() {
+    return this.get('/designs');
+  }
+
   async getProjects() {
     return this.get('/projects');
   }
