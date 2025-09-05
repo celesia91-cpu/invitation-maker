@@ -595,15 +595,20 @@ class ApplicationStateManager {
    */
   deepMerge(target, source) {
     const result = { ...target };
-    
+
     for (const key in source) {
-      if (source[key] !== null && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = this.deepMerge(target[key] || {}, source[key]);
+      const value = source[key];
+
+      // Don't recurse into DOM nodes or non-plain objects
+      if (typeof Node !== 'undefined' && value instanceof Node) {
+        result[key] = value;
+      } else if (value && value.constructor === Object) {
+        result[key] = this.deepMerge(target[key] || {}, value);
       } else {
-        result[key] = source[key];
+        result[key] = value;
       }
     }
-    
+
     return result;
   }
 
