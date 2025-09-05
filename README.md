@@ -38,3 +38,32 @@ await initializeApp();
 // `appInstance` is a live binding to the running application
 ```
 
+
+## Backend API
+Start the development server:
+
+```bash
+npm start
+```
+
+### GET `/api/designs`
+Returns all saved designs for the authenticated user. Authentication is
+validated via a JWT passed either as a `Bearer` token or a `session`
+cookie.
+
+**Response JSON Schema**
+```json
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "title", "thumbnailUrl", "updatedAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "title": { "type": "string" },
+      "thumbnailUrl": { "type": "string", "format": "uri" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  }
+}
+```

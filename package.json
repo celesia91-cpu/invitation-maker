@@ -1,0 +1,9 @@
+{
+  "name": "invitation-maker",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node drag-handlers.test.mjs && node purchased-design-manager.test.mjs && node ui-manager.test.mjs && node utils.test.mjs && node state-manager.test.mjs"
+  }
+}
