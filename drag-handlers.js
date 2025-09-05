@@ -19,6 +19,12 @@ export class DragHandlersManager {
     this.onTransformPointerDown = this.handleTransformPointerDown.bind(this);
     this.onTransformPointerMove = this.handleTransformPointerMove.bind(this);
     this.onTransformPointerUp = this.handleTransformPointerUp.bind(this);
+
+    // Touch handler references
+    this.boundTouchStart = null;
+    this.boundTouchMove = null;
+    this.boundTouchEnd = null;
+    this.lastTap = 0;
   }
 
   /**
@@ -33,6 +39,8 @@ export class DragHandlersManager {
     try {
       this.setupWorkAreaHandlers();
       this.setupTransformBoxHandlers();
+      this.setupTouchHandlers();
+      this.setupDoubleTapHandler();
       
       this.isInitialized = true;
       console.log('✅ DragHandlersManager initialized');
@@ -422,21 +430,21 @@ export class DragHandlersManager {
    */
   setupTouchHandlers() {
     const work = document.getElementById('work');
-    if (!work) return;
+    if (!work || this.boundTouchStart) return;
 
-    // Prevent default touch behaviors that might interfere
-    work.addEventListener('touchstart', (e) => {
+    this.boundTouchStart = (e) => {
       if (e.touches.length === 1) {
-        // Single touch - allow drag
         e.preventDefault();
       }
-    }, { passive: false });
-
-    work.addEventListener('touchmove', (e) => {
+    };
+    this.boundTouchMove = (e) => {
       if (this.isDragging()) {
         e.preventDefault();
       }
-    }, { passive: false });
+    };
+
+    work.addEventListener('touchstart', this.boundTouchStart, { passive: false });
+    work.addEventListener('touchmove', this.boundTouchMove, { passive: false });
   }
 
   /**
@@ -444,25 +452,24 @@ export class DragHandlersManager {
    */
   setupDoubleTapHandler() {
     const work = document.getElementById('work');
-    if (!work) return;
+    if (!work || this.boundTouchEnd) return;
+    this.lastTap = 0;
 
-    let lastTap = 0;
-    
-    work.addEventListener('touchend', async (e) => {
+    this.boundTouchEnd = async (e) => {
       const currentTime = new Date().getTime();
-      const tapLength = currentTime - lastTap;
-      
+      const tapLength = currentTime - this.lastTap;
+
       if (tapLength < 500 && tapLength > 0) {
-        // Double tap detected
         const layer = e.target.closest('.layer');
         if (layer) {
-          // Double tap on text layer - could trigger editing mode
           console.log('📱 Double tap on text layer');
         }
       }
-      
-      lastTap = currentTime;
-    });
+
+      this.lastTap = currentTime;
+    };
+
+    work.addEventListener('touchend', this.boundTouchEnd);
   }
 
   /**
@@ -481,6 +488,18 @@ export class DragHandlersManager {
       work.removeEventListener('pointermove', this.handlePointerMove);
       work.removeEventListener('pointerup', this.handlePointerUp);
       work.removeEventListener('click', this.handleWorkClick);
+      if (this.boundTouchStart) {
+        work.removeEventListener('touchstart', this.boundTouchStart);
+        this.boundTouchStart = null;
+      }
+      if (this.boundTouchMove) {
+        work.removeEventListener('touchmove', this.boundTouchMove);
+        this.boundTouchMove = null;
+      }
+      if (this.boundTouchEnd) {
+        work.removeEventListener('touchend', this.boundTouchEnd);
+        this.boundTouchEnd = null;
+      }
     }
 
     const bgBox = document.getElementById('bgBox');
@@ -493,6 +512,7 @@ export class DragHandlersManager {
     // Reset state
     this.dragState = null;
     this.isInitialized = false;
+    this.lastTap = 0;
     
     console.log('✅ DragHandlersManager cleaned up');
   }
