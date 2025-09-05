@@ -82,19 +82,16 @@ class ApplicationStateManager {
       return false;
     }
 
-    // Create new state
-    const newState = merge 
-      ? { ...this.state, ...updates }
-      : updates;
+    // Determine new state based on merge option
+    const newState = merge
+      ? this.deepMerge(this.state, updates)
+      : { ...this.state, ...updates };
 
-    // Deep merge for nested objects
-    const mergedState = this.deepMerge(this.state, newState);
-    
     // Store previous state for change detection
     const previousState = { ...this.state };
-    
+
     // Update state
-    this.state = mergedState;
+    this.state = newState;
     
     // Notify listeners if requested
     if (notify) {
@@ -231,7 +228,7 @@ class ApplicationStateManager {
 
   // Active layer
   get activeLayer() { return this.state.activeLayer; }
-  set activeLayer(value) { this.setState({ activeLayer: value }); }
+  set activeLayer(value) { this.setState({ activeLayer: value }, { merge: false }); }
 
   // Playing state
   get playing() { return this.state.playing; }
@@ -599,12 +596,26 @@ class ApplicationStateManager {
     for (const key in source) {
       const value = source[key];
 
+
       // Don't recurse into DOM nodes or non-plain objects
       if (typeof Node !== 'undefined' && value instanceof Node) {
         result[key] = value;
       } else if (value && value.constructor === Object) {
         result[key] = this.deepMerge(target[key] || {}, value);
+
+      if (Array.isArray(value)) {
+        // Shallow-copy arrays to avoid reference sharing
+        result[key] = [...value];
+      } else if (
+        value !== null &&
+        typeof value === 'object' &&
+        value.constructor === Object
+      ) {
+        // Recursively merge only plain objects
+        result[key] = this.deepMerge(target[key] || {}, value);
       } else {
+        // Functions, class instances, primitives, etc.
+
         result[key] = value;
       }
     }
