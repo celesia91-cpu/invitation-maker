@@ -5,7 +5,7 @@ import { clamp, workSize, fmtSec } from './utils.js';
 import { saveProjectDebounced, getSlides, getActiveIndex } from './state-manager.js';
 
 // Image state
-export const imgState = { has: false, natW: 0, natH: 0, cx: 0, cy: 0, scale: 1, angle: 0, flip: false, backendImageId: null, backendImageUrl: null, backendThumbnailUrl: null };
+export const imgState = { has: false, natW: 0, natH: 0, cx: 0, cy: 0, scale: 1, angle: 0, signX: 1, signY: 1, flip: false, backendImageId: null, backendImageUrl: null, backendThumbnailUrl: null };
 export const imgFilters = { brightness: 100, contrast: 100, saturation: 100, hue: 0, sepia: 0, blur: 0, grayscale: 0 };
 
 // Filter presets
@@ -139,8 +139,9 @@ export function setTransforms() {
   enforceImageBounds();
   const w = imgState.natW * imgState.scale;
   const h = imgState.natH * imgState.scale;
-  const sx = imgState.flip ? -1 : 1;
-  const base = `translate(-50%,-50%) rotate(${imgState.angle}rad) scaleX(${sx})`;
+  const sx = (imgState.flip ? -1 : 1) * (imgState.signX ?? 1);
+  const sy = imgState.signY ?? 1;
+  const base = `translate(-50%,-50%) rotate(${imgState.angle}rad) scale(${imgState.scale * sx}, ${imgState.scale * sy})`;
 
   userBgWrap.style.width = w + 'px';
   userBgWrap.style.height = h + 'px';
@@ -195,6 +196,8 @@ export async function handleImageUpload(file) {
           const s = Math.min(r.width * 0.95 / imgState.natW, r.height * 0.95 / imgState.natH);
           imgState.scale = s;
           imgState.angle = 0;
+          imgState.signX = 1;
+          imgState.signY = 1;
           imgState.flip = false;
           imgState.cx = r.width / 2;
           imgState.cy = r.height / 2;
@@ -275,6 +278,8 @@ function fallbackToLocalUpload(file) {
         const s = Math.min(r.width * 0.95 / imgState.natW, r.height * 0.95 / imgState.natH);
         imgState.scale = s;
         imgState.angle = 0;
+        imgState.signX = 1;
+        imgState.signY = 1;
         imgState.flip = false;
         imgState.cx = r.width / 2;
         imgState.cy = r.height / 2;

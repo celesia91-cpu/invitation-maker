@@ -199,16 +199,20 @@ class ImageLoader {
           if (slide.image && typeof slide.image.scale === 'number') {
             imgState.scale = slide.image.scale;
             imgState.angle = slide.image.angle || 0;
+            imgState.signX = slide.image.signX ?? 1;
+            imgState.signY = slide.image.signY ?? 1;
             imgState.flip = !!slide.image.flip;
             imgState.cx = slide.image.cx || centerX;
             imgState.cy = slide.image.cy || centerY;
           } else {
             const defaultScale = Math.min(
-              workRect.width * 0.95 / imgState.natW, 
+              workRect.width * 0.95 / imgState.natW,
               workRect.height * 0.95 / imgState.natH
             );
             imgState.scale = defaultScale;
             imgState.angle = 0;
+            imgState.signX = 1;
+            imgState.signY = 1;
             imgState.flip = false;
             imgState.cx = centerX;
             imgState.cy = centerY;
@@ -310,6 +314,8 @@ export function writeCurrentSlide() {
         cy: imgState.cy,
         scale: imgState.scale,
         angle: imgState.angle,
+        signX: imgState.signX ?? 1,
+        signY: imgState.signY ?? 1,
         flip: !!imgState.flip,
         fadeInMs: slides[activeIndex]?.image?.fadeInMs || 0,
         fadeOutMs: slides[activeIndex]?.image?.fadeOutMs || 0,

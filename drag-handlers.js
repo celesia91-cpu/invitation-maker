@@ -258,6 +258,9 @@ export class DragHandlersManager {
         e.clientY - centerY,
         e.clientX - centerX
       );
+      const startVectorX = e.clientX - centerX;
+      const startVectorY = e.clientY - centerY;
+      const startDistance = Math.hypot(startVectorX, startVectorY);
 
       this.dragState = {
         type: 'handle',
@@ -268,7 +271,10 @@ export class DragHandlersManager {
         startAngle: imgState.angle,
         centerX,
         centerY,
-        startPointerAngle
+        startPointerAngle,
+        startVectorX,
+        startVectorY,
+        startDistance
       };
       
       e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -286,9 +292,6 @@ export class DragHandlersManager {
     try {
       const { imgState, setTransforms } = await import('./image-manager.js');
       
-      const dx = e.clientX - this.dragState.startX;
-      const dy = e.clientY - this.dragState.startY;
-
       if (this.dragState.handleType === 'rotate') {
         // Rotation handle: calculate angle relative to start
         const currentAngle = Math.atan2(
@@ -300,10 +303,16 @@ export class DragHandlersManager {
           currentAngle -
           this.dragState.startPointerAngle;
       } else {
-        // Scale handles: calculate distance-based scaling
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const factor = 1 + (distance * (dx > 0 ? 1 : -1)) / 100;
+        // Scale handles: scale based on vector from center to pointer
+        const currentVectorX = e.clientX - this.dragState.centerX;
+        const currentVectorY = e.clientY - this.dragState.centerY;
+        const currentDistance = Math.hypot(currentVectorX, currentVectorY);
+        const factor = currentDistance / this.dragState.startDistance;
         imgState.scale = Math.max(0.1, this.dragState.startScale * factor);
+
+        const sign = v => (v >= 0 ? 1 : -1);
+        imgState.signX = sign(currentVectorX) === sign(this.dragState.startVectorX) ? 1 : -1;
+        imgState.signY = sign(currentVectorY) === sign(this.dragState.startVectorY) ? 1 : -1;
       }
       
       setTransforms();
