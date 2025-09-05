@@ -82,19 +82,16 @@ class ApplicationStateManager {
       return false;
     }
 
-    // Create new state
-    const newState = merge 
-      ? { ...this.state, ...updates }
-      : updates;
+    // Determine new state based on merge option
+    const newState = merge
+      ? this.deepMerge(this.state, updates)
+      : { ...this.state, ...updates };
 
-    // Deep merge for nested objects
-    const mergedState = this.deepMerge(this.state, newState);
-    
     // Store previous state for change detection
     const previousState = { ...this.state };
-    
+
     // Update state
-    this.state = mergedState;
+    this.state = newState;
     
     // Notify listeners if requested
     if (notify) {
@@ -231,7 +228,7 @@ class ApplicationStateManager {
 
   // Active layer
   get activeLayer() { return this.state.activeLayer; }
-  set activeLayer(value) { this.setState({ activeLayer: value }); }
+  set activeLayer(value) { this.setState({ activeLayer: value }, { merge: false }); }
 
   // Playing state
   get playing() { return this.state.playing; }
