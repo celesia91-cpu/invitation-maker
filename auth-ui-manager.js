@@ -309,6 +309,11 @@ export class AuthUIManager {
       // Could show user info in status text
       // statusText.textContent = `Welcome, ${user.name || user.email}`;
     }
+
+    const myDesignsLink = document.getElementById('myDesignsLink');
+    if (myDesignsLink) {
+      myDesignsLink.style.display = isAuthenticated ? '' : 'none';
+    }
     
     console.log('👤 Auth state updated:', { isAuthenticated, user: user?.email });
   }
