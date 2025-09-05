@@ -595,15 +595,25 @@ class ApplicationStateManager {
    */
   deepMerge(target, source) {
     const result = { ...target };
-    
+
     for (const key in source) {
-      if (source[key] !== null && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = this.deepMerge(target[key] || {}, source[key]);
+      const value = source[key];
+      if (Array.isArray(value)) {
+        // Shallow-copy arrays to avoid reference sharing
+        result[key] = [...value];
+      } else if (
+        value !== null &&
+        typeof value === 'object' &&
+        value.constructor === Object
+      ) {
+        // Recursively merge only plain objects
+        result[key] = this.deepMerge(target[key] || {}, value);
       } else {
-        result[key] = source[key];
+        // Functions, class instances, primitives, etc.
+        result[key] = value;
       }
     }
-    
+
     return result;
   }
 
