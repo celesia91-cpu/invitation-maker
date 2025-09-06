@@ -69,7 +69,9 @@ export async function shareCurrent() {
     // Ensure current DOM state is captured before sharing
     try {
       const { writeCurrentSlide } = await import('./slide-manager.js');
-      writeCurrentSlide();
+      if (writeCurrentSlide) {
+        writeCurrentSlide();
+      }
     } catch (error) {
       console.warn('Could not import slide-manager:', error);
     }
@@ -78,6 +80,12 @@ export async function shareCurrent() {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const url = buildViewerUrl();
+    
+    // Validate URL length
+    if (url.length > 8000) {
+      console.warn('Share URL is very long and may not work in all browsers');
+    }
+
     const shareData = {
       title: 'Invitation',
       text: "You're invited! Open the link to view the invitation.",
@@ -86,27 +94,50 @@ export async function shareCurrent() {
 
     console.log('Sharing URL:', url);
 
-    if (navigator.share) {
-      await navigator.share(shareData);
-    } else if (navigator.clipboard && window.isSecureContext) {
+    // Try native sharing first
+    if (navigator.share && typeof navigator.share === 'function') {
       try {
-        const perm = await navigator.permissions?.query({ name: 'clipboard-write' });
-        if (!perm || perm.state === 'granted' || perm.state === 'prompt') {
-          await navigator.clipboard.writeText(url);
-          console.log('Link copied ✓');
-        } else {
-          manualCopy(url);
+        await navigator.share(shareData);
+        return;
+      } catch (shareError) {
+        console.warn('Native share failed:', shareError);
+        // Fall through to clipboard
+      }
+    }
+
+    // Try clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        // Check permissions if available
+        if (navigator.permissions) {
+          const perm = await navigator.permissions.query({ name: 'clipboard-write' });
+          if (perm.state === 'denied') {
+            manualCopy(url);
+            return;
+          }
         }
+        
+        await navigator.clipboard.writeText(url);
+        console.log('Link copied to clipboard ✓');
+        return;
       } catch (err) {
         console.warn('Clipboard write failed:', err);
-        manualCopy(url);
       }
-    } else {
-      manualCopy(url);
     }
+
+    // Fallback to manual copy
+    manualCopy(url);
+    
   } catch (error) {
     console.error('Share failed:', error);
-    console.error('Share failed');
+    // Still try to show the URL to user
+    try {
+      const fallbackUrl = buildViewerUrl();
+      manualCopy(fallbackUrl);
+    } catch (fallbackError) {
+      console.error('Complete share failure:', fallbackError);
+      alert('Unable to share. Please try refreshing the page.');
+    }
   }
 }
 
