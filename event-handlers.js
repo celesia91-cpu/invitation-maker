@@ -75,8 +75,8 @@ export class EventHandlersManager {
     });
 
     this.registerClickHandler('playSlidesBtn', async () => {
-      const { togglePlay } = await import('./slide-manager.js');
-      togglePlay();
+      const { playSlides } = await import('./slide-manager.js');
+      playSlides();
     });
   }
 
