@@ -1,6 +1,5 @@
 // Fixed RSVP System - Complete RSVP functionality with guest form
 
-import { apiClient } from './api-client.js';
 import { toast } from './utils.js';
 
 // RSVP State Management
@@ -207,31 +206,22 @@ async function handleRsvpSubmit(e) {
     }
     
     console.log('Submitting RSVP:', rsvpData);
-    
-    // Submit to backend
+
+    // Save RSVP locally since there is no backend
     try {
-      const response = await apiClient.submitRSVP(rsvpData);
-      console.log('RSVP submitted successfully:', response);
-      
-      // Show success message
-      showRsvpSuccess(rsvpData);
-      
-      // Update UI to show confirmed state
-      updateRsvpButtons(currentRsvpChoice);
-      
-    } catch (apiError) {
-      console.warn('Backend submission failed:', apiError);
-      
-      // For demo purposes, still show success if it's a network issue
-      // In production, you'd want to handle this differently
-      if (apiError.message?.includes('Network') || apiError.message?.includes('fetch')) {
-        showRsvpSuccess(rsvpData, true); // true indicates offline mode
-        updateRsvpButtons(currentRsvpChoice);
-      } else {
-        throw apiError;
-      }
+      const existing = JSON.parse(localStorage.getItem('rsvps') || '[]');
+      existing.push(rsvpData);
+      localStorage.setItem('rsvps', JSON.stringify(existing));
+    } catch (storageError) {
+      console.warn('Failed to store RSVP locally:', storageError);
     }
-    
+
+    // Show success message
+    showRsvpSuccess(rsvpData);
+
+    // Update UI to show confirmed state
+    updateRsvpButtons(currentRsvpChoice);
+
     // Close modal
     const modal = form.closest('.rsvp-modal');
     modal?.remove();
@@ -239,7 +229,7 @@ async function handleRsvpSubmit(e) {
   } catch (error) {
     console.error('RSVP submission failed:', error);
     toast('RSVP submission failed: ' + (error.message || 'Unknown error'));
-    
+
     submitBtn.textContent = originalText;
     submitBtn.disabled = false;
   } finally {

@@ -1,6 +1,37 @@
 // auth-ui-manager.js - Handles all authentication UI functionality
 
-import { apiClient } from './api-client.js';
+// Local authentication stub for offline use
+const authClient = {
+  login: async ({ email, password }) => {
+    if (!email || !password) throw new Error('Missing credentials');
+    const user = { email };
+    const token = `local-${Date.now()}`;
+    try {
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('authUser', JSON.stringify(user));
+    } catch (_) {}
+    return { user };
+  },
+  logout: async () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authUser');
+  },
+  isAuthenticated: () => !!localStorage.getItem('authToken'),
+  getUser: () => {
+    try {
+      const data = localStorage.getItem('authUser');
+      return data ? JSON.parse(data) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+  getCurrentUser: async () => {
+    const user = authClient.getUser();
+    if (!user) throw new Error('No user');
+    return user;
+  },
+  handleError: (error) => error.message || 'Authentication failed'
+};
 
 /**
  * Manages authentication user interface
@@ -170,7 +201,7 @@ export class AuthUIManager {
     
     try {
       // Attempt login
-      const response = await apiClient.login({ email, password });
+      const response = await authClient.login({ email, password });
       
       // Success
       this.handleLoginSuccess(response);
@@ -209,7 +240,7 @@ export class AuthUIManager {
    * Handle login error
    */
   handleLoginError(error) {
-    const message = apiClient.handleError(error);
+    const message = authClient.handleError(error);
     this.showError(message);
     
     // Focus back to email input for retry
@@ -240,7 +271,7 @@ export class AuthUIManager {
    * Show modal if user needs to authenticate
    */
   showModalIfNeeded() {
-    if (!apiClient.isAuthenticated()) {
+    if (!authClient.isAuthenticated()) {
       setTimeout(() => {
         this.showModal();
       }, 500); // Small delay to let app initialize first
@@ -291,7 +322,7 @@ export class AuthUIManager {
    */
   handleKeydown(event) {
     // ESC to close modal (if user is already authenticated)
-    if (event.key === 'Escape' && apiClient.isAuthenticated()) {
+    if (event.key === 'Escape' && authClient.isAuthenticated()) {
       this.hideModal();
     }
   }
@@ -300,8 +331,8 @@ export class AuthUIManager {
    * Update UI based on authentication state
    */
   updateAuthState() {
-    const isAuthenticated = apiClient.isAuthenticated();
-    const user = apiClient.getUser();
+    const isAuthenticated = authClient.isAuthenticated();
+    const user = authClient.getUser();
     
     // Update status text or other UI elements based on auth state
     const statusText = document.getElementById('statusText');
@@ -323,7 +354,7 @@ export class AuthUIManager {
    */
   async logout() {
     try {
-      await apiClient.logout();
+      await authClient.logout();
       this.updateAuthState();
       this.showSuccess('Logged out successfully');
       
@@ -388,8 +419,8 @@ export class AuthUIManager {
    */
   getAuthStatus() {
     return {
-      isAuthenticated: apiClient.isAuthenticated(),
-      user: apiClient.getUser(),
+      isAuthenticated: authClient.isAuthenticated(),
+      user: authClient.getUser(),
       isModalVisible: this.modalElement?.style.display === 'flex',
       isSubmitting: this.isSubmitting
     };
@@ -407,14 +438,14 @@ export class AuthUIManager {
    */
   async checkSession() {
     try {
-      if (!apiClient.isAuthenticated()) {
+      if (!authClient.isAuthenticated()) {
         return false;
       }
       
       // Try to get current user to validate session
-      await apiClient.getCurrentUser();
+      await authClient.getCurrentUser();
       return true;
-      
+
     } catch (error) {
       console.warn('Session validation failed:', error);
       // Session invalid, show modal

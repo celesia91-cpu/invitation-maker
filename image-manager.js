@@ -1,11 +1,10 @@
 // image-manager.js - Image handling, filters, and transformations
 
-import { apiClient } from './api-client.js';
 import { clamp, workSize, fmtSec } from './utils.js';
 import { saveProjectDebounced, getSlides, getActiveIndex } from './state-manager.js';
 
 // Image state
-export const imgState = { has: false, natW: 0, natH: 0, cx: 0, cy: 0, scale: 1, angle: 0, signX: 1, signY: 1, flip: false, backendImageId: null, backendImageUrl: null, backendThumbnailUrl: null };
+export const imgState = { has: false, natW: 0, natH: 0, cx: 0, cy: 0, scale: 1, angle: 0, signX: 1, signY: 1, flip: false };
 export const imgFilters = { brightness: 100, contrast: 100, saturation: 100, hue: 0, sepia: 0, blur: 0, grayscale: 0 };
 
 // Filter presets
@@ -176,85 +175,7 @@ export async function handleImageUpload(file) {
     return;
   }
 
-  // Try backend upload first if user is logged in
-  if (apiClient.token) {
-    try {
-      const response = await apiClient.uploadImage(file);
-      const userBgEl = document.querySelector('#userBg');
-      const work = document.querySelector('#work');
-      
-      userBgEl.onload = () => {
-        try {
-          imgState.natW = userBgEl.naturalWidth;
-          imgState.natH = userBgEl.naturalHeight;
-          
-          if (!imgState.natW || !imgState.natH) {
-            throw new Error('Invalid image dimensions');
-          }
-          
-          const r = work.getBoundingClientRect();
-          const s = Math.min(r.width * 0.95 / imgState.natW, r.height * 0.95 / imgState.natH);
-          imgState.scale = s;
-          imgState.angle = 0;
-          imgState.signX = 1;
-          imgState.signY = 1;
-          imgState.flip = false;
-          imgState.cx = r.width / 2;
-          imgState.cy = r.height / 2;
-          imgState.has = true;
-          Object.assign(imgFilters, PRESETS.none);
-          highlightPreset('none');
-          updatePresetThumb();
-          setTransforms();
-          toggleUploadBtn();
-          
-          // Store backend image info for saving
-          imgState.backendImageId = response.imageId;
-          imgState.backendImageUrl = response.url;
-          imgState.backendThumbnailUrl = response.thumbnailUrl;
-          
-          // Save project with new image
-          import('./slide-manager.js').then(({ writeCurrentSlide }) => {
-            writeCurrentSlide();
-          });
-          
-          const statusText = document.getElementById('statusText');
-          if (statusText) {
-            statusText.textContent = 'Image uploaded to cloud';
-            setTimeout(() => statusText.textContent = '', 2000);
-          }
-          
-        } catch (error) {
-          console.error('Error processing uploaded image:', error);
-          imgState.has = false;
-          const statusText = document.getElementById('statusText');
-          if (statusText) {
-            statusText.textContent = 'Invalid image file';
-            setTimeout(() => statusText.textContent = '', 3000);
-          }
-        }
-      };
-      
-      userBgEl.onerror = () => {
-        console.error('Failed to load backend image');
-        fallbackToLocalUpload(file);
-      };
-      
-      userBgEl.src = response.url;
-      return;
-      
-    } catch (error) {
-      console.error('Backend upload failed, using local storage:', error);
-      const statusText = document.getElementById('statusText');
-      if (statusText) {
-        statusText.textContent = 'Using local storage';
-        setTimeout(() => statusText.textContent = '', 2000);
-      }
-      // Fall through to local upload
-    }
-  }
-  
-  // Fallback to local file reading (existing logic)
+  // Offline mode: read file locally
   fallbackToLocalUpload(file);
 }
 
@@ -284,11 +205,6 @@ function fallbackToLocalUpload(file) {
         imgState.cx = r.width / 2;
         imgState.cy = r.height / 2;
         imgState.has = true;
-        
-        // Clear backend image info since this is local
-        imgState.backendImageId = null;
-        imgState.backendImageUrl = null;
-        imgState.backendThumbnailUrl = null;
         
         Object.assign(imgFilters, PRESETS.none);
         highlightPreset('none');

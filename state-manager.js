@@ -1,7 +1,6 @@
 // state-manager.js - Consistent state management with clear patterns
 
-import { apiClient } from './api-client.js';
-import { debounce, toast, STORAGE_KEY, MAX_HISTORY } from './utils.js';
+import { debounce, STORAGE_KEY, MAX_HISTORY } from './utils.js';
 
 /**
  * Centralized Application State Manager
@@ -457,45 +456,8 @@ class ApplicationStateManager {
       }
     };
 
-    // In viewer mode, only save locally
-    if (this.isViewer) {
-      this.saveToLocalStorage();
-      this.pushHistoryDebounced();
-      return;
-    }
-
-    // Try backend save for authenticated users
-    try {
-      if (apiClient.token && this.currentProjectId) {
-        // Check if project still exists
-        try {
-          await apiClient.getProject(this.currentProjectId);
-          await apiClient.updateProject(this.currentProjectId, projectData);
-          toast('Project updated');
-        } catch (error) {
-          // Project not found, create new one
-          if (error.message?.includes('404') || error.message?.includes('Not Found')) {
-            this.currentProjectId = null;
-            const response = await apiClient.saveProject(projectData);
-            if (response?.projectId) this.currentProjectId = response.projectId;
-            toast('Project re-created in cloud');
-          } else {
-            throw error;
-          }
-        }
-      } else if (apiClient.token) {
-        // Create new project
-        const response = await apiClient.saveProject(projectData);
-        if (response?.projectId) this.currentProjectId = response.projectId;
-        toast('Project saved to cloud');
-      }
-    } catch (error) {
-      console.error('Backend save failed:', error);
-      toast('Saved locally only');
-    }
-    
-    // Always save locally as backup
-    this.saveToLocalStorage();
+    // Always save locally in offline mode
+    this.saveToLocalStorage(JSON.stringify(projectData));
     this.pushHistoryDebounced();
   }
 

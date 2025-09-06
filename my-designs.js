@@ -1,43 +1,28 @@
-import { apiClient } from './api-client.js';
-
+// Offline designs loader using localStorage
 async function loadDesigns() {
   const listEl = document.getElementById('designList');
   if (!listEl) return;
 
-  listEl.textContent = 'Loading...';
+  listEl.textContent = '';
 
   try {
-    const designs = await apiClient.getUserDesigns();
-    listEl.textContent = '';
-
-    if (!Array.isArray(designs) || designs.length === 0) {
+    const raw = localStorage.getItem('invite_maker_project_v10_share');
+    if (!raw) {
       listEl.innerHTML = '<p>No designs found.</p>';
       return;
     }
 
-    const fragment = document.createDocumentFragment();
+    const project = JSON.parse(raw);
+    const title = project.title || 'Untitled';
 
-    for (const design of designs) {
-      const id = design.id || design._id || design.projectId;
-      const thumb = design.thumbnail || design.thumbUrl || '';
-      const title = design.title || 'Untitled';
-      const updated = design.updatedAt
-        ? new Date(design.updatedAt).toLocaleString()
-        : '';
+    const link = document.createElement('a');
+    link.href = 'index.html';
+    link.className = 'design-card';
+    link.innerHTML = `
+      <h3>${title}</h3>
+    `;
 
-      const link = document.createElement('a');
-      link.href = `index.html?project=${encodeURIComponent(id)}`;
-      link.className = 'design-card';
-      link.innerHTML = `
-        ${thumb ? `<img src="${thumb}" alt="${title}">` : ''}
-        <h3>${title}</h3>
-        <p class="updated">${updated}</p>
-      `;
-
-      fragment.appendChild(link);
-    }
-
-    listEl.appendChild(fragment);
+    listEl.appendChild(link);
   } catch (err) {
     console.error('Failed to load designs:', err);
     listEl.innerHTML = '<p class="error">Failed to load designs.</p>';
