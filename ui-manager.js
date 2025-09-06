@@ -262,7 +262,7 @@ function hideViewerUnnecessaryElements() {
 }
 
 // ENHANCED: Ensure RSVP visibility with retry mechanism
-export function ensureRsvpVisibility(retries = 3) {
+function ensureRsvpVisibility(retries = 3) {
   const rsvpBar = document.getElementById('rsvpBar');
   
   if (!rsvpBar) {
