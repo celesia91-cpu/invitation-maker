@@ -1,8 +1,8 @@
-// image-manager.js - FIXED: Complete version with 100% default scaling
+// image-manager.js - COMPLETE FIXED VERSION - No missing imports
 
 import { apiClient } from './api-client.js';
 import { clamp } from './utils.js';
-import { getSlides, getActiveIndex, getSlideImage } from './state-manager.js';
+import { getSlides, getActiveIndex } from './state-manager.js';
 import { saveProjectDebounced } from './state-manager.js';
 
 // Image state management
@@ -44,6 +44,14 @@ export const PRESETS = {
   cool: { blur: 0, brightness: 100, contrast: 105, grayscale: 0, hueRotate: 200, invert: 0, saturate: 110, sepia: 0, opacity: 100 },
   dramatic: { blur: 0, brightness: 95, contrast: 140, grayscale: 0, hueRotate: 0, invert: 0, saturate: 130, sepia: 0, opacity: 100 }
 };
+
+// FIXED: Get slide image helper function (no import needed)
+function getSlideImage() {
+  const slides = getSlides();
+  const activeIndex = getActiveIndex();
+  const slide = slides[activeIndex];
+  return slide?.image || null;
+}
 
 // Format seconds helper
 function fmtSec(ms) {

@@ -1,4 +1,4 @@
-// slide-manager.js - FIXED: Complete version with 100% image scaling
+// slide-manager.js - COMPLETE FIXED VERSION - No missing imports
 
 import { getSlides, getActiveIndex, setActiveIndex, setSlides } from './state-manager.js';
 import { imgState, setTransforms } from './image-manager.js';
@@ -6,6 +6,14 @@ import { clamp } from './utils.js';
 
 // Constants
 const DEFAULT_DUR = 3000;
+
+// FIXED: Get slide image helper function (no import needed)
+function getSlideImage() {
+  const slides = getSlides();
+  const activeIndex = getActiveIndex();
+  const slide = slides[activeIndex];
+  return slide?.image || null;
+}
 
 // Slide switching state management
 class SlideSwitchManager {
@@ -129,7 +137,7 @@ class ImageLoader {
     
     if (!chosenSrc) {
       imgState.has = false;
-      userBg.src = '';
+      if (userBg) userBg.src = '';
       setTransforms();
       return;
     }
@@ -238,11 +246,15 @@ export async function loadSlideIntoDOM(slide) {
 
   try {
     // Set work dimensions
-    work.style.setProperty('--work-w', (slide?.workSize?.w || 800) + 'px');
-    work.style.setProperty('--work-h', (slide?.workSize?.h || 450) + 'px');
+    if (work) {
+      work.style.setProperty('--work-w', (slide?.workSize?.w || 800) + 'px');
+      work.style.setProperty('--work-h', (slide?.workSize?.h || 450) + 'px');
+    }
 
     // Clear existing text layers
-    [...work.querySelectorAll('.layer')].forEach(n => n.remove());
+    if (work) {
+      [...work.querySelectorAll('.layer')].forEach(n => n.remove());
+    }
     
     // Reset image state
     imgState.has = false;
