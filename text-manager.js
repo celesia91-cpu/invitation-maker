@@ -26,6 +26,8 @@ export function addTextLayer(text) {
   t.style.color = fontColorInput.value;
   t._fadeInMs = 0;
   t._fadeOutMs = 0;
+  t._zoomInMs = 0;
+  t._zoomOutMs = 0;
   
   addLayerEventHandlers(t);
   work.appendChild(t);
@@ -39,6 +41,8 @@ export function addLayerEventHandlers(t) {
   t.onpointerdown = beginDragText;
   t._fadeInMs = t._fadeInMs || 0;
   t._fadeOutMs = t._fadeOutMs || 0;
+  t._zoomInMs = t._zoomInMs || 0;
+  t._zoomOutMs = t._zoomOutMs || 0;
   t.addEventListener('input', () => {
     saveProjectDebounced();
   });
@@ -146,9 +150,10 @@ export function updateDeleteButton() {
 export function syncToolbarFromActive() {
   updateDeleteButton();
   const activeLayer = getActiveLayer();
-  
+
   if (!activeLayer) {
     updateTextFadeUI();
+    updateTextZoomUI();
     return;
   }
   
@@ -171,6 +176,7 @@ export function syncToolbarFromActive() {
   const deco = cs.textDecorationLine || cs.textDecoration || '';
   underlineBtn.classList.toggle('active', (deco + '').includes('underline'));
   updateTextFadeUI();
+  updateTextZoomUI();
 }
 
 // Preserve element center during style changes
@@ -341,6 +347,76 @@ export function handleTextFadeOutRange(value) {
   if (textFadeOutVal) textFadeOutVal.textContent = fmtSec(activeLayer._fadeOutMs);
 }
 
+// Text zoom UI management
+export function updateTextZoomUI() {
+  const textZoomInBtn = document.getElementById('textZoomInBtn');
+  const textZoomOutBtn = document.getElementById('textZoomOutBtn');
+  const textZoomInRange = document.getElementById('textZoomInRange');
+  const textZoomOutRange = document.getElementById('textZoomOutRange');
+  const textZoomInVal = document.getElementById('textZoomInVal');
+  const textZoomOutVal = document.getElementById('textZoomOutVal');
+
+  const activeLayer = getActiveLayer();
+  const on = !!activeLayer;
+
+  [textZoomInBtn, textZoomOutBtn, textZoomInRange, textZoomOutRange].forEach(el => {
+    if (el) el.disabled = !on;
+  });
+
+  if (!on) {
+    textZoomInBtn?.classList.remove('active');
+    textZoomOutBtn?.classList.remove('active');
+    if (textZoomInVal) textZoomInVal.textContent = '0.0s';
+    if (textZoomOutVal) textZoomOutVal.textContent = '0.0s';
+    return;
+  }
+
+  const zi = activeLayer._zoomInMs || 0, zo = activeLayer._zoomOutMs || 0;
+  textZoomInBtn?.classList.toggle('active', zi > 0);
+  textZoomOutBtn?.classList.toggle('active', zo > 0);
+  if (textZoomInRange) textZoomInRange.value = zi;
+  if (textZoomOutRange) textZoomOutRange.value = zo;
+  if (textZoomInVal) textZoomInVal.textContent = fmtSec(zi);
+  if (textZoomOutVal) textZoomOutVal.textContent = fmtSec(zo);
+}
+
+// Text zoom handlers
+export function handleTextZoomIn() {
+  const activeLayer = getActiveLayer();
+  if (!activeLayer) return;
+  activeLayer._zoomInMs = (activeLayer._zoomInMs || 0) > 0 ? 0 : 800;
+  updateTextZoomUI();
+  // Write the current slide to ensure zoom settings are saved
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveProjectDebounced();
+}
+
+export function handleTextZoomOut() {
+  const activeLayer = getActiveLayer();
+  if (!activeLayer) return;
+  activeLayer._zoomOutMs = (activeLayer._zoomOutMs || 0) > 0 ? 0 : 800;
+  updateTextZoomUI();
+  // Write the current slide to ensure zoom settings are saved
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveProjectDebounced();
+}
+
+export function handleTextZoomInRange(value) {
+  const activeLayer = getActiveLayer();
+  if (!activeLayer) return;
+  activeLayer._zoomInMs = parseInt(value, 10) || 0;
+  const textZoomInVal = document.getElementById('textZoomInVal');
+  if (textZoomInVal) textZoomInVal.textContent = fmtSec(activeLayer._zoomInMs);
+}
+
+export function handleTextZoomOutRange(value) {
+  const activeLayer = getActiveLayer();
+  if (!activeLayer) return;
+  activeLayer._zoomOutMs = parseInt(value, 10) || 0;
+  const textZoomOutVal = document.getElementById('textZoomOutVal');
+  if (textZoomOutVal) textZoomOutVal.textContent = fmtSec(activeLayer._zoomOutMs);
+}
+
 // Set active layer with visual feedback
 export function handleSetActiveLayer(el) {
   const work = document.querySelector('#work');
@@ -372,7 +448,9 @@ export function buildLayersFromDOM() {
       textDecoration: cs.textDecorationLine || cs.textDecoration || 'none',
       padding: l.style.padding || '4px 6px',
       fadeInMs: l._fadeInMs || 0,
-      fadeOutMs: l._fadeOutMs || 0
+      fadeOutMs: l._fadeOutMs || 0,
+      zoomInMs: l._zoomInMs || 0,
+      zoomOutMs: l._zoomOutMs || 0
     };
   });
 }
@@ -406,6 +484,8 @@ export function loadLayersIntoDOM(layers) {
     t.style.color = L.color || fontColorInput.value;
     t._fadeInMs = L.fadeInMs || 0;
     t._fadeOutMs = L.fadeOutMs || 0;
+    t._zoomInMs = L.zoomInMs || 0;
+    t._zoomOutMs = L.zoomOutMs || 0;
     addLayerEventHandlers(t);
     work.appendChild(t);
   });
