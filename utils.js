@@ -159,7 +159,9 @@ function compressProjectData(project) {
         textDecoration: layer.textDecoration === 'none' ? undefined : layer.textDecoration,
         padding: layer.padding === '4px 6px' ? undefined : layer.padding, // Remove default
         fadeInMs: layer.fadeInMs,
-        fadeOutMs: layer.fadeOutMs
+        fadeOutMs: layer.fadeOutMs,
+        zoomInMs: layer.zoomInMs,
+        zoomOutMs: layer.zoomOutMs
       })) || [],
       workSize: slide.workSize,
       durationMs: slide.durationMs
