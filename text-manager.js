@@ -26,6 +26,8 @@ export function addTextLayer(text) {
   t.style.color = fontColorInput.value;
   t._fadeInMs = 0;
   t._fadeOutMs = 0;
+  t._zoomInMs = 0;
+  t._zoomOutMs = 0;
   
   addLayerEventHandlers(t);
   work.appendChild(t);
@@ -39,6 +41,8 @@ export function addLayerEventHandlers(t) {
   t.onpointerdown = beginDragText;
   t._fadeInMs = t._fadeInMs || 0;
   t._fadeOutMs = t._fadeOutMs || 0;
+  t._zoomInMs = t._zoomInMs || 0;
+  t._zoomOutMs = t._zoomOutMs || 0;
   t.addEventListener('input', () => {
     saveProjectDebounced();
   });
@@ -372,7 +376,9 @@ export function buildLayersFromDOM() {
       textDecoration: cs.textDecorationLine || cs.textDecoration || 'none',
       padding: l.style.padding || '4px 6px',
       fadeInMs: l._fadeInMs || 0,
-      fadeOutMs: l._fadeOutMs || 0
+      fadeOutMs: l._fadeOutMs || 0,
+      zoomInMs: l._zoomInMs || 0,
+      zoomOutMs: l._zoomOutMs || 0
     };
   });
 }
@@ -406,6 +412,8 @@ export function loadLayersIntoDOM(layers) {
     t.style.color = L.color || fontColorInput.value;
     t._fadeInMs = L.fadeInMs || 0;
     t._fadeOutMs = L.fadeOutMs || 0;
+    t._zoomInMs = L.zoomInMs || 0;
+    t._zoomOutMs = L.zoomOutMs || 0;
     addLayerEventHandlers(t);
     work.appendChild(t);
   });
