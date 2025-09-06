@@ -253,13 +253,25 @@ export function getElements() {
     textFadeOutRange: document.getElementById('textFadeOutRange'),
     textFadeInVal: document.getElementById('textFadeInVal'),
     textFadeOutVal: document.getElementById('textFadeOutVal'),
-    
+    textZoomInBtn: document.getElementById('textZoomInBtn'),
+    textZoomOutBtn: document.getElementById('textZoomOutBtn'),
+    textZoomInRange: document.getElementById('textZoomInRange'),
+    textZoomOutRange: document.getElementById('textZoomOutRange'),
+    textZoomInVal: document.getElementById('textZoomInVal'),
+    textZoomOutVal: document.getElementById('textZoomOutVal'),
+
     imgFadeInBtn: document.getElementById('imgFadeInBtn'),
     imgFadeOutBtn: document.getElementById('imgFadeOutBtn'),
     imgFadeInRange: document.getElementById('imgFadeInRange'),
     imgFadeOutRange: document.getElementById('imgFadeOutRange'),
     imgFadeInVal: document.getElementById('imgFadeInVal'),
-    imgFadeOutVal: document.getElementById('imgFadeOutVal')
+    imgFadeOutVal: document.getElementById('imgFadeOutVal'),
+    imgZoomInBtn: document.getElementById('imgZoomInBtn'),
+    imgZoomOutBtn: document.getElementById('imgZoomOutBtn'),
+    imgZoomInRange: document.getElementById('imgZoomInRange'),
+    imgZoomOutRange: document.getElementById('imgZoomOutRange'),
+    imgZoomInVal: document.getElementById('imgZoomInVal'),
+    imgZoomOutVal: document.getElementById('imgZoomOutVal')
   };
 }
 
