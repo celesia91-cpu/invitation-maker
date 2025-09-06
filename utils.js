@@ -42,17 +42,6 @@ export function fmtSec(ms) {
   return (ms / 1000).toFixed(1) + 's';
 }
 
-// Toast notifications
-export function toast(msg) {
-  const statusText = document.getElementById('statusText');
-  if (!statusText) {
-    console.log(msg);
-    return;
-  }
-  statusText.textContent = msg;
-  setTimeout(() => statusText.textContent = '', 2000);
-}
-
 // URL parsing utilities
 export function getUrlParams() {
   return new URLSearchParams(location.search);
@@ -212,8 +201,7 @@ export function getElements() {
     slideLabel: document.getElementById('slideLabel'),
     
     shareBtn: document.getElementById('shareBtn'),
-    statusText: document.getElementById('statusText'),
-    
+
     slidesStrip: document.getElementById('slidesStrip'),
     addSlideBtn: document.getElementById('addSlideBtn'),
     dupSlideBtn: document.getElementById('dupSlideBtn'),

@@ -210,11 +210,8 @@ class InvitationMakerApp {
    * Handle initialization errors gracefully
    */
   handleInitializationError(error) {
-    const statusText = document.getElementById('statusText');
-    if (statusText) {
-      statusText.textContent = 'Failed to load editor';
-    }
-    
+    console.error('Failed to load editor', error);
+
     // Show user-friendly error
     const errorCard = document.createElement('div');
     errorCard.style.cssText = `

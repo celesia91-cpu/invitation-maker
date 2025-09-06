@@ -303,13 +303,6 @@ export class AuthUIManager {
     const isAuthenticated = apiClient.isAuthenticated();
     const user = apiClient.getUser();
     
-    // Update status text or other UI elements based on auth state
-    const statusText = document.getElementById('statusText');
-    if (statusText && isAuthenticated && user) {
-      // Could show user info in status text
-      // statusText.textContent = `Welcome, ${user.name || user.email}`;
-    }
-
     console.log('👤 Auth state updated:', { isAuthenticated, user: user?.email });
   }
 
@@ -335,39 +328,16 @@ export class AuthUIManager {
    * Show error message
    */
   showError(message) {
-    // Could implement a proper toast/notification system
-    // For now, use simple alert or status text
-    const statusText = document.getElementById('statusText');
-    if (statusText) {
-      statusText.textContent = message;
-      statusText.style.color = '#ef4444';
-      
-      // Clear after 5 seconds
-      setTimeout(() => {
-        statusText.textContent = '';
-        statusText.style.color = '';
-      }, 5000);
-    } else {
-      // Fallback to alert
-      alert(message);
-    }
+    // Basic error feedback
+    console.error(message);
+    alert(message);
   }
 
   /**
    * Show success message
    */
   showSuccess(message) {
-    const statusText = document.getElementById('statusText');
-    if (statusText) {
-      statusText.textContent = message;
-      statusText.style.color = '#10b981';
-      
-      // Clear after 3 seconds
-      setTimeout(() => {
-        statusText.textContent = '';
-        statusText.style.color = '';
-      }, 3000);
-    }
+    console.log(message);
   }
 
   /**
