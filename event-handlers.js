@@ -382,12 +382,8 @@ export class EventHandlersManager {
       } catch (error) {
         console.error(`Error in ${elementId} ${eventType} handler:`, error);
         
-        // Show user-friendly error
-        const statusText = document.getElementById('statusText');
-        if (statusText) {
-          statusText.textContent = 'An error occurred';
-          setTimeout(() => statusText.textContent = '', 2000);
-        }
+        // User-friendly feedback
+        console.log('An error occurred');
       }
     };
 

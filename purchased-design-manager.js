@@ -86,27 +86,11 @@ export class PurchasedDesignManager {
     const designTitle = this.customer?.designTitle || '';
     document.title = `Customize ${designTitle} - Invitation Editor`;
     
-    // Update status text in topbar
-    this.updateStatusText();
-    
-    // Add customer info panel
-    this.addCustomerInfoPanel();
+      // Add customer info panel
+      this.addCustomerInfoPanel();
     
     // Add RSVP management panel
     this.addRSVPPanel();
-  }
-
-  /**
-   * Update status text in topbar
-   */
-  updateStatusText() {
-    const statusText = document.getElementById('statusText');
-    if (statusText && this.customer) {
-      statusText.innerHTML = `
-        <span style="color:#10b981;">${this.escapeHtml(this.customer.designTitle)}</span> • 
-        <span style="color:#6b7280;">${this.escapeHtml(String(this.customer.daysRemaining))} days left</span>
-      `;
-    }
   }
 
   /**
@@ -348,7 +332,7 @@ export class PurchasedDesignManager {
       });
 
       if (response.ok) {
-        this.showSaveSuccess();
+        console.log('Saved');
       } else {
         const error = await response.json().catch(() => ({}));
         console.error('Save failed:', error);
@@ -364,28 +348,6 @@ export class PurchasedDesignManager {
         setTimeout(() => this.saveCustomization(), 1000);
       }
     }
-  }
-
-  /**
-   * Show save success indicator
-   */
-  showSaveSuccess() {
-    const statusText = document.getElementById('statusText');
-    if (!statusText) return;
-
-    let badge = document.getElementById('savedBadge');
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.id = 'savedBadge';
-      badge.style.cssText = 'margin-left:6px;color:#10b981;';
-      statusText.appendChild(badge);
-    }
-    
-    badge.textContent = '• Saved';
-    
-    // Clear the badge after 1.5 seconds
-    clearTimeout(this._savedTimer);
-    this._savedTimer = setTimeout(() => badge?.remove(), 1500);
   }
 
   /**

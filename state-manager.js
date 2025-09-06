@@ -1,7 +1,7 @@
 // state-manager.js - Consistent state management with clear patterns
 
 import { apiClient } from './api-client.js';
-import { debounce, toast, STORAGE_KEY, MAX_HISTORY } from './utils.js';
+import { debounce, STORAGE_KEY, MAX_HISTORY } from './utils.js';
 
 /**
  * Centralized Application State Manager
@@ -471,14 +471,14 @@ class ApplicationStateManager {
         try {
           await apiClient.getProject(this.currentProjectId);
           await apiClient.updateProject(this.currentProjectId, projectData);
-          toast('Project updated');
+          console.log('Project updated');
         } catch (error) {
           // Project not found, create new one
           if (error.message?.includes('404') || error.message?.includes('Not Found')) {
             this.currentProjectId = null;
             const response = await apiClient.saveProject(projectData);
             if (response?.projectId) this.currentProjectId = response.projectId;
-            toast('Project re-created in cloud');
+            console.log('Project re-created in cloud');
           } else {
             throw error;
           }
@@ -487,11 +487,11 @@ class ApplicationStateManager {
         // Create new project
         const response = await apiClient.saveProject(projectData);
         if (response?.projectId) this.currentProjectId = response.projectId;
-        toast('Project saved to cloud');
+        console.log('Project saved to cloud');
       }
     } catch (error) {
       console.error('Backend save failed:', error);
-      toast('Saved locally only');
+      console.log('Saved locally only');
     }
     
     // Always save locally as backup

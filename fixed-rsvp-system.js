@@ -1,7 +1,6 @@
 // Fixed RSVP System - Complete RSVP functionality with guest form
 
 import { apiClient } from './api-client.js';
-import { toast } from './utils.js';
 
 // RSVP State Management
 let currentRsvpChoice = null;
@@ -238,7 +237,7 @@ async function handleRsvpSubmit(e) {
     
   } catch (error) {
     console.error('RSVP submission failed:', error);
-    toast('RSVP submission failed: ' + (error.message || 'Unknown error'));
+    console.error('RSVP submission failed: ' + (error.message || 'Unknown error'));
     
     submitBtn.textContent = originalText;
     submitBtn.disabled = false;
@@ -277,8 +276,8 @@ function showRsvpSuccess(rsvpData, isOffline = false) {
   // Auto close after 5 seconds
   setTimeout(() => successModal.remove(), 5000);
   
-  // Show toast as well
-  toast(isOffline ? 'RSVP saved locally ✓' : 'RSVP submitted successfully ✓');
+  // Show feedback as well
+  console.log(isOffline ? 'RSVP saved locally ✓' : 'RSVP submitted successfully ✓');
 }
 
 // Update RSVP button states

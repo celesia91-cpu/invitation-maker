@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 
-import { setState, getState } from './state-manager.js';
+import stateManager, { setState, getState } from './state-manager.js';
 
 // Minimal mock HTMLElement with a circular reference to simulate DOM structure
 class MockHTMLElement {

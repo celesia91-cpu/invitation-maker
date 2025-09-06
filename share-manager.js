@@ -1,6 +1,6 @@
 // share-manager.js - Fixed sharing functionality
 
-import { encodeState, decodeState, toast } from './utils.js';
+import { encodeState, decodeState } from './utils.js';
 import {
   buildProject,
   applyProject,
@@ -88,7 +88,7 @@ export async function shareCurrent() {
         const perm = await navigator.permissions?.query({ name: 'clipboard-write' });
         if (!perm || perm.state === 'granted' || perm.state === 'prompt') {
           await navigator.clipboard.writeText(url);
-          toast('Link copied ✓');
+          console.log('Link copied ✓');
         } else {
           manualCopy(url);
         }
@@ -101,7 +101,7 @@ export async function shareCurrent() {
     }
   } catch (error) {
     console.error('Share failed:', error);
-    toast('Share failed');
+    console.error('Share failed');
   }
 }
 
@@ -112,7 +112,7 @@ function manualCopy(url) {
   } catch (err) {
     console.warn('Prompt failed:', err);
   }
-  toast('Copy the link manually');
+  console.log('Copy the link manually');
 }
 
 // Apply viewer mode from URL parameters
@@ -183,7 +183,7 @@ export function applyViewerFromUrl() {
       historyState.lock = false;
     } catch (error) {
       console.warn('Failed to decode shared state:', error);
-      toast('Invalid share link');
+      console.error('Invalid share link');
     }
   }
 }

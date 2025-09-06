@@ -168,11 +168,7 @@ export async function handleImageUpload(file) {
   // Validate file size first
   const maxSize = 10 * 1024 * 1024; // 10MB limit
   if (file.size > maxSize) {
-    const statusText = document.getElementById('statusText');
-    if (statusText) {
-      statusText.textContent = 'Image too large (max 10MB)';
-      setTimeout(() => statusText.textContent = '', 3000);
-    }
+    console.error('Image too large (max 10MB)');
     return;
   }
 
@@ -218,20 +214,12 @@ export async function handleImageUpload(file) {
             writeCurrentSlide();
           });
           
-          const statusText = document.getElementById('statusText');
-          if (statusText) {
-            statusText.textContent = 'Image uploaded to cloud';
-            setTimeout(() => statusText.textContent = '', 2000);
-          }
+          console.log('Image uploaded to cloud');
           
         } catch (error) {
-          console.error('Error processing uploaded image:', error);
-          imgState.has = false;
-          const statusText = document.getElementById('statusText');
-          if (statusText) {
-            statusText.textContent = 'Invalid image file';
-            setTimeout(() => statusText.textContent = '', 3000);
-          }
+        console.error('Error processing uploaded image:', error);
+        imgState.has = false;
+        console.error('Invalid image file');
         }
       };
       
@@ -244,12 +232,8 @@ export async function handleImageUpload(file) {
       return;
       
     } catch (error) {
-      console.error('Backend upload failed, using local storage:', error);
-      const statusText = document.getElementById('statusText');
-      if (statusText) {
-        statusText.textContent = 'Using local storage';
-        setTimeout(() => statusText.textContent = '', 2000);
-      }
+        console.error('Backend upload failed, using local storage:', error);
+        console.log('Using local storage');
       // Fall through to local upload
     }
   }
@@ -301,36 +285,22 @@ function fallbackToLocalUpload(file) {
         });
         
       } catch (error) {
-        console.error('Error processing local image:', error);
-        imgState.has = false;
-        const statusText = document.getElementById('statusText');
-        if (statusText) {
-          statusText.textContent = 'Invalid image file';
-          setTimeout(() => statusText.textContent = '', 3000);
-        }
+          console.error('Error processing local image:', error);
+          imgState.has = false;
+          console.error('Invalid image file');
       }
     };
     
-    userBgEl.onerror = () => {
-      console.error('Failed to load local image');
-      const statusText = document.getElementById('statusText');
-      if (statusText) {
-        statusText.textContent = 'Failed to load image';
-        setTimeout(() => statusText.textContent = '', 3000);
-      }
-    };
+      userBgEl.onerror = () => {
+        console.error('Failed to load local image');
+      };
     
     userBgEl.src = evt.target.result;
   };
   
-  reader.onerror = () => {
-    console.error('Failed to read image file');
-    const statusText = document.getElementById('statusText');
-    if (statusText) {
-      statusText.textContent = 'Failed to read file';
-      setTimeout(() => statusText.textContent = '', 3000);
-    }
-  };
+    reader.onerror = () => {
+      console.error('Failed to read image file');
+    };
   
   reader.readAsDataURL(file);
 }
