@@ -94,75 +94,29 @@ export function addLayerEventHandlers(t) {
  */
 export function beginDragText(e) {
   const body = document.body;
-  if (body.classList.contains('preview') || body.classList.contains('viewer')) {
-    return false;
-  }
-
-  // Prevent multiple simultaneous drags
+  if (body.classList.contains('preview') || body.classList.contains('viewer')) return;
+  
+  // End any existing drag first
   if (dragText) {
     endTextDrag();
   }
-
-  const t = e.currentTarget;
-  if (!t) return false;
-
+  
+  setActiveLayer(e.currentTarget);
+  dragText = {
+    t: e.currentTarget,
+    x: e.clientX,
+    y: e.clientY,
+    left: parseFloat(e.currentTarget.style.left || '0'),
+    top: parseFloat(e.currentTarget.style.top || '0'),
+    w: e.currentTarget.offsetWidth,
+    h: e.currentTarget.offsetHeight
+  };
+  
+  // Safe pointer capture
   try {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const work = document.querySelector('#work');
-    if (!work) {
-      console.error('Work area not found');
-      return false;
-    }
-
-    const workRect = work.getBoundingClientRect();
-    const layerRect = t.getBoundingClientRect();
-
-    // Calculate relative positions more accurately
-    const left = layerRect.left - workRect.left;
-    const top = layerRect.top - workRect.top;
-
-    dragText = {
-      t: t,
-      x: e.clientX,
-      y: e.clientY,
-      left: left,
-      top: top,
-      w: t.offsetWidth,
-      h: t.offsetHeight,
-      isResizing: e.shiftKey, // Track initial resize state
-      workRect: workRect, // Cache work bounds
-      hasMoved: false
-    };
-
-    // Set the active layer
-    handleSetActiveLayer(t);
-    
-    // Add dragging class for visual feedback
-    t.classList.add('dragging');
-    
-    // Capture pointer safely
-    try {
-      if (e.currentTarget && e.currentTarget.setPointerCapture) {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }
-    } catch (error) {
-      console.warn('Pointer capture failed:', error);
-    }
-    
-    console.log('📝 Text drag started', { 
-      isResizing: dragText.isResizing,
-      dimensions: { w: dragText.w, h: dragText.h },
-      position: { left: dragText.left, top: dragText.top }
-    });
-
-    return true;
-
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   } catch (error) {
-    console.error('Failed to begin text drag:', error);
-    dragText = null;
-    return false;
+    // Ignore capture errors
   }
 }
 
@@ -172,52 +126,52 @@ export function beginDragText(e) {
  */
 export function handleTextDrag(e) {
   if (!dragText) return;
+  
+  const work = document.querySelector('#work');
+  const vGuide = document.getElementById('vGuide');
+  const hGuide = document.getElementById('hGuide');
+  
+  if (!work) return;
+  
+  const r = work.getBoundingClientRect();
+  const centerX = r.width / 2, centerY = r.height / 2;
 
-  try {
-    const work = document.querySelector('#work');
-    const vGuide = document.getElementById('vGuide');
-    const hGuide = document.getElementById('hGuide');
+  if (e.shiftKey) {
+    // Resize mode - Fixed boundary checking
+    const deltaX = e.clientX - dragText.x;
+    const newWidth = Math.max(20, dragText.w + deltaX);
+    const left = parseFloat(dragText.t.style.left || '0');
+    const maxW = Math.max(20, r.width - left - 10); // 10px margin
     
-    if (!work) {
-      console.error('Work area not found during drag');
-      return;
+    dragText.t.style.width = Math.min(newWidth, maxW) + 'px';
+    hideGuides();
+  } else {
+    // Move mode - Fixed boundary checking
+    let newLeft = dragText.left + (e.clientX - dragText.x);
+    let newTop = dragText.top + (e.clientY - dragText.y);
+    const w = dragText.t.offsetWidth;
+    const h = dragText.t.offsetHeight;
+
+    // Better boundary constraints
+    newLeft = Math.max(0, Math.min(newLeft, Math.max(0, r.width - w)));
+    newTop = Math.max(0, Math.min(newTop, Math.max(0, r.height - h)));
+
+    const elCx = newLeft + w / 2;
+    const elCy = newTop + h / 2;
+    let snapV = false, snapH = false;
+    
+    if (Math.abs(elCx - centerX) <= 8) {
+      newLeft = Math.round(centerX - w / 2);
+      snapV = true;
+    }
+    if (Math.abs(elCy - centerY) <= 8) {
+      newTop = Math.round(centerY - h / 2);
+      snapH = true;
     }
 
-    // Mark movement
-    if (!dragText.hasMoved) {
-      const dx = Math.abs(e.clientX - dragText.x);
-      const dy = Math.abs(e.clientY - dragText.y);
-      if (dx > 3 || dy > 3) {
-        dragText.hasMoved = true;
-      }
-    }
-
-    const workRect = work.getBoundingClientRect();
-    const centerX = workRect.width / 2;
-    const centerY = workRect.height / 2;
-
-    // Check if we're in resize mode (shift key or initially started with shift)
-    const isResizing = e.shiftKey || dragText.isResizing;
-
-    if (isResizing) {
-      // RESIZE MODE - Improved resize handling
-      handleTextResize(e, workRect, centerX, centerY);
-      
-      // Add resizing class
-      dragText.t.classList.add('resizing');
-      dragText.t.classList.remove('dragging');
-    } else {
-      // MOVE MODE - Improved movement with better snapping
-      handleTextMove(e, workRect, centerX, centerY, vGuide, hGuide);
-      
-      // Remove resizing class
-      dragText.t.classList.remove('resizing');
-      dragText.t.classList.add('dragging');
-    }
-
-  } catch (error) {
-    console.error('Error during text drag:', error);
-    endTextDrag(); // Clean up on error
+    dragText.t.style.left = newLeft + 'px';
+    dragText.t.style.top = newTop + 'px';
+    showGuides({ v: snapV, h: snapH });
   }
 }
 
@@ -476,18 +430,8 @@ export function getTextDragState() {
  * Force cleanup for emergency situations
  */
 export function forceEndTextDrag() {
-  console.log('🛑 Force ending text drag');
-  
-  if (dragText && dragText.t) {
-    dragText.t.classList.remove('dragging', 'resizing');
-  }
-  
   dragText = null;
   hideGuides();
-  
-  // Remove any stuck active states
-  const activeElements = document.querySelectorAll('.layer.active');
-  activeElements.forEach(el => el.classList.remove('active'));
 }
 
 // Active layer management
@@ -855,30 +799,9 @@ export function setupTextKeyboardShortcuts() {
   if (window._textKeyboardSetup) return;
   window._textKeyboardSetup = true;
   
-  document.addEventListener('keydown', (e) => {
-    const activeLayer = getActiveLayer();
-    if (!activeLayer) return;
-    
-    // Don't interfere with text editing
-    if (document.activeElement === activeLayer) return;
-    
-    // Delete key to remove layer
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (confirm('Delete this text layer?')) {
-        deleteActiveText();
-      }
-      e.preventDefault();
-    }
-    
-    // Arrow keys for precise movement
-    if (e.key.startsWith('Arrow')) {
-      moveLayerWithKeyboard(e);
-    }
-    
-    // Escape to deselect
-    if (e.key === 'Escape') {
-      handleSetActiveLayer(null);
-      forceEndTextDrag(); // Also end any stuck drags
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && dragText) {
+      endTextDrag();
     }
   });
 }
@@ -1033,3 +956,27 @@ export function loadLayersIntoDOM(layers) {
 setTimeout(() => {
   setupTextKeyboardShortcuts();
 }, 100);
+
+export function buildLayersFromDOM() {
+  const work = document.querySelector('#work');
+  return [...work.querySelectorAll('.layer')].map(l => {
+    const cs = getComputedStyle(l);
+    return {
+      text: l.textContent,
+      left: parseFloat(l.style.left || '0'),
+      top: parseFloat(l.style.top || '0'),
+      width: l.style.width || null,
+      fontSize: parseInt(cs.fontSize, 10) || 28,
+      fontFamily: cs.fontFamily,
+      color: rgbToHex(cs.color),
+      fontWeight: cs.fontWeight,
+      fontStyle: cs.fontStyle,
+      textDecoration: cs.textDecorationLine || cs.textDecoration || 'none',
+      padding: l.style.padding || '4px 6px',
+      fadeInMs: l._fadeInMs || 0,
+      fadeOutMs: l._fadeOutMs || 0,
+      zoomInMs: l._zoomInMs || 0,
+      zoomOutMs: l._zoomOutMs || 0
+    };
+  });
+}
