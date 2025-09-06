@@ -267,7 +267,7 @@ const imageLoader = new ImageLoader();
 
 export async function loadSlideIntoDOM(slide) {
   const { work } = getEls();
-  
+
   try {
     // Set work dimensions
     work.style.setProperty('--work-w', (slide?.workSize?.w || 800) + 'px');
@@ -278,6 +278,12 @@ export async function loadSlideIntoDOM(slide) {
     
     // Reset image state
     imgState.has = false;
+
+    // Ensure zoom timing defaults exist
+    if (slide?.image) {
+      slide.image.zoomInMs = slide.image.zoomInMs || 0;
+      slide.image.zoomOutMs = slide.image.zoomOutMs || 0;
+    }
     
     // Load text layers
     loadLayersIntoDOM(slide?.layers || []);
@@ -319,6 +325,8 @@ export function writeCurrentSlide() {
         flip: !!imgState.flip,
         fadeInMs: slides[activeIndex]?.image?.fadeInMs || 0,
         fadeOutMs: slides[activeIndex]?.image?.fadeOutMs || 0,
+        zoomInMs: slides[activeIndex]?.image?.zoomInMs || 0,
+        zoomOutMs: slides[activeIndex]?.image?.zoomOutMs || 0,
       };
     }
 

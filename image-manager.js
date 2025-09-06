@@ -78,9 +78,14 @@ export function enableImageControls(on) {
   const imgFadeOutBtn = document.getElementById('imgFadeOutBtn');
   const imgFadeInRange = document.getElementById('imgFadeInRange');
   const imgFadeOutRange = document.getElementById('imgFadeOutRange');
+  const imgZoomInBtn = document.getElementById('imgZoomInBtn');
+  const imgZoomOutBtn = document.getElementById('imgZoomOutBtn');
+  const imgZoomInRange = document.getElementById('imgZoomInRange');
+  const imgZoomOutRange = document.getElementById('imgZoomOutRange');
   const presetGrid = document.querySelector('#presetGrid');
-  
-  [imgScale, imgRotate, imgFlipBtn, imgDeleteBtn, imgFadeInBtn, imgFadeOutBtn, imgFadeInRange, imgFadeOutRange].forEach(el => {
+
+  [imgScale, imgRotate, imgFlipBtn, imgDeleteBtn, imgFadeInBtn, imgFadeOutBtn, imgFadeInRange, imgFadeOutRange,
+   imgZoomInBtn, imgZoomOutBtn, imgZoomInRange, imgZoomOutRange].forEach(el => {
     if (el) el.disabled = !on;
   });
   [...presetGrid.querySelectorAll('.preset-btn')].forEach(b => b.disabled = !on);
@@ -107,6 +112,7 @@ export function syncImageControls() {
   imgRotate.value = Math.max(imgRotate.min, Math.min(imgRotate.max, deg));
   imgRotateVal.textContent = deg + '°';
   updateImageFadeUI();
+  updateImageZoomUI();
 }
 
 // Enforce image bounds within work area
@@ -323,6 +329,7 @@ export function deleteImage() {
   syncImageControls();
   highlightPreset('none');
   updateImageFadeUI();
+  updateImageZoomUI();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
@@ -431,6 +438,40 @@ export function handleImageFadeOutRange(value) {
   img.fadeOutMs = parseInt(value, 10) || 0;
   const imgFadeOutVal = document.getElementById('imgFadeOutVal');
   imgFadeOutVal.textContent = fmtSec(img.fadeOutMs);
+}
+
+export function handleImageZoomIn() {
+  const img = getSlideImage();
+  if (!img) return;
+  img.zoomInMs = (img.zoomInMs || 0) > 0 ? 0 : 800;
+  updateImageZoomUI();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveProjectDebounced();
+}
+
+export function handleImageZoomOut() {
+  const img = getSlideImage();
+  if (!img) return;
+  img.zoomOutMs = (img.zoomOutMs || 0) > 0 ? 0 : 800;
+  updateImageZoomUI();
+  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveProjectDebounced();
+}
+
+export function handleImageZoomInRange(value) {
+  const img = getSlideImage();
+  if (!img) return;
+  img.zoomInMs = parseInt(value, 10) || 0;
+  const imgZoomInVal = document.getElementById('imgZoomInVal');
+  imgZoomInVal.textContent = fmtSec(img.zoomInMs);
+}
+
+export function handleImageZoomOutRange(value) {
+  const img = getSlideImage();
+  if (!img) return;
+  img.zoomOutMs = parseInt(value, 10) || 0;
+  const imgZoomOutVal = document.getElementById('imgZoomOutVal');
+  imgZoomOutVal.textContent = fmtSec(img.zoomOutMs);
 }
 
 // Image scaling and rotation handlers

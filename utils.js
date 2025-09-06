@@ -142,7 +142,9 @@ function compressProjectData(project) {
         angle: Math.round(slide.image.angle * 100) / 100,
         flip: slide.image.flip,
         fadeInMs: slide.image.fadeInMs,
-        fadeOutMs: slide.image.fadeOutMs
+        fadeOutMs: slide.image.fadeOutMs,
+        zoomInMs: slide.image.zoomInMs,
+        zoomOutMs: slide.image.zoomOutMs
       } : null,
       layers: slide.layers?.map(layer => ({
         text: layer.text,
@@ -157,7 +159,9 @@ function compressProjectData(project) {
         textDecoration: layer.textDecoration === 'none' ? undefined : layer.textDecoration,
         padding: layer.padding === '4px 6px' ? undefined : layer.padding, // Remove default
         fadeInMs: layer.fadeInMs,
-        fadeOutMs: layer.fadeOutMs
+        fadeOutMs: layer.fadeOutMs,
+        zoomInMs: layer.zoomInMs,
+        zoomOutMs: layer.zoomOutMs
       })) || [],
       workSize: slide.workSize,
       durationMs: slide.durationMs
@@ -253,13 +257,25 @@ export function getElements() {
     textFadeOutRange: document.getElementById('textFadeOutRange'),
     textFadeInVal: document.getElementById('textFadeInVal'),
     textFadeOutVal: document.getElementById('textFadeOutVal'),
-    
+    textZoomInBtn: document.getElementById('textZoomInBtn'),
+    textZoomOutBtn: document.getElementById('textZoomOutBtn'),
+    textZoomInRange: document.getElementById('textZoomInRange'),
+    textZoomOutRange: document.getElementById('textZoomOutRange'),
+    textZoomInVal: document.getElementById('textZoomInVal'),
+    textZoomOutVal: document.getElementById('textZoomOutVal'),
+
     imgFadeInBtn: document.getElementById('imgFadeInBtn'),
     imgFadeOutBtn: document.getElementById('imgFadeOutBtn'),
     imgFadeInRange: document.getElementById('imgFadeInRange'),
     imgFadeOutRange: document.getElementById('imgFadeOutRange'),
     imgFadeInVal: document.getElementById('imgFadeInVal'),
-    imgFadeOutVal: document.getElementById('imgFadeOutVal')
+    imgFadeOutVal: document.getElementById('imgFadeOutVal'),
+    imgZoomInBtn: document.getElementById('imgZoomInBtn'),
+    imgZoomOutBtn: document.getElementById('imgZoomOutBtn'),
+    imgZoomInRange: document.getElementById('imgZoomInRange'),
+    imgZoomOutRange: document.getElementById('imgZoomOutRange'),
+    imgZoomInVal: document.getElementById('imgZoomInVal'),
+    imgZoomOutVal: document.getElementById('imgZoomOutVal')
   };
 }
 
