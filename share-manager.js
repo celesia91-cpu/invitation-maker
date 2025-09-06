@@ -12,6 +12,7 @@ import {
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
 const CANONICAL_VIEWER_ORIGIN = 'https://celesia.app';
+
 function getViewerOrigin() {
   try {
     const here = location.origin;
@@ -66,8 +67,12 @@ export function buildViewerUrl() {
 export async function shareCurrent() {
   try {
     // Ensure current DOM state is captured before sharing
-    const { writeCurrentSlide } = await import('./slide-manager.js');
-    writeCurrentSlide();
+    try {
+      const { writeCurrentSlide } = await import('./slide-manager.js');
+      writeCurrentSlide();
+    } catch (error) {
+      console.warn('Could not import slide-manager:', error);
+    }
 
     // Small delay allows layout/state microtasks to flush
     await new Promise((resolve) => setTimeout(resolve, 50));
