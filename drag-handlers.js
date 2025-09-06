@@ -184,17 +184,18 @@ export class DragHandlersManager {
   async startTextDrag(e) {
     try {
       const { beginDragText } = await import('./text-manager.js');
-      const success = beginDragText(e);
-      
+      const layer = e.target.closest('.layer');
+      const success = beginDragText({ ...e, currentTarget: layer });
+
+      this.dragState = {
+        type: 'text',
+        startX: e.clientX,
+        startY: e.clientY,
+        hasMoved: false
+      };
+
       if (success) {
-        this.dragState = {
-          type: 'text',
-          startX: e.clientX,
-          startY: e.clientY,
-          hasMoved: false
-        };
-        
-        this.capturePointer(e);
+        this.capturePointer({ ...e, currentTarget: layer });
         console.log('📝 Started text drag');
       }
     } catch (error) {
