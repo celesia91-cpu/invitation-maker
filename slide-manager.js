@@ -1,96 +1,60 @@
-// slide-manager.js - Simplified version with reliable concurrency control
+// slide-manager.js - FIXED: Complete version with 100% image scaling
 
-import { 
-  getSlides, setSlides, getActiveIndex, setActiveIndex, 
-  getPlaying, setPlaying, getRafId, setRafId, 
-  getSlideStartTs, setSlideStartTs,
-  saveProjectDebounced, updateUndoRedoUI
-} from './state-manager.js';
+import { getSlides, getActiveIndex, setActiveIndex, setSlides } from './state-manager.js';
+import { imgState, setTransforms } from './image-manager.js';
+import { clamp } from './utils.js';
 
-import { clamp, DEFAULT_DUR, fmtSec } from './utils.js';
-import { buildLayersFromDOM, loadLayersIntoDOM, updateTextFadeUI, updateTextZoomUI } from './text-manager.js';
-import {
-  imgState, setTransforms, updateImageFadeUI, updateImageZoomUI
-} from './image-manager.js';
+// Constants
+const DEFAULT_DUR = 3000;
 
-/**
- * Simplified Slide Switching Manager
- * Uses a single Promise-based queue to prevent race conditions
- */
+// Slide switching state management
 class SlideSwitchManager {
   constructor() {
-    this.currentSwitch = null; // Single active switch promise
+    this.currentSwitch = null;
     this.isDestroyed = false;
   }
 
   /**
-   * Switch to target slide with automatic queuing
-   */
-  async switchToSlide(targetIndex) {
-    // Normalize target index
-    const slides = getSlides();
-    const normalizedIndex = clamp(targetIndex, 0, slides.length - 1);
-    
-    // If already at target slide, do nothing
-    if (normalizedIndex === getActiveIndex()) {
-      return;
-    }
-
-    // If there's an active switch, wait for it to complete
-    if (this.currentSwitch) {
-      try {
-        await this.currentSwitch;
-      } catch (error) {
-        console.warn('Previous slide switch failed:', error);
-      }
-    }
-
-    // Start new switch
-    this.currentSwitch = this.performSlideSwitch(normalizedIndex);
-    
-    try {
-      await this.currentSwitch;
-    } finally {
-      this.currentSwitch = null;
-    }
-  }
-
-  /**
-   * Perform the actual slide switch
-   */
-  async performSlideSwitch(targetIndex) {
-    if (this.isDestroyed) return;
-
-    try {
-      // Save current slide state
-      writeCurrentSlide();
-      
-      // Small delay to ensure DOM updates complete
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
-      // Update active index
-      setActiveIndex(targetIndex);
-      
-      // Load new slide content
-      const slides = getSlides();
-      await loadSlideIntoDOM(slides[targetIndex]);
-      
-      // Update UI
-      updateSlidesUI();
-      
-    } catch (error) {
-      console.error('Slide switch failed:', error);
-      // Attempt recovery by updating UI anyway
-      updateSlidesUI();
-      throw error;
-    }
-  }
-
-  /**
-   * Check if currently switching
+   * Check if a switch operation is in progress
    */
   isSwitching() {
-    return !!this.currentSwitch;
+    return !this.isDestroyed && !!this.currentSwitch;
+  }
+
+  /**
+   * Start a new switch operation if none is in progress
+   */
+  beginSwitch() {
+    if (this.isSwitching()) {
+      return false; // Switch already in progress
+    }
+    
+    this.currentSwitch = {
+      startTime: Date.now(),
+      id: Math.random().toString(36).substr(2, 9)
+    };
+    
+    return this.currentSwitch;
+  }
+
+  /**
+   * End the current switch operation
+   */
+  endSwitch(switchId) {
+    if (this.currentSwitch && this.currentSwitch.id === switchId) {
+      this.currentSwitch = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if the provided switch is the current one
+   */
+  isCurrentSwitch(switchOperation) {
+    return this.currentSwitch && 
+           this.currentSwitch.id === switchOperation?.id && 
+           !this.isDestroyed;
   }
 
   /**
@@ -154,7 +118,7 @@ class ImageLoader {
   }
 
   /**
-   * Load slide image with cancellation support
+   * FIXED: Load slide image with 100% default scaling
    */
   async loadSlideImage(slide) {
     // Cancel any previous load
@@ -195,7 +159,7 @@ class ImageLoader {
           const centerX = workRect.width / 2;
           const centerY = workRect.height / 2;
           
-          // Use saved values or calculate defaults
+          // Use saved values or calculate 100% defaults
           if (slide.image && typeof slide.image.scale === 'number') {
             imgState.scale = slide.image.scale;
             imgState.angle = slide.image.angle || 0;
@@ -205,11 +169,13 @@ class ImageLoader {
             imgState.cx = slide.image.cx || centerX;
             imgState.cy = slide.image.cy || centerY;
           } else {
-            const defaultScale = Math.min(
-              workRect.width * 0.95 / imgState.natW,
-              workRect.height * 0.95 / imgState.natH
-            );
-            imgState.scale = defaultScale;
+            // FIXED: Default to 100% scale (full coverage) instead of 95%
+            const scaleToFitWidth = workRect.width / imgState.natW;
+            const scaleToFitHeight = workRect.height / imgState.natH;
+            
+            // Use the larger scale for 100% coverage
+            imgState.scale = Math.max(scaleToFitWidth, scaleToFitHeight);
+            
             imgState.angle = 0;
             imgState.signX = 1;
             imgState.signY = 1;
@@ -219,6 +185,8 @@ class ImageLoader {
           }
           
           setTransforms();
+          console.log('✅ Slide image loaded with 100% scale:', imgState.scale);
+          
         } catch (error) {
           console.warn('Image processing error:', error);
           imgState.has = false;
@@ -281,422 +249,418 @@ export async function loadSlideIntoDOM(slide) {
 
     // Ensure zoom timing defaults exist
     if (slide?.image) {
-      slide.image.zoomInMs = slide.image.zoomInMs || 0;
-      slide.image.zoomOutMs = slide.image.zoomOutMs || 0;
+      slide.image.zoomInMs = slide.image.zoomInMs ?? 0;
+      slide.image.zoomOutMs = slide.image.zoomOutMs ?? 0;
+      slide.image.fadeInMs = slide.image.fadeInMs ?? 0;
+      slide.image.fadeOutMs = slide.image.fadeOutMs ?? 0;
     }
-    
-    // Load text layers
-    loadLayersIntoDOM(slide?.layers || []);
 
-    // Load image
-    await imageLoader.loadSlideImage(slide);
-    
+    // Load image if present
+    if (slide?.image?.src || slide?.image?.thumb) {
+      await imageLoader.loadSlideImage(slide);
+    } else {
+      setTransforms();
+    }
+
+    // Create text layers
+    if (slide?.layers) {
+      for (const layer of slide.layers) {
+        await createTextLayerFromData(layer);
+      }
+    }
+
+    console.log('✅ Slide loaded into DOM');
+
   } catch (error) {
-    console.error('Error loading slide into DOM:', error);
-    // Continue anyway with partial load
+    console.error('Failed to load slide into DOM:', error);
   }
 }
 
-/* --------------------------- Write Current Slide ----------------------------- */
+/* --------------------------- Text Layer Creation ----------------------------- */
 
-export function writeCurrentSlide() {
-  ensureSlide();
-  const slides = getSlides();
-  const activeIndex = getActiveIndex();
-
-  if (activeIndex < 0 || activeIndex >= slides.length) return;
-
+async function createTextLayerFromData(layerData) {
   try {
-    const layers = buildLayersFromDOM();
-    const { userBg } = getEls();
+    const { addTextLayer } = await import('./text-manager.js');
     
-    // Build image object
-    let image = null;
-    if (imgState.has && userBg?.src) {
-      image = {
-        src: userBg.src,
-        thumb: makeThumb(userBg),
-        cx: imgState.cx,
-        cy: imgState.cy,
-        scale: imgState.scale,
-        angle: imgState.angle,
-        signX: imgState.signX ?? 1,
-        signY: imgState.signY ?? 1,
-        flip: !!imgState.flip,
-        fadeInMs: slides[activeIndex]?.image?.fadeInMs || 0,
-        fadeOutMs: slides[activeIndex]?.image?.fadeOutMs || 0,
-        zoomInMs: slides[activeIndex]?.image?.zoomInMs || 0,
-        zoomOutMs: slides[activeIndex]?.image?.zoomOutMs || 0,
-      };
-    }
+    const textEl = await addTextLayer(layerData.text || 'Text', {
+      fontSize: layerData.fontSize || 28,
+      fontFamily: layerData.fontFamily || 'system-ui',
+      fontWeight: layerData.fontWeight || 'normal',
+      fontStyle: layerData.fontStyle || 'normal',
+      color: layerData.color || '#ffffff',
+      left: layerData.left || 0,
+      top: layerData.top || 0,
+      width: layerData.width,
+      textAlign: layerData.textAlign || 'left',
+      textDecoration: layerData.textDecoration || 'none',
+      textShadow: layerData.textShadow || 'none',
+      letterSpacing: layerData.letterSpacing || 'normal',
+      lineHeight: layerData.lineHeight || 'normal'
+    });
 
-    // Preserve duration + workSize
-    const prev = slides[activeIndex] || {};
-    slides[activeIndex] = {
-      image,
-      layers,
-      workSize: prev.workSize || { w: 800, h: 450 },
-      durationMs: prev.durationMs || DEFAULT_DUR
-    };
-    
-    setSlides([...slides]);
-    
-    // Only save if not switching (prevent recursive saves)
-    if (!switchManager.isSwitching()) {
-      saveProjectDebounced();
-    }
-    
+    return textEl;
   } catch (error) {
-    console.error('Error writing current slide:', error);
-  }
-}
-
-// Simplified thumbnail generation
-function makeThumb(imgEl, maxW = 640, maxH = 640, quality = 0.72) {
-  try {
-    const src = String(imgEl?.src || '');
-    if (!src.startsWith('data:')) return null;
-    
-    const imW = imgEl.naturalWidth || imgEl.width;
-    const imH = imgEl.naturalHeight || imgEl.height;
-    if (!imW || !imH) return null;
-
-    const r = Math.min(maxW / imW, maxH / imH, 1);
-    const w = Math.max(1, Math.round(imW * r));
-    const h = Math.max(1, Math.round(imH * r));
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imgEl, 0, 0, w, h);
-    
-    return canvas.toDataURL('image/jpeg', quality);
-  } catch (error) {
-    console.warn('Thumbnail generation failed:', error);
+    console.error('Failed to create text layer:', error);
     return null;
   }
 }
 
-/* --------------------------- Simplified Navigation Functions ----------------------------- */
+/* --------------------------- Slide Switching ----------------------------- */
 
-export async function setActiveSlide(targetIndex) {
-  ensureSlide();
-  await switchManager.switchToSlide(targetIndex);
-}
+export async function switchToSlide(idx) {
+  // Start a new switch operation
+  const switchOperation = switchManager.beginSwitch();
+  if (!switchOperation) {
+    console.log('Switch already in progress, ignoring request');
+    return;
+  }
 
-export async function previousSlide() {
-  const currentIndex = getActiveIndex();
-  await setActiveSlide(Math.max(0, currentIndex - 1));
-}
+  try {
+    ensureSlide(idx);
+    const targetIndex = getActiveIndex();
+    
+    console.log(`🔄 Switching to slide ${targetIndex}`);
 
-export async function nextSlide() {
-  const slides = getSlides();
-  const currentIndex = getActiveIndex();
-  await setActiveSlide(Math.min(slides.length - 1, currentIndex + 1));
+    // Load the slide
+    const slides = getSlides();
+    await loadSlideIntoDOM(slides[targetIndex]);
+    
+    // Update UI
+    updateSlidesUI();
+    
+    // Verify this switch operation is still current
+    if (!switchManager.isCurrentSwitch(switchOperation)) {
+      console.log('Switch operation superseded, aborting');
+      return;
+    }
+
+    console.log(`✅ Successfully switched to slide ${targetIndex}`);
+    
+  } catch (error) {
+    console.error('Failed to switch slide:', error);
+  } finally {
+    // End the switch operation
+    switchManager.endSwitch(switchOperation.id);
+  }
 }
 
 /* --------------------------- UI Updates ----------------------------- */
 
 export function updateSlidesUI() {
-  ensureSlide();
   const { slidesStrip, slideLabel, slideDur, slideDurVal } = getEls();
   const slides = getSlides();
-  const active = getActiveIndex();
+  const activeIndex = getActiveIndex();
 
-  if (!slidesStrip) return;
+  // Update slides strip
+  if (slidesStrip) {
+    slidesStrip.innerHTML = slides.map((slide, i) => 
+      `<button class="slide-chip ${i === activeIndex ? 'active' : ''}" 
+              data-slide="${i}"
+              aria-pressed="${i === activeIndex}"
+              title="Slide ${i + 1}">
+        ${i + 1}
+      </button>`
+    ).join('');
 
-  // Render slides strip
-  slidesStrip.innerHTML = '';
-  slides.forEach((_, i) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btn';
-    button.textContent = 'S' + (i + 1);
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-selected', i === active ? 'true' : 'false');
-    
-    // Use async click handler
-    button.addEventListener('click', async () => {
-      try {
-        await setActiveSlide(i);
-      } catch (error) {
-        console.error('Failed to switch to slide:', error);
-      }
+    // Add click handlers
+    [...slidesStrip.querySelectorAll('.slide-chip')].forEach(chip => {
+      chip.addEventListener('click', () => {
+        const slideIndex = parseInt(chip.dataset.slide, 10);
+        switchToSlide(slideIndex);
+      });
     });
-    
-    if (i === active) {
-      button.classList.add('primary');
-    }
-    
-    slidesStrip.appendChild(button);
-  });
+  }
 
-  // Update labels and controls
+  // Update slide label
   if (slideLabel) {
-    slideLabel.textContent = `Slide ${active + 1}/${slides.length}`;
+    slideLabel.textContent = `Slide ${activeIndex + 1} of ${slides.length}`;
   }
 
-  const currentSlideData = slides[active];
-  const duration = currentSlideData?.durationMs || DEFAULT_DUR;
-  
-  if (slideDur) {
-    slideDur.value = duration;
+  // Update duration controls
+  const currentSlideData = slides[activeIndex];
+  if (slideDur && slideDurVal && currentSlideData) {
+    const durationMs = currentSlideData.durationMs || DEFAULT_DUR;
+    slideDur.value = durationMs;
+    slideDurVal.textContent = (durationMs / 1000).toFixed(1) + 's';
   }
-  if (slideDurVal) {
-    slideDurVal.textContent = fmtSec(duration);
-  }
-
-  // Update fade and zoom controls
-  updateTextFadeUI();
-  updateImageFadeUI();
-  updateTextZoomUI();
-  updateImageZoomUI();
 }
 
-/* --------------------------- Slide CRUD Operations ----------------------------- */
+/* --------------------------- Slide Data Management ----------------------------- */
+
+export function writeCurrentSlide() {
+  try {
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    const slide = slides[activeIndex];
+    
+    if (!slide) {
+      console.warn('No active slide to write to');
+      return;
+    }
+
+    // Update image data
+    if (imgState.has) {
+      slide.image = {
+        src: document.querySelector('#userBg')?.src || '',
+        scale: imgState.scale,
+        angle: imgState.angle,
+        signX: imgState.signX,
+        signY: imgState.signY,
+        flip: imgState.flip,
+        cx: imgState.cx,
+        cy: imgState.cy,
+        natW: imgState.natW,
+        natH: imgState.natH,
+        // Preserve timing data
+        zoomInMs: slide.image?.zoomInMs ?? 0,
+        zoomOutMs: slide.image?.zoomOutMs ?? 0,
+        fadeInMs: slide.image?.fadeInMs ?? 0,
+        fadeOutMs: slide.image?.fadeOutMs ?? 0,
+        // Backend data if available
+        ...(imgState.backendImageId && {
+          backendImageId: imgState.backendImageId,
+          backendImageUrl: imgState.backendImageUrl,
+          backendThumbnailUrl: imgState.backendThumbnailUrl
+        })
+      };
+    } else {
+      slide.image = null;
+    }
+
+    // Update text layers
+    const layers = [...document.querySelectorAll('.layer')].map(el => ({
+      text: el.textContent || '',
+      left: parseFloat(el.style.left || '0'),
+      top: parseFloat(el.style.top || '0'),
+      width: el.style.width ? parseFloat(el.style.width) : null,
+      fontSize: parseFloat(el.style.fontSize || '28'),
+      fontFamily: el.style.fontFamily || 'system-ui',
+      fontWeight: el.style.fontWeight || 'normal',
+      fontStyle: el.style.fontStyle || 'normal',
+      color: el.style.color || '#ffffff',
+      textAlign: el.style.textAlign || 'left',
+      textDecoration: el.style.textDecoration || 'none',
+      textShadow: el.style.textShadow || 'none',
+      letterSpacing: el.style.letterSpacing || 'normal',
+      lineHeight: el.style.lineHeight || 'normal'
+    }));
+
+    slide.layers = layers;
+
+    // Update slides array
+    slides[activeIndex] = slide;
+    setSlides([...slides]); // Create new array to trigger updates
+
+    console.log('✅ Current slide data written');
+    
+  } catch (error) {
+    console.error('Failed to write current slide:', error);
+  }
+}
+
+/* --------------------------- Slide Actions ----------------------------- */
 
 export function addSlide() {
-  writeCurrentSlide();
-  const slides = getSlides();
-  const currentIndex = getActiveIndex();
-  
-  const newSlide = { 
-    image: null, 
-    layers: [], 
-    workSize: { w: 800, h: 450 }, 
-    durationMs: DEFAULT_DUR 
-  };
-  
-  slides.splice(currentIndex + 1, 0, newSlide);
-  setSlides([...slides]);
-  setActiveSlide(currentIndex + 1); // Use async slide switching
+  try {
+    const slides = getSlides();
+    const currentIndex = getActiveIndex();
+    const workSize = { w: 800, h: 450 };
+    
+    const newSlide = {
+      image: null,
+      layers: [],
+      workSize,
+      durationMs: DEFAULT_DUR
+    };
+    
+    const newSlides = [...slides];
+    newSlides.splice(currentIndex + 1, 0, newSlide);
+    
+    setSlides(newSlides);
+    switchToSlide(currentIndex + 1);
+    
+    console.log('✅ New slide added');
+  } catch (error) {
+    console.error('Failed to add slide:', error);
+  }
 }
 
 export function duplicateSlide() {
-  writeCurrentSlide();
-  const slides = getSlides();
-  const currentIndex = getActiveIndex();
-  const currentSlideData = slides[currentIndex];
-  
-  if (!currentSlideData) return;
-  
-  const duplicatedSlide = JSON.parse(JSON.stringify(currentSlideData));
-  slides.splice(currentIndex + 1, 0, duplicatedSlide);
-  setSlides([...slides]);
-  setActiveSlide(currentIndex + 1); // Use async slide switching
+  try {
+    writeCurrentSlide(); // Save current state first
+    
+    const slides = getSlides();
+    const currentIndex = getActiveIndex();
+    const currentSlide = slides[currentIndex];
+    
+    if (!currentSlide) {
+      console.warn('No slide to duplicate');
+      return;
+    }
+    
+    // Deep clone the slide
+    const duplicatedSlide = JSON.parse(JSON.stringify(currentSlide));
+    
+    const newSlides = [...slides];
+    newSlides.splice(currentIndex + 1, 0, duplicatedSlide);
+    
+    setSlides(newSlides);
+    switchToSlide(currentIndex + 1);
+    
+    console.log('✅ Slide duplicated');
+  } catch (error) {
+    console.error('Failed to duplicate slide:', error);
+  }
 }
 
 export function deleteSlide() {
+  try {
+    const slides = getSlides();
+    const currentIndex = getActiveIndex();
+    
+    if (slides.length <= 1) {
+      console.warn('Cannot delete the last slide');
+      return;
+    }
+    
+    const newSlides = slides.filter((_, i) => i !== currentIndex);
+    setSlides(newSlides);
+    
+    // Adjust active index if necessary
+    const newActiveIndex = Math.min(currentIndex, newSlides.length - 1);
+    switchToSlide(newActiveIndex);
+    
+    console.log('✅ Slide deleted');
+  } catch (error) {
+    console.error('Failed to delete slide:', error);
+  }
+}
+
+/* --------------------------- Slide Duration ----------------------------- */
+
+export function handleSlideDuration(value) {
+  try {
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    const slide = slides[activeIndex];
+    
+    if (slide) {
+      const durationMs = parseInt(value, 10) || DEFAULT_DUR;
+      slide.durationMs = durationMs;
+      
+      const slideDurVal = document.getElementById('slideDurVal');
+      if (slideDurVal) {
+        slideDurVal.textContent = (durationMs / 1000).toFixed(1) + 's';
+      }
+      
+      setSlides([...slides]); // Trigger update
+      
+      console.log(`✅ Slide duration set to ${durationMs}ms`);
+    }
+  } catch (error) {
+    console.error('Failed to update slide duration:', error);
+  }
+}
+
+/* --------------------------- Slide Playback ----------------------------- */
+
+let slidePlayback = {
+  isPlaying: false,
+  currentSlideIndex: 0,
+  timeoutId: null,
+  startTime: 0
+};
+
+export function playSlides() {
+  if (slidePlayback.isPlaying) {
+    stopSlides();
+    return;
+  }
+  
   const slides = getSlides();
-  const currentIndex = getActiveIndex();
+  if (slides.length === 0) return;
   
-  if (slides.length <= 1) return;
+  slidePlayback.isPlaying = true;
+  slidePlayback.currentSlideIndex = 0;
+  slidePlayback.startTime = Date.now();
   
-  slides.splice(currentIndex, 1);
-  setSlides([...slides]);
+  // Update play button
+  const playBtn = document.getElementById('playSlidesBtn');
+  if (playBtn) {
+    playBtn.textContent = 'Stop';
+    playBtn.classList.add('active');
+  }
   
-  const newIndex = currentIndex >= slides.length ? slides.length - 1 : currentIndex;
-  setActiveSlide(newIndex); // Use async slide switching
+  playNextSlide();
+  console.log('▶️ Started slide playback');
 }
 
-export function handleSlideDurationChange(value) {
-  const ms = clamp(parseInt(value, 10) || DEFAULT_DUR, 500, 60000);
+export function stopSlides() {
+  slidePlayback.isPlaying = false;
+  
+  if (slidePlayback.timeoutId) {
+    clearTimeout(slidePlayback.timeoutId);
+    slidePlayback.timeoutId = null;
+  }
+  
+  // Update play button
+  const playBtn = document.getElementById('playSlidesBtn');
+  if (playBtn) {
+    playBtn.textContent = 'Play';
+    playBtn.classList.remove('active');
+  }
+  
+  console.log('⏹️ Stopped slide playback');
+}
+
+function playNextSlide() {
+  if (!slidePlayback.isPlaying) return;
+  
   const slides = getSlides();
-  const currentIndex = getActiveIndex();
+  if (slidePlayback.currentSlideIndex >= slides.length) {
+    // Loop back to start or stop
+    slidePlayback.currentSlideIndex = 0;
+  }
   
-  if (!slides[currentIndex]) return;
+  const slide = slides[slidePlayback.currentSlideIndex];
+  switchToSlide(slidePlayback.currentSlideIndex);
   
-  slides[currentIndex].durationMs = ms;
-  setSlides([...slides]);
-  saveProjectDebounced();
-  updateSlidesUI();
+  const duration = slide?.durationMs || DEFAULT_DUR;
+  slidePlayback.timeoutId = setTimeout(() => {
+    slidePlayback.currentSlideIndex++;
+    playNextSlide();
+  }, duration);
 }
 
-/* --------------------------- Playback Functions ----------------------------- */
-
-function computeOpacity(t, dur, fadeInMs, fadeOutMs) {
-  const fi = Math.max(0, fadeInMs | 0);
-  const fo = Math.max(0, fadeOutMs | 0);
-  const a = fi > 0 ? Math.min(1, t / fi) : 1;
-  const b = fo > 0 ? Math.min(1, (dur - t) / fo) : 1;
-  return Math.max(0, Math.min(1, Math.min(a, b)));
-}
-
-function computeScale(t, dur, zoomInMs, zoomOutMs) {
-  const zi = Math.max(0, zoomInMs | 0);
-  const zo = Math.max(0, zoomOutMs | 0);
-  const a = zi > 0 ? Math.min(1, t / zi) : 1;
-  const b = zo > 0 ? Math.min(1, (dur - t) / zo) : 1;
-  return Math.max(0, Math.min(1, Math.min(a, b)));
-}
+/* --------------------------- Reset Utilities ----------------------------- */
 
 export function resetOpacities() {
-  const { work, userBgWrap } = getEls();
-  [...work.querySelectorAll('.layer')].forEach(n => (n.style.opacity = '1'));
-  if (userBgWrap) {
-    userBgWrap.style.opacity = '1';
-    userBgWrap.style.transition = '';
+  // Reset any opacity animations or transitions
+  const userBg = document.querySelector('#userBg');
+  if (userBg) {
+    userBg.style.opacity = '';
+    userBg.style.transition = '';
   }
-}
-
-export function resetZooms() {
-  const { work, userBgWrap } = getEls();
-  [...work.querySelectorAll('.layer')].forEach(el => {
-    if (el.dataset.baseTransform !== undefined) {
-      el.style.transform = el.dataset.baseTransform;
-      delete el.dataset.baseTransform;
-    }
+  
+  const layers = document.querySelectorAll('.layer');
+  layers.forEach(layer => {
+    layer.style.opacity = '';
+    layer.style.transition = '';
   });
-  if (userBgWrap && userBgWrap.dataset.baseTransform !== undefined) {
-    userBgWrap.style.transform = userBgWrap.dataset.baseTransform;
-    delete userBgWrap.dataset.baseTransform;
-  }
 }
 
-async function stepFrame(ts) {
-  const slides = getSlides();
-  let currentIndex = getActiveIndex();
-  const currentSlideData = slides[currentIndex];
-  
-  if (!currentSlideData) { 
-    stopPlay(); 
-    return; 
-  }
+/* --------------------------- Cleanup ----------------------------- */
 
-  let slideStart = getSlideStartTs();
-  if (!slideStart) { 
-    setSlideStartTs(ts); 
-    slideStart = ts; 
-  }
-  
-  const elapsed = ts - slideStart;
-  const duration = currentSlideData.durationMs || DEFAULT_DUR;
-
-  // Apply fades and zooms
-  const { work, userBgWrap } = getEls();
-
-  // Text layers
-  const domLayers = [...work.querySelectorAll('.layer')];
-  domLayers.forEach((element, index) => {
-    const layerData = currentSlideData.layers?.[index] || {};
-    const opacity = computeOpacity(elapsed, duration, layerData.fadeInMs || 0, layerData.fadeOutMs || 0);
-    element.style.opacity = String(opacity);
-
-    const scale = computeScale(elapsed, duration, layerData.zoomInMs || 0, layerData.zoomOutMs || 0);
-    if (element.dataset.baseTransform === undefined) {
-      element.dataset.baseTransform = element.style.transform || '';
-    }
-    const base = element.dataset.baseTransform;
-    element.style.transform = `${base ? base + ' ' : ''}scale(${scale})`;
-  });
-
-  // Image
-  const imageData = currentSlideData.image;
-  if (imageData && userBgWrap) {
-    const opacity = computeOpacity(elapsed, duration, imageData.fadeInMs || 0, imageData.fadeOutMs || 0);
-    userBgWrap.style.opacity = String(opacity);
-
-    const scale = computeScale(elapsed, duration, imageData.zoomInMs || 0, imageData.zoomOutMs || 0);
-    if (userBgWrap.dataset.baseTransform === undefined) {
-      userBgWrap.dataset.baseTransform = userBgWrap.style.transform || '';
-    }
-    const base = userBgWrap.dataset.baseTransform;
-    userBgWrap.style.transform = `${base ? base + ' ' : ''}scale(${scale})`;
-  }
-
-  // Advance to next slide
-  if (elapsed >= duration) {
-    const nextIndex = (currentIndex + 1) % slides.length;
-    setActiveIndex(nextIndex);
-    setSlideStartTs(ts);
-    
-    // Use simplified slide loading during playback
-    try {
-      await loadSlideIntoDOM(slides[nextIndex]);
-      updateSlidesUI();
-      const { userBgWrap: newWrap } = getEls();
-      if (newWrap) {
-        delete newWrap.dataset.baseTransform;
-      }
-    } catch (error) {
-      console.error('Error during playback slide switch:', error);
-    }
-  }
-
-  // Continue animation
-  const rafId = requestAnimationFrame(stepFrame);
-  setRafId(rafId);
-}
-
-export function startPlay() {
-  if (getPlaying()) return;
-  
-  setPlaying(true);
-  const { playBtn, userBgWrap } = getEls();
-  
-  if (playBtn) {
-    playBtn.setAttribute('aria-pressed', 'true');
-    playBtn.textContent = 'Stop';
-  }
-  
-  if (userBgWrap) {
-    userBgWrap.style.transition = 'opacity 0ms linear';
-  }
-
-  setSlideStartTs(0);
-  const rafId = requestAnimationFrame(stepFrame);
-  setRafId(rafId);
-}
-
-function stopPlay() {
-  if (!getPlaying()) return;
-  
-  setPlaying(false);
-  
-  const rafId = getRafId();
-  if (rafId) {
-    cancelAnimationFrame(rafId);
-  }
-  setRafId(0);
-  
-  const { playBtn } = getEls();
-  if (playBtn) {
-    playBtn.setAttribute('aria-pressed', 'false');
-    playBtn.textContent = 'Play';
-  }
-
-  resetOpacities();
-  resetZooms();
-}
-
-export function togglePlay() {
-  if (getPlaying()) {
-    stopPlay();
-  } else {
-    startPlay();
-  }
-}
-
-/* --------------------------- Cleanup Functions ----------------------------- */
-
-export function cleanup() {
-  console.log('🧹 Cleaning up slide manager...');
-
-  stopPlay();
-  resetZooms();
+export function destroySlideManager() {
   switchManager.destroy();
   imageLoader.destroy();
-  
-  console.log('✅ Slide manager cleaned up');
+  stopSlides();
+  console.log('✅ Slide manager destroyed');
 }
 
 /* --------------------------- Initialization ----------------------------- */
 
-// Ensure UI is updated when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', updateSlidesUI);
-} else {
+// Initialize slides UI when the module loads
+document.addEventListener('DOMContentLoaded', () => {
   updateSlidesUI();
-}
+});

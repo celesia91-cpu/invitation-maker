@@ -1,4 +1,4 @@
-// ui-manager.js - Complete Fixed Version - COPY THIS INTO YOUR PROJECT
+// ui-manager.js - COMPLETE FIXED VERSION with drag support
 
 // UI state management
 let sidebarOpen = false;
@@ -90,19 +90,31 @@ export function exitPreview() {
 }
 
 // Guide management
-export function showGuides(x, y, w, h) {
+export function showGuides(options = {}) {
   const vGuide = document.getElementById('vGuide');
   const hGuide = document.getElementById('hGuide');
   
-  if (vGuide) vGuide.style.display = x !== undefined ? 'block' : 'none';
-  if (hGuide) hGuide.style.display = h !== undefined ? 'block' : 'none';
+  if (vGuide) {
+    vGuide.style.display = options.v ? 'block' : 'none';
+    vGuide.classList.toggle('visible', !!options.v);
+  }
+  if (hGuide) {
+    hGuide.style.display = options.h ? 'block' : 'none';
+    hGuide.classList.toggle('visible', !!options.h);
+  }
 }
 
 export function hideGuides() {
   const vGuide = document.getElementById('vGuide');
   const hGuide = document.getElementById('hGuide');
-  if (vGuide) vGuide.style.display = 'none';
-  if (hGuide) hGuide.style.display = 'none';
+  if (vGuide) {
+    vGuide.style.display = 'none';
+    vGuide.classList.remove('visible');
+  }
+  if (hGuide) {
+    hGuide.style.display = 'none';
+    hGuide.classList.remove('visible');
+  }
 }
 
 // Event handlers setup
