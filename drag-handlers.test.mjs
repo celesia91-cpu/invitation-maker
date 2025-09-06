@@ -4,6 +4,7 @@ import { DragHandlersManager } from './drag-handlers.js';
 class MockElement {
   constructor() {
     this.listeners = {};
+    this.style = {};
   }
   addEventListener(type, handler) {
     if (!this.listeners[type]) this.listeners[type] = new Set();
@@ -26,10 +27,12 @@ global.document = {
   getElementById(id) {
     return elements[id] || null;
   },
-  body: { classList: { contains: () => false } }
+  body: { classList: { contains: () => false } },
+  addEventListener() {},
+  removeEventListener() {}
 };
 
-global.window = {};
+global.window = { addEventListener() {} };
 
 const manager = new DragHandlersManager();
 manager.initialize();

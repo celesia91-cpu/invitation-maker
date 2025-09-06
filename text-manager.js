@@ -42,7 +42,6 @@ export function addTextLayer(text) {
 
 // Add event handlers to text layers
 export function addLayerEventHandlers(t) {
-  t.onpointerdown = beginDragText;
   t._fadeInMs = t._fadeInMs || 0;
   t._fadeOutMs = t._fadeOutMs || 0;
   t._zoomInMs = t._zoomInMs || 0;
@@ -56,13 +55,13 @@ export function addLayerEventHandlers(t) {
 // Begin dragging text layer
 export function beginDragText(e) {
   const body = document.body;
-  if (body.classList.contains('preview') || body.classList.contains('viewer')) return;
+  if (body.classList.contains('preview') || body.classList.contains('viewer')) return false;
   
   // End any existing drag first
   if (dragText) {
     endTextDrag();
   }
-  
+
   setActiveLayer(e.currentTarget);
   dragText = {
     t: e.currentTarget,
@@ -80,6 +79,8 @@ export function beginDragText(e) {
   } catch (error) {
     // Ignore capture errors
   }
+
+  return true;
 }
 
 // Handle text drag movement - Fixed version
