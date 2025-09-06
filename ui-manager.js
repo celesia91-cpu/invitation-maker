@@ -1,8 +1,51 @@
-// ui-manager.js - FIXED RSVP Bar Visibility in Viewer Mode
+// ui-manager.js - Complete Fixed Version - COPY THIS INTO YOUR PROJECT
 
 // UI state management
 let sidebarOpen = false;
 let previewMode = false;
+
+// Top bar height synchronization
+export function syncTopbarHeight() {
+  const topbar = document.getElementById('topbar');
+  const body = document.body;
+  const h = body.classList.contains('viewer') ? 0 : Math.max(40, topbar?.offsetHeight || 40);
+  document.documentElement.style.setProperty('--topbar-h', h + 'px');
+}
+
+// Top bar and mobile responsiveness
+export function initializeResponsive() {
+  window.addEventListener('load', syncTopbarHeight);
+  window.addEventListener('resize', () => {
+    syncTopbarHeight();
+    ensureRsvpVisibility();
+  });
+  
+  const topbarToggle = document.getElementById('topbarToggle');
+  topbarToggle?.addEventListener('click', () => {
+    const body = document.body;
+    const collapsed = !body.classList.contains('mb-topbar-collapsed');
+    setMobileTopbarCollapsed(collapsed);
+  });
+  
+  const mqMobile600 = window.matchMedia('(max-width: 599px)');
+  mqMobile600.addEventListener('change', (e) => {
+    const body = document.body;
+    if (!e.matches) { 
+      body.classList.remove('mb-topbar-collapsed'); 
+    }
+    syncTopbarHeight();
+  });
+}
+
+export function setMobileTopbarCollapsed(collapsed) {
+  const body = document.body;
+  const topbarToggle = document.getElementById('topbarToggle');
+  
+  body.classList.toggle('mb-topbar-collapsed', collapsed);
+  topbarToggle?.setAttribute('aria-expanded', String(!collapsed));
+  if (topbarToggle) topbarToggle.textContent = collapsed ? '▾' : '▴';
+  syncTopbarHeight();
+}
 
 // Export main functions
 export function togglePanel() {
@@ -44,29 +87,6 @@ export function enterPreview() {
 export function exitPreview() {
   document.body.classList.remove('preview');
   previewMode = false;
-}
-
-// Top bar height synchronization
-export function syncTopbarHeight() {
-  const topbar = document.getElementById('topbar');
-  if (topbar) {
-    const height = topbar.offsetHeight;
-    document.documentElement.style.setProperty('--topbar-height', `${height}px`);
-  }
-}
-
-// Mobile topbar collapse
-export function setMobileTopbarCollapsed(collapsed) {
-  const body = document.body;
-  const toggleBtn = document.getElementById('togglePanelBtn');
-  
-  if (collapsed) {
-    body.classList.add('mobile-topbar-collapsed');
-    if (toggleBtn) toggleBtn.style.display = 'none';
-  } else {
-    body.classList.remove('mobile-topbar-collapsed');
-    if (toggleBtn) toggleBtn.style.display = '';
-  }
 }
 
 // Guide management
@@ -312,6 +332,11 @@ export function setupRsvpHandlers() {
 }
 
 // Map controls with improved error handling
+export function setupMapHandlers() {
+  // Map control handlers would go here
+  console.log('Map handlers initialized');
+}
+
 export function showMapControls() {
   const mapContainer = document.getElementById('mapContainer');
   if (mapContainer) {
@@ -328,11 +353,30 @@ export function hideMapControls() {
   }
 }
 
-// Responsive handling
-window.addEventListener('resize', () => {
-  syncTopbarHeight();
-  ensureRsvpVisibility();
-});
+// Viewer fullscreen functionality
+export function initializeViewerFullscreen() {
+  // Setup fullscreen viewer functionality
+  const body = document.body;
+  
+  if (body.classList.contains('viewer')) {
+    // Add fullscreen capabilities for viewer mode
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      }
+    });
+  }
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {
+      console.warn('Could not enter fullscreen:', err);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
 
 // Export additional utilities
 export { 
