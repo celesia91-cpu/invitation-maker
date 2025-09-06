@@ -363,6 +363,39 @@ export function updateImageFadeUI() {
   imgFadeOutVal.textContent = fmtSec(fo);
 }
 
+export function updateImageZoomUI() {
+  const imgZoomInBtn = document.getElementById('imgZoomInBtn');
+  const imgZoomOutBtn = document.getElementById('imgZoomOutBtn');
+  const imgZoomInRange = document.getElementById('imgZoomInRange');
+  const imgZoomOutRange = document.getElementById('imgZoomOutRange');
+  const imgZoomInVal = document.getElementById('imgZoomInVal');
+  const imgZoomOutVal = document.getElementById('imgZoomOutVal');
+
+  const img = getSlideImage();
+  const on = !!(img && imgState.has);
+
+  [imgZoomInBtn, imgZoomOutBtn, imgZoomInRange, imgZoomOutRange].forEach(el => {
+    if (el) el.disabled = !on;
+  });
+
+  if (!on) {
+    imgZoomInBtn?.classList.remove('active');
+    imgZoomOutBtn?.classList.remove('active');
+    if (imgZoomInVal) imgZoomInVal.textContent = '0.0s';
+    if (imgZoomOutVal) imgZoomOutVal.textContent = '0.0s';
+    return;
+  }
+
+  const zi = img.zoomInMs || 0;
+  const zo = img.zoomOutMs || 0;
+  imgZoomInBtn?.classList.toggle('active', zi > 0);
+  imgZoomOutBtn?.classList.toggle('active', zo > 0);
+  if (imgZoomInRange) imgZoomInRange.value = zi;
+  if (imgZoomOutRange) imgZoomOutRange.value = zo;
+  if (imgZoomInVal) imgZoomInVal.textContent = fmtSec(zi);
+  if (imgZoomOutVal) imgZoomOutVal.textContent = fmtSec(zo);
+}
+
 // Handle image fade controls
 export function handleImageFadeIn() {
   const img = getSlideImage();
