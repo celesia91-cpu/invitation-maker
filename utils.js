@@ -3,6 +3,11 @@
 // Math and validation utilities
 export const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
+// Unique ID generation
+export function generateId(prefix = 'id') {
+  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 // Debounce utility for performance
 export function debounce(fn, delay = 300) {
   let t;

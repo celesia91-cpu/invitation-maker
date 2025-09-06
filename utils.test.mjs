@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { encodeState, decodeState, workSize } from './utils.js';
+import { encodeState, decodeState, workSize, generateId } from './utils.js';
 
 // A minimal project state containing non-ASCII characters to verify
 // Unicode-safe base64 round-tripping.
@@ -82,3 +82,11 @@ console.log('decodeState rejects malformed input');
 global.document = { querySelector: () => null };
 assert.deepStrictEqual(workSize(), { w: 0, h: 0 });
 console.log('workSize returns fallback when #work is absent');
+
+// generateId should produce unique, prefixed IDs
+const gid1 = generateId('test');
+const gid2 = generateId('test');
+assert.ok(gid1.startsWith('test-'));
+assert.ok(gid2.startsWith('test-'));
+assert.notStrictEqual(gid1, gid2);
+console.log('generateId creates unique prefixed IDs');
