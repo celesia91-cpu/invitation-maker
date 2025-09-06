@@ -488,13 +488,16 @@ input[type="color"] {
   transform-origin: center center;
 }
 
+/* Enhanced work area with improved drag support */
 #work {
-  position: absolute;
-  inset: 14px;
-  border-radius: 18px;
-  overflow: hidden;
-  background: #000;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
+  position: relative;
+  touch-action: none; /* Prevent touch gestures from interfering */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  width: 100%;
+  height: 100%;
 }
 
 #userBgWrap {
@@ -530,20 +533,113 @@ input[type="color"] {
   mix-blend-mode: normal;
 }
 
+/* ===== ENHANCED TEXT LAYER STYLES ===== */
 .layer {
   position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 30;
-  color: #fff;
-  touch-action: none;
+  cursor: move;
+  outline: none;
+  border-radius: 4px;
+  transition: outline 0.15s ease, box-shadow 0.15s ease;
+  min-width: 20px;
+  min-height: 20px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  resize: none; /* Disable native resize to use custom */
+  will-change: transform; /* Performance optimization */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
+/* Enhanced hover state for layers */
+.layer:hover:not(.active):not(.dragging):not(.resizing) {
+  outline: 1px solid rgba(96, 165, 250, 0.6);
+  outline-offset: 1px;
+  transition: outline 0.1s ease;
+}
+
+/* Enhanced active layer styling */
+.layer.active {
+  outline: 2px solid rgba(37, 99, 235, 0.8);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+/* Dragging state */
+.layer.dragging {
+  cursor: grabbing !important;
+  outline: 2px solid rgba(124, 58, 237, 0.8) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 4px rgba(124, 58, 237, 0.2) !important;
+  z-index: 100;
+  transition: none; /* Disable transitions during drag */
+}
+
+/* Resizing state */
+.layer.resizing {
+  cursor: ew-resize !important;
+  outline: 2px solid rgba(16, 185, 129, 0.8) !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+  transition: none; /* Disable transitions during resize */
+}
+
+/* Text layer specific styles */
+.layer.text-layer {
+  cursor: move;
+}
+
+.layer.text-layer:hover {
+  cursor: move;
+}
+
+.layer.text-layer.resizable {
+  resize: none; /* Disable native resize */
+}
+
+/* Custom resize handle for text layers */
+.layer.text-layer::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(-45deg, transparent 40%, #2563eb 40%, #2563eb 60%, transparent 60%);
+  cursor: se-resize;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.layer.text-layer.active::after {
+  opacity: 0.7;
+  pointer-events: auto;
+}
+
+.layer.text-layer.active:hover::after {
+  opacity: 1;
+}
+
+/* Selection state improvements */
+.layer.selected {
+  outline: 2px solid rgba(37, 99, 235, 0.8);
+  outline-offset: 1px;
+}
+
+.layer.multi-selected {
+  outline: 2px dashed rgba(124, 58, 237, 0.8);
+  outline-offset: 1px;
+}
+
+/* ===== ENHANCED GUIDE STYLES ===== */
 .guide {
   position: absolute;
   pointer-events: none;
-  z-index: 26;
-  display: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.guide.visible {
+  opacity: 1;
 }
 
 .guide.v {
@@ -551,7 +647,14 @@ input[type="color"] {
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: rgba(96, 165, 250, 0.85);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(96, 165, 250, 0.9) 20%,
+    rgba(96, 165, 250, 0.9) 80%,
+    transparent 100%
+  );
+  transform: translateX(-0.5px);
 }
 
 .guide.h {
@@ -559,9 +662,63 @@ input[type="color"] {
   right: 0;
   top: 50%;
   height: 1px;
-  background: rgba(96, 165, 250, 0.85);
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(96, 165, 250, 0.9) 20%,
+    rgba(96, 165, 250, 0.9) 80%,
+    transparent 100%
+  );
+  transform: translateY(-0.5px);
 }
 
+/* Legacy guide IDs for compatibility */
+#vGuide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(96, 165, 250, 0.9) 20%,
+    rgba(96, 165, 250, 0.9) 80%,
+    transparent 100%
+  );
+  transform: translateX(-0.5px);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#hGuide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(96, 165, 250, 0.9) 20%,
+    rgba(96, 165, 250, 0.9) 80%,
+    transparent 100%
+  );
+  transform: translateY(-0.5px);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#vGuide.visible,
+#hGuide.visible {
+  opacity: 1;
+}
+
+/* ===== ENHANCED TRANSFORM BOX STYLES ===== */
 #bgBox {
   position: absolute;
   left: 50%;
@@ -570,27 +727,58 @@ input[type="color"] {
   height: 0;
   transform-origin: center;
   border: 1.5px dashed #60a5fa;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25) inset;
+  box-shadow: 
+    0 0 0 1px rgba(59, 130, 246, 0.25) inset,
+    0 2px 8px rgba(0, 0, 0, 0.15);
   z-index: 20;
   touch-action: none;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+  will-change: transform;
 }
 
 #bgBox.hidden {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
+#bgBox.dragging {
+  border-color: #7c3aed;
+  box-shadow: 
+    0 0 0 1px rgba(124, 58, 237, 0.35) inset,
+    0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== ENHANCED TRANSFORM HANDLES ===== */
 .handle {
   position: absolute;
   width: 14px;
   height: 14px;
-  background: #0b1630;
+  background: linear-gradient(135deg, #0b1630, #1e293b);
   border: 2px solid #2563eb;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
   touch-action: none;
   z-index: 21;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  will-change: transform;
 }
 
+.handle:hover {
+  transform: scale(1.15);
+  border-color: #3b82f6;
+  box-shadow: 
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
+
+.handle:active {
+  transform: scale(0.95);
+}
+
+/* Corner handles */
 .handle.nw {
   left: -7px;
   top: -7px;
@@ -615,16 +803,68 @@ input[type="color"] {
   cursor: nesw-resize;
 }
 
+/* Enhanced rotation handle */
 .handle.rotate {
   left: 50%;
-  top: -28px;
+  top: -32px;
   transform: translateX(-50%);
   width: 16px;
   height: 16px;
   cursor: grab;
   border-color: #7c3aed;
+  background: linear-gradient(135deg, #0b1630, #2d1b69);
 }
 
+.handle.rotate:hover {
+  border-color: #8b5cf6;
+  transform: translateX(-50%) scale(1.15);
+}
+
+.handle.rotate:active {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(0.95);
+}
+
+.handle.rotate::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: #7c3aed;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* ===== SNAP INDICATORS ===== */
+.snap-indicator {
+  position: absolute;
+  pointer-events: none;
+  z-index: 45;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.snap-indicator.active {
+  opacity: 1;
+}
+
+.snap-indicator.vertical {
+  width: 2px;
+  height: 20px;
+  background: rgba(96, 165, 250, 0.9);
+  border-radius: 1px;
+}
+
+.snap-indicator.horizontal {
+  width: 20px;
+  height: 2px;
+  background: rgba(96, 165, 250, 0.9);
+  border-radius: 1px;
+}
+
+/* ===== ENHANCED RSVP STYLES ===== */
 .rsvp {
   position: absolute;
   left: 14px;
@@ -636,6 +876,7 @@ input[type="color"] {
   justify-content: center;
   flex-wrap: wrap;
   pointer-events: auto;
+  transition: all 0.3s ease;
 }
 
 .rsvp-btn {
@@ -648,6 +889,15 @@ input[type="color"] {
   border-radius: 999px;
   font-weight: 900;
   cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.rsvp-btn:hover {
+  background: #1a2332;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .rsvp-btn.primary {
@@ -656,8 +906,74 @@ input[type="color"] {
   color: #fff;
 }
 
+.rsvp-btn.primary:hover {
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+}
+
 .rsvp-btn.active {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  background: #1a2332;
+}
+
+/* New confirmed state for RSVP buttons */
+.rsvp-btn.confirmed {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  border-color: transparent !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+}
+
+.rsvp-btn.confirmed:hover {
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+/* Loading state for buttons */
+.rsvp-btn.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.rsvp-btn.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Success states */
+.rsvp-btn.success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: transparent;
+  color: white;
+}
+
+.rsvp-btn.success::before {
+  content: '✓ ';
+  font-weight: bold;
+}
+
+/* Pulse animation for call-to-action */
+@keyframes rsvp-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+.rsvp-btn.pulse {
+  animation: rsvp-pulse 2s infinite;
 }
 
 #uploadBgBtn {
@@ -752,6 +1068,7 @@ body.viewer #fxVideo {
   z-index: 18;
 }
 
+/* Enhanced viewer mode RSVP styling */
 body.viewer .rsvp {
   position: fixed;
   left: max(12px, env(safe-area-inset-left));
@@ -759,15 +1076,19 @@ body.viewer .rsvp {
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 1200;
   pointer-events: auto;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 body.viewer .rsvp::before {
   content: "";
   position: absolute;
   inset: -12px -12px -12px -12px;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.35));
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.4) 70%, rgba(0, 0, 0, 0.6) 100%);
   z-index: -1;
-  border-radius: 16px;
+  border-radius: 24px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 /* Auto-rotate for mobile */
@@ -843,6 +1164,53 @@ body.auto-rotate .wrap {
   width: 100%;
 }
 
+/* ===== MOBILE & TOUCH OPTIMIZATIONS ===== */
+@media (max-width: 768px) {
+  .handle {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .handle.nw { left: -9px; top: -9px; }
+  .handle.ne { right: -9px; top: -9px; }
+  .handle.se { right: -9px; bottom: -9px; }
+  .handle.sw { left: -9px; bottom: -9px; }
+  
+  .handle.rotate {
+    width: 20px;
+    height: 20px;
+    top: -36px;
+  }
+  
+  .layer {
+    min-width: 30px;
+    min-height: 30px;
+  }
+}
+
+/* Touch device optimizations */
+@media (pointer: coarse) {
+  .layer {
+    cursor: pointer; /* Better for touch */
+  }
+  
+  .handle {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .handle.nw { left: -10px; top: -10px; }
+  .handle.ne { right: -10px; top: -10px; }
+  .handle.se { right: -10px; bottom: -10px; }
+  .handle.sw { left: -10px; bottom: -10px; }
+  
+  .handle.rotate {
+    width: 24px;
+    height: 24px;
+    top: -40px;
+  }
+}
+
 /* ===== RESPONSIVE DESIGN ===== */
 @media (min-width: 960px) {
   body.panel-open {
@@ -886,118 +1254,6 @@ body.auto-rotate .wrap {
   }
   
   .rsvp-btn {
-    height: 30px;
-    font-size: 12px;
-    padding: 0 10px;
-  }
-}
-
-/* ===== UTILITY CLASSES ===== */
-.hint {
-  margin: 8px 0 0;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-/* RSVP CSS Updates - Add these to your styles.css */
-
-/* Enhanced RSVP bar styling */
-.rsvp {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 14px;
-  z-index: 45;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-  pointer-events: auto;
-  transition: all 0.3s ease;
-}
-
-.rsvp-btn {
-  appearance: none;
-  border: 1px solid #26334f;
-  background: #0b1630;
-  color: #e5e7eb;
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.rsvp-btn:hover {
-  background: #1a2332;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.rsvp-btn.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-}
-
-.rsvp-btn.primary:hover {
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
-}
-
-.rsvp-btn.active {
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
-  background: #1a2332;
-}
-
-/* New confirmed state for RSVP buttons */
-.rsvp-btn.confirmed {
-  background: linear-gradient(135deg, #10b981, #059669) !important;
-  border-color: transparent !important;
-  color: white !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
-}
-
-.rsvp-btn.confirmed:hover {
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4) !important;
-  transform: translateY(-1px);
-}
-
-/* Enhanced viewer mode RSVP styling */
-body.viewer .rsvp {
-  position: fixed;
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 1200;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-body.viewer .rsvp::before {
-  content: "";
-  position: absolute;
-  inset: -12px -12px -12px -12px;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.4) 70%, rgba(0, 0, 0, 0.6) 100%);
-  z-index: -1;
-  border-radius: 24px;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-
-/* Responsive RSVP design */
-@media (max-width: 599px) {
-  .rsvp {
-    gap: 6px;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-  }
-  
-  .rsvp-btn {
     height: 34px;
     font-size: 13px;
     padding: 0 12px;
@@ -1024,52 +1280,110 @@ body.viewer .rsvp::before {
   }
 }
 
-/* Pulse animation for call-to-action */
-@keyframes rsvp-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+/* ===== ACCESSIBILITY IMPROVEMENTS ===== */
+.layer:focus {
+  outline: 3px solid rgba(37, 99, 235, 0.8);
+  outline-offset: 2px;
 }
 
-.rsvp-btn.pulse {
-  animation: rsvp-pulse 2s infinite;
+.handle:focus {
+  outline: 2px solid rgba(96, 165, 250, 0.8);
+  outline-offset: 2px;
 }
 
-/* Loading state for buttons */
-.rsvp-btn.loading {
-  opacity: 0.7;
-  cursor: not-allowed;
-  pointer-events: none;
+.rsvp-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5);
 }
 
-.rsvp-btn.loading::after {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.rsvp-btn.confirmed:focus {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.5);
 }
 
-@keyframes spin {
-  to { transform: translate(-50%, -50%) rotate(360deg); }
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .layer.active {
+    outline: 3px solid #ffffff;
+    background: rgba(0, 0, 0, 0.1);
+  }
+  
+  .handle {
+    border-color: #ffffff;
+    background: #000000;
+  }
+  
+  #bgBox {
+    border-color: #ffffff;
+  }
+  
+  .guide,
+  #vGuide,
+  #hGuide {
+    background: #ffffff !important;
+  }
 }
 
-/* Success states */
-.rsvp-btn.success {
-  background: linear-gradient(135deg, #10b981, #059669);
-  border-color: transparent;
-  color: white;
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .layer,
+  .handle,
+  .guide,
+  #bgBox,
+  #vGuide,
+  #hGuide {
+    transition: none !important;
+  }
+  
+  .rsvp-btn.pulse {
+    animation: none !important;
+  }
 }
 
-.rsvp-btn.success::before {
-  content: '✓ ';
-  font-weight: bold;
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .layer.active {
+    outline-color: rgba(96, 165, 250, 0.9);
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.2);
+  }
+  
+  .handle {
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border-color: #3b82f6;
+  }
+  
+  .handle.rotate {
+    background: linear-gradient(135deg, #1e293b, #4c1d95);
+    border-color: #8b5cf6;
+  }
+  
+  .rsvp-btn {
+    border-color: #374151;
+    background: #1f2937;
+  }
+  
+  .rsvp-btn:hover {
+    background: #374151;
+  }
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+.layer,
+.handle,
+#bgBox {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* During drag operations, disable expensive effects */
+body.dragging .layer:not(.dragging),
+body.dragging .handle:not(:active) {
+  transition: none;
+  will-change: auto;
+}
+
+body.dragging #bgBox:not(.dragging) {
+  transition: none;
 }
 
 /* Ensure RSVP bar doesn't interfere with other UI */
@@ -1088,24 +1402,9 @@ body.viewer .rsvp {
   }
 }
 
-/* Focus states for accessibility */
-.rsvp-btn:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5);
-}
-
-.rsvp-btn.confirmed:focus {
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.5);
-}
-
-/* Dark theme adjustments */
-@media (prefers-color-scheme: dark) {
-  .rsvp-btn {
-    border-color: #374151;
-    background: #1f2937;
-  }
-  
-  .rsvp-btn:hover {
-    background: #374151;
-  }
+/* ===== UTILITY CLASSES ===== */
+.hint {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
 }
