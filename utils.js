@@ -142,7 +142,9 @@ function compressProjectData(project) {
         angle: Math.round(slide.image.angle * 100) / 100,
         flip: slide.image.flip,
         fadeInMs: slide.image.fadeInMs,
-        fadeOutMs: slide.image.fadeOutMs
+        fadeOutMs: slide.image.fadeOutMs,
+        zoomInMs: slide.image.zoomInMs,
+        zoomOutMs: slide.image.zoomOutMs
       } : null,
       layers: slide.layers?.map(layer => ({
         text: layer.text,

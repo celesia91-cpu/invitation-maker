@@ -319,6 +319,8 @@ export function writeCurrentSlide() {
         flip: !!imgState.flip,
         fadeInMs: slides[activeIndex]?.image?.fadeInMs || 0,
         fadeOutMs: slides[activeIndex]?.image?.fadeOutMs || 0,
+        zoomInMs: slides[activeIndex]?.image?.zoomInMs || 0,
+        zoomOutMs: slides[activeIndex]?.image?.zoomOutMs || 0,
       };
     }
 
