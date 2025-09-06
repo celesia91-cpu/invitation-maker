@@ -494,36 +494,3 @@ export function loadLayersIntoDOM(layers) {
   const lastLayer = [...work.querySelectorAll('.layer')].slice(-1)[0] || null;
   handleSetActiveLayer(lastLayer);
 }
-
-export function updateTextZoomUI() {
-  const textZoomInBtn = document.getElementById('textZoomInBtn');
-  const textZoomOutBtn = document.getElementById('textZoomOutBtn');
-  const textZoomInRange = document.getElementById('textZoomInRange');
-  const textZoomOutRange = document.getElementById('textZoomOutRange');
-  const textZoomInVal = document.getElementById('textZoomInVal');
-  const textZoomOutVal = document.getElementById('textZoomOutVal');
-
-  const activeLayer = getActiveLayer();
-  const on = !!activeLayer;
-
-  [textZoomInBtn, textZoomOutBtn, textZoomInRange, textZoomOutRange].forEach(el => {
-    if (el) el.disabled = !on;
-  });
-
-  if (!on) {
-    textZoomInBtn?.classList.remove('active');
-    textZoomOutBtn?.classList.remove('active');
-    if (textZoomInVal) textZoomInVal.textContent = '0.0s';
-    if (textZoomOutVal) textZoomOutVal.textContent = '0.0s';
-    return;
-  }
-
-  const zi = activeLayer._zoomInMs || 0;
-  const zo = activeLayer._zoomOutMs || 0;
-  textZoomInBtn?.classList.toggle('active', zi > 0);
-  textZoomOutBtn?.classList.toggle('active', zo > 0);
-  if (textZoomInRange) textZoomInRange.value = zi;
-  if (textZoomOutRange) textZoomOutRange.value = zo;
-  if (textZoomInVal) textZoomInVal.textContent = fmtSec(zi);
-  if (textZoomOutVal) textZoomOutVal.textContent = fmtSec(zo);
-}
