@@ -29,8 +29,10 @@ export class EventHandlersManager {
       this.setupTextManagementHandlers();
       this.setupTextStylingHandlers();
       this.setupTextFadeHandlers();
+      this.setupTextZoomHandlers();
       this.setupImageManagementHandlers();
       this.setupImageFadeHandlers();
+      this.setupImageZoomHandlers();
       this.setupPresetHandlers();
       this.setupKeyboardShortcuts();
       
@@ -197,6 +199,31 @@ export class EventHandlersManager {
   }
 
   /**
+   * Setup text zoom handlers
+   */
+  setupTextZoomHandlers() {
+    this.registerClickHandler('textZoomInBtn', async () => {
+      const { handleTextZoomIn } = await import('./text-manager.js');
+      handleTextZoomIn();
+    });
+
+    this.registerClickHandler('textZoomOutBtn', async () => {
+      const { handleTextZoomOut } = await import('./text-manager.js');
+      handleTextZoomOut();
+    });
+
+    this.registerInputHandler('textZoomInRange', async (e) => {
+      const { handleTextZoomInRange } = await import('./text-manager.js');
+      handleTextZoomInRange(e.target.value);
+    });
+
+    this.registerInputHandler('textZoomOutRange', async (e) => {
+      const { handleTextZoomOutRange } = await import('./text-manager.js');
+      handleTextZoomOutRange(e.target.value);
+    });
+  }
+
+  /**
    * Setup image management handlers
    */
   setupImageManagementHandlers() {
@@ -262,6 +289,31 @@ export class EventHandlersManager {
     this.registerInputHandler('imgFadeOutRange', async (e) => {
       const { handleImageFadeOutRange } = await import('./image-manager.js');
       handleImageFadeOutRange(e.target.value);
+    });
+  }
+
+  /**
+   * Setup image zoom handlers
+   */
+  setupImageZoomHandlers() {
+    this.registerClickHandler('imgZoomInBtn', async () => {
+      const { handleImageZoomIn } = await import('./image-manager.js');
+      handleImageZoomIn();
+    });
+
+    this.registerClickHandler('imgZoomOutBtn', async () => {
+      const { handleImageZoomOut } = await import('./image-manager.js');
+      handleImageZoomOut();
+    });
+
+    this.registerInputHandler('imgZoomInRange', async (e) => {
+      const { handleImageZoomInRange } = await import('./image-manager.js');
+      handleImageZoomInRange(e.target.value);
+    });
+
+    this.registerInputHandler('imgZoomOutRange', async (e) => {
+      const { handleImageZoomOutRange } = await import('./image-manager.js');
+      handleImageZoomOutRange(e.target.value);
     });
   }
 
