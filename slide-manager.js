@@ -8,9 +8,9 @@ import {
 } from './state-manager.js';
 
 import { clamp, DEFAULT_DUR, fmtSec } from './utils.js';
-import { buildLayersFromDOM, loadLayersIntoDOM, updateTextFadeUI } from './text-manager.js';
-import { 
-  imgState, setTransforms, updateImageFadeUI 
+import { buildLayersFromDOM, loadLayersIntoDOM, updateTextFadeUI, updateTextZoomUI } from './text-manager.js';
+import {
+  imgState, setTransforms, updateImageFadeUI, updateImageZoomUI
 } from './image-manager.js';
 
 /**
@@ -448,9 +448,11 @@ export function updateSlidesUI() {
     slideDurVal.textContent = fmtSec(duration);
   }
 
-  // Update fade controls
+  // Update fade and zoom controls
   updateTextFadeUI();
   updateImageFadeUI();
+  updateTextZoomUI();
+  updateImageZoomUI();
 }
 
 /* --------------------------- Slide CRUD Operations ----------------------------- */
@@ -522,12 +524,34 @@ function computeOpacity(t, dur, fadeInMs, fadeOutMs) {
   return Math.max(0, Math.min(1, Math.min(a, b)));
 }
 
+function computeScale(t, dur, zoomInMs, zoomOutMs) {
+  const zi = Math.max(0, zoomInMs | 0);
+  const zo = Math.max(0, zoomOutMs | 0);
+  const a = zi > 0 ? Math.min(1, t / zi) : 1;
+  const b = zo > 0 ? Math.min(1, (dur - t) / zo) : 1;
+  return Math.max(0, Math.min(1, Math.min(a, b)));
+}
+
 export function resetOpacities() {
   const { work, userBgWrap } = getEls();
   [...work.querySelectorAll('.layer')].forEach(n => (n.style.opacity = '1'));
   if (userBgWrap) {
     userBgWrap.style.opacity = '1';
     userBgWrap.style.transition = '';
+  }
+}
+
+export function resetZooms() {
+  const { work, userBgWrap } = getEls();
+  [...work.querySelectorAll('.layer')].forEach(el => {
+    if (el.dataset.baseTransform !== undefined) {
+      el.style.transform = el.dataset.baseTransform;
+      delete el.dataset.baseTransform;
+    }
+  });
+  if (userBgWrap && userBgWrap.dataset.baseTransform !== undefined) {
+    userBgWrap.style.transform = userBgWrap.dataset.baseTransform;
+    delete userBgWrap.dataset.baseTransform;
   }
 }
 
@@ -550,7 +574,7 @@ async function stepFrame(ts) {
   const elapsed = ts - slideStart;
   const duration = currentSlideData.durationMs || DEFAULT_DUR;
 
-  // Apply fades
+  // Apply fades and zooms
   const { work, userBgWrap } = getEls();
 
   // Text layers
@@ -559,6 +583,13 @@ async function stepFrame(ts) {
     const layerData = currentSlideData.layers?.[index] || {};
     const opacity = computeOpacity(elapsed, duration, layerData.fadeInMs || 0, layerData.fadeOutMs || 0);
     element.style.opacity = String(opacity);
+
+    const scale = computeScale(elapsed, duration, layerData.zoomInMs || 0, layerData.zoomOutMs || 0);
+    if (element.dataset.baseTransform === undefined) {
+      element.dataset.baseTransform = element.style.transform || '';
+    }
+    const base = element.dataset.baseTransform;
+    element.style.transform = `${base ? base + ' ' : ''}scale(${scale})`;
   });
 
   // Image
@@ -566,6 +597,13 @@ async function stepFrame(ts) {
   if (imageData && userBgWrap) {
     const opacity = computeOpacity(elapsed, duration, imageData.fadeInMs || 0, imageData.fadeOutMs || 0);
     userBgWrap.style.opacity = String(opacity);
+
+    const scale = computeScale(elapsed, duration, imageData.zoomInMs || 0, imageData.zoomOutMs || 0);
+    if (userBgWrap.dataset.baseTransform === undefined) {
+      userBgWrap.dataset.baseTransform = userBgWrap.style.transform || '';
+    }
+    const base = userBgWrap.dataset.baseTransform;
+    userBgWrap.style.transform = `${base ? base + ' ' : ''}scale(${scale})`;
   }
 
   // Advance to next slide
@@ -578,6 +616,10 @@ async function stepFrame(ts) {
     try {
       await loadSlideIntoDOM(slides[nextIndex]);
       updateSlidesUI();
+      const { userBgWrap: newWrap } = getEls();
+      if (newWrap) {
+        delete newWrap.dataset.baseTransform;
+      }
     } catch (error) {
       console.error('Error during playback slide switch:', error);
     }
@@ -624,8 +666,9 @@ function stopPlay() {
     playBtn.setAttribute('aria-pressed', 'false');
     playBtn.textContent = 'Play';
   }
-  
+
   resetOpacities();
+  resetZooms();
 }
 
 export function togglePlay() {
@@ -640,8 +683,9 @@ export function togglePlay() {
 
 export function cleanup() {
   console.log('🧹 Cleaning up slide manager...');
-  
+
   stopPlay();
+  resetZooms();
   switchManager.destroy();
   imageLoader.destroy();
   

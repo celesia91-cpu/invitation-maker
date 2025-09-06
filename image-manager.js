@@ -380,16 +380,27 @@ export function updateImageZoomUI() {
 
   const img = getSlideImage();
   const on = !!(img && imgState.has);
+
   [imgZoomInBtn, imgZoomOutBtn, imgZoomInRange, imgZoomOutRange].forEach(el => {
     if (el) el.disabled = !on;
   });
-  const zi = (img?.zoomInMs) || 0, zo = (img?.zoomOutMs) || 0;
-  imgZoomInBtn.classList.toggle('active', zi > 0);
-  imgZoomOutBtn.classList.toggle('active', zo > 0);
-  imgZoomInRange.value = zi;
-  imgZoomOutRange.value = zo;
-  imgZoomInVal.textContent = fmtSec(zi);
-  imgZoomOutVal.textContent = fmtSec(zo);
+
+  if (!on) {
+    imgZoomInBtn?.classList.remove('active');
+    imgZoomOutBtn?.classList.remove('active');
+    if (imgZoomInVal) imgZoomInVal.textContent = '0.0s';
+    if (imgZoomOutVal) imgZoomOutVal.textContent = '0.0s';
+    return;
+  }
+
+  const zi = img.zoomInMs || 0;
+  const zo = img.zoomOutMs || 0;
+  imgZoomInBtn?.classList.toggle('active', zi > 0);
+  imgZoomOutBtn?.classList.toggle('active', zo > 0);
+  if (imgZoomInRange) imgZoomInRange.value = zi;
+  if (imgZoomOutRange) imgZoomOutRange.value = zo;
+  if (imgZoomInVal) imgZoomInVal.textContent = fmtSec(zi);
+  if (imgZoomOutVal) imgZoomOutVal.textContent = fmtSec(zo);
 }
 
 // Handle image fade controls
