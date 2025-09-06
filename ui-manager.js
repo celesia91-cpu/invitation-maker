@@ -1,149 +1,81 @@
-// ui-manager.js - Updated with fixed RSVP system + preview image rehydrate
+// ui-manager.js - FIXED RSVP Bar Visibility in Viewer Mode
 
-import { setTransforms } from './image-manager.js';
-import { resetOpacities } from './slide-manager.js';
-import { initializeRsvpSystem } from './fixed-rsvp-system.js';
+// UI state management
+let sidebarOpen = false;
+let previewMode = false;
 
-// Top bar and mobile responsiveness
-export function syncTopbarHeight() {
-  const body = document.body;
-  const topbar = document.getElementById('topbar');
-  const h = body.classList.contains('viewer') ? 0 : Math.max(40, topbar?.offsetHeight || 40);
-  document.documentElement.style.setProperty('--topbar-h', h + 'px');
-}
-
-export function setMobileTopbarCollapsed(collapsed) {
-  const body = document.body;
-  const topbarToggle = document.getElementById('topbarToggle');
-  
-  body.classList.toggle('mb-topbar-collapsed', collapsed);
-  topbarToggle?.setAttribute('aria-expanded', String(!collapsed));
-  if (topbarToggle) topbarToggle.textContent = collapsed ? '▾' : '▴';
-  syncTopbarHeight();
-}
-
-export function initializeResponsive() {
-  window.addEventListener('load', syncTopbarHeight);
-  window.addEventListener('resize', syncTopbarHeight);
-  
-  const topbarToggle = document.getElementById('topbarToggle');
-  topbarToggle?.addEventListener('click', () => {
-    const body = document.body;
-    const collapsed = !body.classList.contains('mb-topbar-collapsed');
-    setMobileTopbarCollapsed(collapsed);
-  });
-  
-  const mqMobile600 = window.matchMedia('(max-width: 599px)');
-  mqMobile600.addEventListener('change', (e) => {
-    const body = document.body;
-    if (!e.matches) { 
-      body.classList.remove('mb-topbar-collapsed'); 
-    }
-    syncTopbarHeight();
-  });
-}
-
-// Panel management
-export function openPanel() {
-  const body = document.body;
-  const togglePanelBtn = document.getElementById('togglePanelBtn');
-  const previewBtn = document.getElementById('previewBtn');
-  
-  body.classList.remove('preview');
-  body.classList.add('panel-open');
-  togglePanelBtn?.setAttribute('aria-expanded', 'true');
-  previewBtn?.setAttribute('aria-pressed', 'false');
-  if (previewBtn) previewBtn.textContent = 'Preview';
-  setTransforms();
-}
-
-export function closePanel() {
-  const body = document.body;
-  const togglePanelBtn = document.getElementById('togglePanelBtn');
-  
-  body.classList.remove('panel-open');
-  togglePanelBtn?.setAttribute('aria-expanded', 'false');
-}
-
+// Export main functions
 export function togglePanel() {
-  const body = document.body;
-  if (body.classList.contains('panel-open')) {
+  if (sidebarOpen) {
     closePanel();
   } else {
     openPanel();
   }
 }
 
-// Preview mode
-export function enterPreview() {
-  const body = document.body;
-  const previewBtn = document.getElementById('previewBtn');
-  const work = document.querySelector('#work');
-
-  // Persist any pending changes before hiding editor UI (prevents state loss)
-  import('./slide-manager.js')
-    .then(({ writeCurrentSlide }) => writeCurrentSlide())
-    .catch(() => {});
-  
-  body.classList.add('preview');
-  closePanel();
-  hideGuides();
-  previewBtn?.setAttribute('aria-pressed', 'true');
-  if (previewBtn) previewBtn.textContent = 'Exit Preview';
-  [...(work?.querySelectorAll('.layer') || [])].forEach(l => l.style.outline = '');
-  setTransforms();
+export function openPanel() {
+  document.body.classList.add('panel-open');
+  sidebarOpen = true;
+  syncTopbarHeight();
 }
 
-export function exitPreview() {
-  const body = document.body;
-  const previewBtn = document.getElementById('previewBtn');
-  
-  body.classList.remove('preview');
-  previewBtn?.setAttribute('aria-pressed', 'false');
-  if (previewBtn) previewBtn.textContent = 'Preview';
-  setTransforms();
-  resetOpacities();
-
-  // ---- SAFEGUARD: if the image element lost its src, rehydrate from slide data ----
-  (async () => {
-    const userBg = document.getElementById('userBg');
-    if (userBg && !userBg.src) {
-      try {
-        const [{ getSlides, getActiveIndex }, { loadSlideIntoDOM }, { imgState }] = await Promise.all([
-          import('./state-manager.js'),
-          import('./slide-manager.js'),
-          import('./image-manager.js'),
-        ]);
-        const s = getSlides();
-        const current = s[getActiveIndex()];
-        if (current?.image && (current.image.src || current.image.thumb)) {
-          // Force the normal loader path so width/height/transform are reapplied
-          imgState.has = false;
-          await loadSlideIntoDOM(current);
-          setTransforms();
-        }
-      } catch (err) {
-        console.warn('Image rehydrate failed after exiting preview:', err);
-      }
-    }
-  })().catch(() => {});
+export function closePanel() {
+  document.body.classList.remove('panel-open');
+  sidebarOpen = false;
+  syncTopbarHeight();
 }
 
 export function togglePreview() {
-  const body = document.body;
-  if (body.classList.contains('preview')) {
+  if (previewMode) {
     exitPreview();
   } else {
     enterPreview();
   }
 }
 
-// Guide visibility
-export function showGuides({ v = false, h = false } = {}) {
+export function enterPreview() {
+  document.body.classList.add('preview');
+  previewMode = true;
+  
+  // Ensure RSVP bar is visible in preview mode
+  ensureRsvpVisibility();
+}
+
+export function exitPreview() {
+  document.body.classList.remove('preview');
+  previewMode = false;
+}
+
+// Top bar height synchronization
+export function syncTopbarHeight() {
+  const topbar = document.getElementById('topbar');
+  if (topbar) {
+    const height = topbar.offsetHeight;
+    document.documentElement.style.setProperty('--topbar-height', `${height}px`);
+  }
+}
+
+// Mobile topbar collapse
+export function setMobileTopbarCollapsed(collapsed) {
+  const body = document.body;
+  const toggleBtn = document.getElementById('togglePanelBtn');
+  
+  if (collapsed) {
+    body.classList.add('mobile-topbar-collapsed');
+    if (toggleBtn) toggleBtn.style.display = 'none';
+  } else {
+    body.classList.remove('mobile-topbar-collapsed');
+    if (toggleBtn) toggleBtn.style.display = '';
+  }
+}
+
+// Guide management
+export function showGuides(x, y, w, h) {
   const vGuide = document.getElementById('vGuide');
   const hGuide = document.getElementById('hGuide');
-  if (vGuide) vGuide.style.display = v ? 'block' : 'none';
-  if (hGuide) hGuide.style.display = h ? 'block' : 'none';
+  
+  if (vGuide) vGuide.style.display = x !== undefined ? 'block' : 'none';
+  if (hGuide) hGuide.style.display = h !== undefined ? 'block' : 'none';
 }
 
 export function hideGuides() {
@@ -184,7 +116,9 @@ export function initializeForMode() {
   
   // Import state manager to check if viewer mode
   import('./state-manager.js').then(({ getIsViewer }) => {
-    if (!getIsViewer()) {
+    const isViewer = getIsViewer();
+    
+    if (!isViewer) {
       const isDesktop = window.matchMedia('(min-width: 960px)').matches;
       if (isDesktop) {
         openPanel();
@@ -193,156 +127,216 @@ export function initializeForMode() {
       }
     } else {
       closePanel();
-      // CRITICAL FIX: Ensure RSVP bar is visible and positioned in viewer mode
-      setupViewerRsvp();
+      // Setup viewer mode with RSVP bar
+      setupViewerMode();
+    }
+  }).catch((error) => {
+    console.warn('Could not import state manager, using fallback:', error);
+    // Fallback: check if body has viewer class
+    if (body.classList.contains('viewer')) {
+      setupViewerMode();
     }
   });
   
   setMobileTopbarCollapsed(false);
 }
 
-// FIXED: Setup RSVP for viewer mode
+// FIXED: Complete viewer mode setup
+function setupViewerMode() {
+  console.log('Setting up viewer mode...');
+  
+  const body = document.body;
+  body.classList.add('viewer');
+  
+  // Setup RSVP bar for viewer mode
+  setupViewerRsvp();
+  
+  // Ensure RSVP handlers are properly initialized
+  initializeRsvpHandlers();
+  
+  // Hide unnecessary UI elements in viewer mode
+  hideViewerUnnecessaryElements();
+  
+  console.log('Viewer mode setup complete');
+}
+
+// FIXED: Enhanced RSVP setup for viewer mode
 function setupViewerRsvp() {
   const rsvpBar = document.getElementById('rsvpBar');
-  if (rsvpBar) {
-    // Ensure RSVP bar is visible in viewer mode
-    rsvpBar.style.display = 'flex';
-    rsvpBar.style.position = 'fixed';
-    rsvpBar.style.bottom = 'max(12px, env(safe-area-inset-bottom))';
-    rsvpBar.style.left = 'max(12px, env(safe-area-inset-left))';
-    rsvpBar.style.right = 'max(12px, env(safe-area-inset-right))';
-    rsvpBar.style.zIndex = '1200';
-    rsvpBar.style.pointerEvents = 'auto';
-    console.log('RSVP bar setup for viewer mode');
-  }
-}
-
-// UPDATED: Setup RSVP handlers with new system
-export function setupRsvpHandlers() {
-  // Use the new RSVP system
-  initializeRsvpSystem();
-}
-
-// Map controls (unchanged but improved error handling)
-export function setupMapHandlers() {
-  const mapInput = document.getElementById('mapInput');
-  const mapOpenBtn = document.getElementById('mapOpenBtn');
-  const mapCopyBtn = document.getElementById('mapCopyBtn');
   
-  if (!mapInput || !mapOpenBtn || !mapCopyBtn) {
-    console.warn('Map elements not found');
+  if (!rsvpBar) {
+    console.warn('RSVP bar element not found');
+    return;
+  }
+
+  // Remove any existing inline styles that might interfere
+  rsvpBar.removeAttribute('style');
+  
+  // Apply viewer mode styles
+  Object.assign(rsvpBar.style, {
+    display: 'flex',
+    position: 'fixed',
+    bottom: 'max(12px, env(safe-area-inset-bottom))',
+    left: 'max(12px, env(safe-area-inset-left))', 
+    right: 'max(12px, env(safe-area-inset-right))',
+    zIndex: '1200',
+    pointerEvents: 'auto',
+    visibility: 'visible',
+    opacity: '1',
+    transform: 'none' // Reset any transforms
+  });
+  
+  // Add viewer class for CSS targeting
+  rsvpBar.classList.add('viewer-mode');
+  
+  console.log('RSVP bar configured for viewer mode');
+}
+
+// FIXED: Initialize RSVP handlers with error handling
+function initializeRsvpHandlers() {
+  const rsvpButtons = document.querySelectorAll('.rsvp-btn');
+  
+  if (rsvpButtons.length === 0) {
+    console.warn('No RSVP buttons found');
     return;
   }
   
-  import('./state-manager.js').then(({ handleMapQuery, getMapUrl }) => {
-    mapInput.addEventListener('input', (e) => handleMapQuery(e.target.value));
-    
-    mapOpenBtn.addEventListener('click', () => {
-      const query = (mapInput.value || '').trim();
-      if (!query) {
-        mapInput.focus();
-        return;
-      }
-      handleMapQuery(query);
-      window.open(getMapUrl(), '_blank', 'noopener,noreferrer');
-    });
-    
-    mapCopyBtn.addEventListener('click', async () => {
-      const query = (mapInput.value || '').trim();
-      if (!query) {
-        mapInput.focus();
-        return;
-      }
-      handleMapQuery(query);
-      const url = getMapUrl();
-      
-      try {
-        await navigator.clipboard.writeText(url);
-        const originalText = mapCopyBtn.textContent;
-        mapCopyBtn.textContent = 'Copied!';
-        setTimeout(() => mapCopyBtn.textContent = originalText, 1200);
-      } catch (clipboardError) {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = url;
-        textArea.style.position = 'fixed';
-        textArea.style.top = '-1000px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        const originalText = mapCopyBtn.textContent;
-        mapCopyBtn.textContent = 'Copied!';
-        setTimeout(() => mapCopyBtn.textContent = originalText, 1200);
-      }
-    });
-  }).catch(error => {
-    console.error('Failed to setup map handlers:', error);
+  rsvpButtons.forEach(button => {
+    if (!button.hasAttribute('data-rsvp-initialized')) {
+      button.addEventListener('click', handleRsvpClick);
+      button.setAttribute('data-rsvp-initialized', 'true');
+    }
+  });
+  
+  console.log(`Initialized ${rsvpButtons.length} RSVP buttons`);
+}
+
+// RSVP click handler
+function handleRsvpClick(event) {
+  const button = event.target;
+  const response = button.dataset.response;
+  
+  if (!response) {
+    console.error('RSVP button missing data-response attribute');
+    return;
+  }
+  
+  // Update button states
+  updateRsvpButtonStates(response);
+  
+  // Trigger RSVP submission if state manager is available
+  if (window.stateManager && typeof window.stateManager.setRsvpChoice === 'function') {
+    window.stateManager.setRsvpChoice(response);
+  }
+  
+  console.log('RSVP response:', response);
+}
+
+// Update RSVP button visual states
+function updateRsvpButtonStates(activeResponse) {
+  const rsvpButtons = document.querySelectorAll('.rsvp-btn');
+  
+  rsvpButtons.forEach(button => {
+    const response = button.dataset.response;
+    button.classList.toggle('active', response === activeResponse);
+    button.classList.toggle('confirmed', response === activeResponse);
   });
 }
 
-// Fullscreen functionality for viewer mode (enhanced)
-export function initializeViewerFullscreen() {
+// Hide unnecessary elements in viewer mode
+function hideViewerUnnecessaryElements() {
+  const elementsToHide = [
+    '#sidebar',
+    '#togglePanelBtn', 
+    '#previewBtn',
+    '.editor-only',
+    '.admin-only'
+  ];
+  
+  elementsToHide.forEach(selector => {
+    const element = document.querySelector(selector);
+    if (element) {
+      element.style.display = 'none';
+    }
+  });
+}
+
+// ENHANCED: Ensure RSVP visibility with retry mechanism
+export function ensureRsvpVisibility(retries = 3) {
+  const rsvpBar = document.getElementById('rsvpBar');
+  
+  if (!rsvpBar) {
+    if (retries > 0) {
+      console.log(`RSVP bar not found, retrying... (${retries} attempts left)`);
+      setTimeout(() => ensureRsvpVisibility(retries - 1), 100);
+    } else {
+      console.error('RSVP bar element not found after retries');
+    }
+    return;
+  }
+  
   const body = document.body;
   const isViewer = body.classList.contains('viewer');
-  if (!isViewer) return;
-
-  const overlay = document.getElementById('fsOverlay');
-  const btn = document.getElementById('fsEnterBtn');
-  if (!overlay || !btn) return;
-
-  const docEl = document.documentElement;
-  const supportsFS = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-  function hideOverlay() {
-    overlay.classList.remove('show');
-    overlay.setAttribute('aria-hidden', 'true');
-  }
-
-  function showOverlay() {
-    if (document.fullscreenElement || isStandalone || !supportsFS) return;
-    overlay.classList.add('show');
-    overlay.removeAttribute('aria-hidden');
-  }
-
-  async function enterFullscreen() {
-    try {
-      if (document.fullscreenElement || !supportsFS) {
-        hideOverlay();
-        return;
-      }
-      if (docEl.requestFullscreen) await docEl.requestFullscreen();
-      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-      hideOverlay();
-    } catch (error) {
-      console.warn('Fullscreen request failed:', error);
-      showOverlay();
+  const isPreview = body.classList.contains('preview');
+  
+  if (isViewer || isPreview) {
+    // Force visibility in viewer/preview modes
+    rsvpBar.style.display = 'flex';
+    rsvpBar.style.visibility = 'visible';
+    rsvpBar.style.opacity = '1';
+    
+    // Ensure proper positioning
+    if (isViewer) {
+      setupViewerRsvp();
     }
   }
-
-  window.addEventListener('load', () => {
-    if (!isStandalone && supportsFS) {
-      setTimeout(() => {
-        enterFullscreen().catch(showOverlay);
-      }, 350);
-    }
-  });
-
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement && !isStandalone) showOverlay();
-  });
-
-  const oneTap = () => {
-    enterFullscreen();
-    document.removeEventListener('touchend', oneTap);
-    document.removeEventListener('click', oneTap);
-  };
-  document.addEventListener('touchend', oneTap, { passive: true, once: true });
-  document.addEventListener('click', oneTap, { once: true });
-
-  btn.addEventListener('click', enterFullscreen);
-
-  if (!supportsFS || isStandalone) hideOverlay();
 }
+
+// UPDATED: Setup RSVP handlers with comprehensive initialization
+export function setupRsvpHandlers() {
+  // Wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeRsvpHandlers();
+      ensureRsvpVisibility();
+    });
+  } else {
+    initializeRsvpHandlers();
+    ensureRsvpVisibility();
+  }
+  
+  // Also ensure visibility on window load
+  window.addEventListener('load', () => {
+    ensureRsvpVisibility();
+  });
+}
+
+// Map controls with improved error handling
+export function showMapControls() {
+  const mapContainer = document.getElementById('mapContainer');
+  if (mapContainer) {
+    mapContainer.style.display = 'block';
+  } else {
+    console.warn('Map container not found');
+  }
+}
+
+export function hideMapControls() {
+  const mapContainer = document.getElementById('mapContainer');
+  if (mapContainer) {
+    mapContainer.style.display = 'none';
+  }
+}
+
+// Responsive handling
+window.addEventListener('resize', () => {
+  syncTopbarHeight();
+  ensureRsvpVisibility();
+});
+
+// Export additional utilities
+export { 
+  ensureRsvpVisibility,
+  setupViewerMode,
+  updateRsvpButtonStates
+};
