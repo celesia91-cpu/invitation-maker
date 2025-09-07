@@ -612,7 +612,7 @@ export function playSlides() {
   if (slides.length === 0) return;
   
   slidePlayback.isPlaying = true;
-  slidePlayback.currentSlideIndex = 0;
+  slidePlayback.currentSlideIndex = getActiveIndex();
   slidePlayback.startTime = Date.now();
   
   // Update play button
