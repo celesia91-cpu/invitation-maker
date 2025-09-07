@@ -1,4 +1,4 @@
-// drag-handlers.js - FIXED: Complete working drag system with proper error handling
+// drag-handlers.js - RESOLVED: Complete working drag system with proper error handling
 
 /**
  * Enhanced Drag Handlers Manager
@@ -44,7 +44,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Initialize with proper context validation
+   * RESOLVED: Initialize with proper context validation
    */
   initialize(ctx) {
     if (this.isInitialized) {
@@ -71,7 +71,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Validate and provide fallbacks for context
+   * RESOLVED: Validate and provide fallbacks for context
    */
   validateContext(ctx) {
     const defaultContext = {
@@ -81,7 +81,7 @@ export class DragHandlersManager {
       userBgWrap: document.getElementById('userBgWrap'),
       
       // Image state and functions
-      imgState: { has: false, cx: 0, cy: 0, scale: 1, angle: 0, natW: 0, natH: 0 },
+      imgState: { has: false, cx: 0, cy: 0, scale: 1, angle: 0, natW: 0, natH: 0, shearX: 0, shearY: 0 },
       setTransforms: () => console.warn('setTransforms not available'),
       enforceImageBounds: () => console.warn('enforceImageBounds not available'),
       
@@ -125,7 +125,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Setup work area handlers with comprehensive event handling
+   * RESOLVED: Setup work area handlers with comprehensive event handling
    */
   setupWorkAreaHandlers() {
     const work = this.ctx.work;
@@ -157,7 +157,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Setup background image handlers with proper validation
+   * RESOLVED: Setup background image handlers with proper validation
    */
   setupBackgroundHandlers() {
     const bgBox = this.ctx.bgBox;
@@ -182,7 +182,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Setup touch handlers for mobile devices
+   * RESOLVED: Setup touch handlers for mobile devices
    */
   setupTouchHandlers() {
     const work = this.ctx.work;
@@ -222,7 +222,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Enhanced pointer down handler with proper mode detection
+   * RESOLVED: Enhanced pointer down handler with proper mode detection
    */
   async handlePointerDown(e) {
     const body = document.body;
@@ -260,7 +260,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Start image drag operation with validation
+   * RESOLVED: Start image drag operation with validation
    */
   async startImageDrag(e) {
     try {
@@ -294,7 +294,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Start text layer drag operation
+   * RESOLVED: Start text layer drag operation
    */
   async startTextDrag(e, layer) {
     try {
@@ -336,7 +336,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Start handle transform operation
+   * RESOLVED: Start handle transform operation with vector tracking
    */
   async startHandleTransform(e, handle) {
     try {
@@ -351,6 +351,10 @@ export class DragHandlersManager {
       const work = this.ctx.work;
       const workRect = work.getBoundingClientRect();
       
+      // Calculate initial vector for sign tracking
+      const startVectorX = e.clientX - imgState.cx;
+      const startVectorY = e.clientY - imgState.cy;
+      
       this.dragState = {
         type: 'transform',
         handleType,
@@ -362,6 +366,8 @@ export class DragHandlersManager {
         startCy: imgState.cy,
         centerX: imgState.cx,
         centerY: imgState.cy,
+        startVectorX,
+        startVectorY,
         hasMoved: false
       };
       
@@ -376,7 +382,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Enhanced pointer move handler
+   * RESOLVED: Enhanced pointer move handler
    */
   async handlePointerMove(e) {
     if (!this.dragState) return;
@@ -403,7 +409,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Handle image movement with snapping
+   * RESOLVED: Handle image movement with snapping
    */
   async handleImagePointerMove(e, dx, dy) {
     const imgState = this.ctx.imgState;
@@ -445,7 +451,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Handle text movement
+   * RESOLVED: Handle text movement
    */
   async handleTextPointerMove(e, dx, dy) {
     if (!this.dragState.element) return;
@@ -458,13 +464,18 @@ export class DragHandlersManager {
   }
 
   /**
-   * FIXED: Handle transform operations (scale/rotate)
+   * RESOLVED: Handle transform operations (scale/rotate) with shear support
    */
   async handleTransformPointerMove(e, dx, dy) {
-    const imgState = this.ctx.imgState;
-    const { setTransforms, enforceImageBounds } = this.ctx;
-    const { handleType, startScale, startAngle, centerX, centerY } = this.dragState;
-    
+    let imgState, setTransforms, enforceImageBounds;
+    if (this.ctx) {
+      imgState = this.ctx.imgState;
+      ({ setTransforms, enforceImageBounds } = this.ctx);
+    } else {
+      ({ imgState, setTransforms, enforceImageBounds } = await import('./image-manager.js'));
+    }
+    const { handleType, startScale, startAngle, centerX, centerY, startVectorX, startVectorY } = this.dragState;
+
     if (!imgState) return;
 
     if (handleType === 'rotate') {
@@ -484,38 +495,59 @@ export class DragHandlersManager {
         imgState.shearX = dx / norm;
         imgState.shearY = dy / norm;
       } else {
-        // Default scaling behaviour
+        // Default scaling behavior
         const currentDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+
         if (startDistance > 0) {
           const scaleFactor = currentDistance / startDistance;
           imgState.scale = Math.max(0.1, startScale * scaleFactor);
         }
-        // Flip signs when crossing image center
-        const relX = e.clientX - centerX;
-        const relY = e.clientY - centerY;
-        imgState.signX = relX * this.dragState.startVectorX < 0 ? -1 : 1;
-        imgState.signY = relY * this.dragState.startVectorY < 0 ? -1 : 1;
+
+        // Flip signs when crossing image center (only if we have start vectors)
+        if (startVectorX !== undefined && startVectorY !== undefined) {
+          const relX = e.clientX - centerX;
+          const relY = e.clientY - centerY;
+          imgState.signX = relX * startVectorX < 0 ? -1 : 1;
+          imgState.signY = relY * startVectorY < 0 ? -1 : 1;
+        } else {
+          // Fallback sign calculation based on handle type
+          if (handleType.includes('n')) {
+            imgState.signY = e.clientY > centerY ? -1 : 1;
+          } else if (handleType.includes('s')) {
+            imgState.signY = e.clientY < centerY ? -1 : 1;
+          }
+          if (handleType.includes('w')) {
+            imgState.signX = e.clientX > centerX ? -1 : 1;
+          } else if (handleType.includes('e')) {
+            imgState.signX = e.clientX < centerX ? -1 : 1;
+          }
+        }
       }
     }
-    
+
     if (enforceImageBounds) enforceImageBounds();
     if (setTransforms) setTransforms();
   }
 
   /**
-   * FIXED: Enhanced pointer up handler
+   * RESOLVED: Enhanced pointer up handler
    */
   async handlePointerUp(e) {
     if (!this.dragState) return;
 
     try {
+      const ctx = this.ctx || {};
       // Clean up drag state
       const wasMoving = this.dragState.hasMoved;
       const dragType = this.dragState.type;
       const element = this.dragState.element;
 
+      if (dragType === 'handle' && typeof this.handleTransformPointerUp === 'function') {
+        await this.handleTransformPointerUp(e);
+      }
+
       // Clean up UI classes
-      document.body.classList.remove('dragging');
+      document.body?.classList?.remove?.('dragging');
       
       if (element) {
         element.classList.remove('dragging');
@@ -527,24 +559,24 @@ export class DragHandlersManager {
       }
 
       // Hide guides
-      if (this.ctx.hideGuides) {
-        this.ctx.hideGuides();
+      if (ctx.hideGuides) {
+        ctx.hideGuides();
       }
 
       // Save changes if there was actual movement
       if (wasMoving) {
         setTimeout(() => {
-          if (this.ctx.writeCurrentSlide) this.ctx.writeCurrentSlide();
-          if (this.ctx.saveProjectDebounced) this.ctx.saveProjectDebounced();
+          if (ctx.writeCurrentSlide) ctx.writeCurrentSlide();
+          if (ctx.saveProjectDebounced) ctx.saveProjectDebounced();
         }, 10);
       }
 
       // Clear drag state
       this.dragState = null;
-      
+
       // Release pointer capture
       if (this.capturedPointerId !== null) {
-        const work = this.ctx.work;
+        const work = ctx.work;
         if (work && work.hasPointerCapture(this.capturedPointerId)) {
           work.releasePointerCapture(this.capturedPointerId);
         }
@@ -700,11 +732,21 @@ export class DragHandlersManager {
         a0: Math.atan2(p.y - imgState.cy, p.x - imgState.cx)
       };
     } else if (handle) {
-      this.dragMode = 'scale';
-      this.start = {
-        scale0: imgState.scale,
-        d0: Math.hypot(p.x - imgState.cx, p.y - imgState.cy)
-      };
+      if (['nw', 'ne', 'se', 'sw'].includes(handle) && e.shiftKey) {
+        this.dragMode = 'shear';
+        this.start = {
+          shearX: imgState.shearX || 0,
+          shearY: imgState.shearY || 0,
+          px: p.x,
+          py: p.y
+        };
+      } else {
+        this.dragMode = 'scale';
+        this.start = {
+          scale0: imgState.scale,
+          d0: Math.hypot(p.x - imgState.cx, p.y - imgState.cy)
+        };
+      }
     } else {
       this.dragMode = 'move';
       this.start = {
@@ -767,12 +809,18 @@ export class DragHandlersManager {
       
       if (enforceImageBounds) enforceImageBounds();
       if (setTransforms) setTransforms();
-      
+
     } else if (this.dragMode === 'rotate') {
       const a = Math.atan2(p.y - imgState.cy, p.x - imgState.cx);
       imgState.angle = this.start.angle0 + (a - this.start.a0);
-      
+
       if (enforceImageBounds) enforceImageBounds();
+      if (setTransforms) setTransforms();
+    } else if (this.dragMode === 'shear') {
+      const dx = p.x - this.start.px;
+      const dy = p.y - this.start.py;
+      imgState.shearX = (this.start.shearX || 0) + dx / imgState.natH;
+      imgState.shearY = (this.start.shearY || 0) + dy / imgState.natW;
       if (setTransforms) setTransforms();
     }
   }
@@ -863,7 +911,6 @@ export class DragHandlersManager {
     if (bgBox) {
       bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
       bgBox.removeEventListener('pointermove', this._onBgBoxMove);
-      // remove auxiliary listener used for cleanup callbacks
       bgBox.removeEventListener('pointermove', this._onBgBoxUp);
       bgBox.removeEventListener('pointerup', this._onBgBoxUp);
     }

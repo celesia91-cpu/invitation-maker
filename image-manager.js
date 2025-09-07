@@ -13,10 +13,9 @@ export const imgState = {
   cx: 0,
   cy: 0,
   scale: 1,
-  // Shear components for freeform skewing
+  angle: 0,
   shearX: 0,
   shearY: 0,
-  angle: 0,
   signX: 1,
   signY: 1,
   flip: false,
@@ -202,7 +201,7 @@ export function setTransforms() {
   const h = imgState.natH * imgState.scale;
   const sx = (imgState.flip ? -1 : 1) * (imgState.signX ?? 1);
   const sy = imgState.signY ?? 1;
-  const base = `translate(-50%,-50%) rotate(${imgState.angle}rad) scale(${imgState.scale * sx}, ${imgState.scale * sy})`;
+  const base = `translate(-50%,-50%) rotate(${imgState.angle}rad) skew(${imgState.shearX}rad, ${imgState.shearY}rad) scale(${imgState.scale * sx}, ${imgState.scale * sy})`;
 
   if (userBgWrap) {
     userBgWrap.style.width = w + 'px';
@@ -262,8 +261,9 @@ export async function handleImageUpload(file) {
 
           // Use the smaller scale and avoid upscaling beyond 100%
           imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-          
           imgState.angle = 0;
+          imgState.shearX = 0;
+          imgState.shearY = 0;
           imgState.signX = 1;
           imgState.signY = 1;
           imgState.flip = false;
@@ -332,17 +332,6 @@ function fallbackToLocalUpload(file) {
       // Set default scale so image fits within work area
       const scaleToFitWidth = r.width / imgState.natW;
       const scaleToFitHeight = r.height / imgState.natH;
-
-      // Use the smaller scale and avoid upscaling beyond 100%
-      imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-      
-      imgState.angle = 0;
-      imgState.signX = 1;
-      imgState.signY = 1;
-      imgState.flip = false;
-      imgState.cx = r.width / 2;
-      imgState.cy = r.height / 2;
-      imgState.has = true;
       
       // Reset filters
       Object.assign(imgFilters, PRESETS.none);
@@ -569,6 +558,8 @@ export function handleImageDelete() {
   imgState.cy = 0;
   imgState.scale = 1;
   imgState.angle = 0;
+  imgState.shearX = 0;
+  imgState.shearY = 0;
   imgState.signX = 1;
   imgState.signY = 1;
   imgState.flip = false;

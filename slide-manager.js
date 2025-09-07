@@ -137,6 +137,8 @@ class ImageLoader {
     
     if (!chosenSrc) {
       imgState.has = false;
+      imgState.shearX = 0;
+      imgState.shearY = 0;
       if (userBg) userBg.src = '';
       setTransforms();
       return;
@@ -171,6 +173,8 @@ class ImageLoader {
           if (slide.image && typeof slide.image.scale === 'number') {
             imgState.scale = slide.image.scale;
             imgState.angle = slide.image.angle || 0;
+            imgState.shearX = slide.image.shearX ?? 0;
+            imgState.shearY = slide.image.shearY ?? 0;
             imgState.signX = slide.image.signX ?? 1;
             imgState.signY = slide.image.signY ?? 1;
             imgState.flip = !!slide.image.flip;
@@ -183,8 +187,9 @@ class ImageLoader {
 
             // Use the smaller scale and avoid upscaling beyond 100%
             imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-            
             imgState.angle = 0;
+            imgState.shearX = 0;
+            imgState.shearY = 0;
             imgState.signX = 1;
             imgState.signY = 1;
             imgState.flip = false;
@@ -198,6 +203,8 @@ class ImageLoader {
         } catch (error) {
           console.warn('Image processing error:', error);
           imgState.has = false;
+          imgState.shearX = 0;
+          imgState.shearY = 0;
           setTransforms();
         }
         
@@ -207,6 +214,8 @@ class ImageLoader {
       const onError = () => {
         if (!loadOperation.cancelled) {
           imgState.has = false;
+          imgState.shearX = 0;
+          imgState.shearY = 0;
           setTransforms();
         }
         resolve();
@@ -258,6 +267,8 @@ export async function loadSlideIntoDOM(slide) {
     
     // Reset image state
     imgState.has = false;
+    imgState.shearX = 0;
+    imgState.shearY = 0;
 
     // Ensure zoom timing defaults exist
     if (slide?.image) {
@@ -416,6 +427,8 @@ export function writeCurrentSlide() {
         src: document.querySelector('#userBg')?.src || '',
         scale: imgState.scale,
         angle: imgState.angle,
+        shearX: imgState.shearX,
+        shearY: imgState.shearY,
         signX: imgState.signX,
         signY: imgState.signY,
         flip: imgState.flip,
