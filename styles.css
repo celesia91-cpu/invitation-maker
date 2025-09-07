@@ -268,7 +268,8 @@ body {
 }
 
 .iconbtn.active,
-.iconbtn[aria-expanded="true"] {
+.iconbtn[aria-expanded="true"],
+.iconbtn[aria-pressed="true"] {
   border-color: var(--accent);
   background: rgba(37, 99, 235, 0.1);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);

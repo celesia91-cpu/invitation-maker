@@ -97,8 +97,10 @@ console.log('togglePanel opens and closes the editor panel');
 enterPreview();
 assert.ok(body.classList.contains('preview'));
 assert.strictEqual(previewBtn.getAttribute('aria-pressed'), 'true');
+assert.ok(previewBtn.classList.contains('active'));
 
 exitPreview();
 assert.ok(!body.classList.contains('preview'));
 assert.strictEqual(previewBtn.getAttribute('aria-pressed'), 'false');
+assert.ok(!previewBtn.classList.contains('active'));
 console.log('enterPreview and exitPreview toggle preview mode and aria-pressed');
