@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 
-import stateManager, { setState, getState } from './state-manager.js';
+import stateManager, { setState, getState, setSlides, initializeHistory, pushHistory, doUndo } from './state-manager.js';
 
 // Minimal mock HTMLElement with a circular reference to simulate DOM structure
 class MockHTMLElement {
@@ -64,5 +64,31 @@ const sm = new stateManager.constructor();
   assert.notStrictEqual(result.obj, target.obj);
   console.log('deepMerge bypasses recursion for class instances');
 }
+
+// --- Undo/Redo UI state ---
+stateManager.reset();
+
+const undoBtn = { disabled: true };
+const redoBtn = { disabled: true };
+global.document = {
+  querySelector: (selector) => {
+    if (selector === '#undoBtn') return undoBtn;
+    if (selector === '#redoBtn') return redoBtn;
+    return null;
+  }
+};
+
+initializeHistory();
+setSlides([{ image: null, layers: [], workSize: { w: 800, h: 450 }, durationMs: 3000 }]);
+pushHistory();
+
+assert.strictEqual(undoBtn.disabled, false);
+assert.strictEqual(redoBtn.disabled, true);
+
+doUndo();
+
+assert.strictEqual(undoBtn.disabled, true);
+assert.strictEqual(redoBtn.disabled, false);
+console.log('undo/redo buttons reflect history state');
 
 

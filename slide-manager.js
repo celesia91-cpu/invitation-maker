@@ -1,6 +1,6 @@
 // slide-manager.js - COMPLETE VERSION WITH FADE & ZOOM ANIMATIONS
 
-import { getSlides, getActiveIndex, setActiveIndex, setSlides } from './state-manager.js';
+import { getSlides, getActiveIndex, setActiveIndex, setSlides, recordHistory } from './state-manager.js';
 import { imgState, setTransforms } from './image-manager.js';
 import { clamp } from './utils.js';
 
@@ -767,6 +767,7 @@ export function addSlide() {
     switchToSlide(currentIndex + 1);
     
     console.log('✅ New slide added');
+    recordHistory();
   } catch (error) {
     console.error('Failed to add slide:', error);
   }
@@ -795,6 +796,7 @@ export function duplicateSlide() {
     switchToSlide(currentIndex + 1);
     
     console.log('✅ Slide duplicated');
+    recordHistory();
   } catch (error) {
     console.error('Failed to duplicate slide:', error);
   }
@@ -818,6 +820,7 @@ export function deleteSlide() {
     switchToSlide(newActiveIndex);
     
     console.log('✅ Slide deleted');
+    recordHistory();
   } catch (error) {
     console.error('Failed to delete slide:', error);
   }
@@ -843,6 +846,7 @@ export function handleSlideDuration(value) {
       setSlides([...slides]); // Trigger update
       
       console.log(`✅ Slide duration set to ${durationMs}ms`);
+      recordHistory();
     }
   } catch (error) {
     console.error('Failed to update slide duration:', error);

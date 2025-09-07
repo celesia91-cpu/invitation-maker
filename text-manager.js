@@ -1,11 +1,16 @@
 // text-manager.js - COMPLETE FIXED VERSION - All text management functions
 
-import { saveProjectDebounced } from './state-manager.js';
+import { saveProjectDebounced, recordHistory } from './state-manager.js';
 import { generateId } from './utils.js';
 
 // Active layer management
 let activeLayer = null;
 let isLocked = false;
+
+function saveAndRecord() {
+  saveProjectDebounced();
+  recordHistory();
+}
 
 /**
  * Add a new text layer to the work area
@@ -70,7 +75,7 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     
     // Save changes
     setTimeout(() => {
-      saveProjectDebounced();
+      saveAndRecord();
     }, 100);
 
     return textEl;
@@ -100,12 +105,12 @@ function setupTextLayerEvents(textEl) {
 
   // Text input changes
   textEl.addEventListener('input', () => {
-    saveProjectDebounced();
+    saveAndRecord();
   });
 
   // Blur to save changes
   textEl.addEventListener('blur', () => {
-    saveProjectDebounced();
+    saveAndRecord();
   });
 
   // Keyboard shortcuts
@@ -190,7 +195,7 @@ export function deleteTextLayer(textEl) {
     textEl.remove();
     console.log('✅ Text layer deleted');
     
-    saveProjectDebounced();
+    saveAndRecord();
   } catch (error) {
     console.error('Failed to delete text layer:', error);
   }
@@ -235,7 +240,7 @@ export function duplicateActiveLayer() {
     setActiveLayer(newLayer);
 
     console.log('✅ Text layer duplicated');
-    saveProjectDebounced();
+    saveAndRecord();
 
   } catch (error) {
     console.error('Failed to duplicate text layer:', error);
@@ -263,7 +268,7 @@ export function applyFontFamily(fontFamily) {
   
   activeLayer.style.fontFamily = fontFamily;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Font family applied:', fontFamily);
 }
 
@@ -275,7 +280,7 @@ export function applyFontSize(fontSize) {
   
   activeLayer.style.fontSize = fontSize + 'px';
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Font size applied:', fontSize);
 }
 
@@ -287,7 +292,7 @@ export function applyColor(color) {
   
   activeLayer.style.color = color;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Color applied:', color);
 }
 
@@ -302,7 +307,7 @@ export function toggleBold() {
   
   activeLayer.style.fontWeight = newWeight;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Bold toggled:', newWeight);
 }
 
@@ -317,7 +322,7 @@ export function toggleItalic() {
   
   activeLayer.style.fontStyle = newStyle;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Italic toggled:', newStyle);
 }
 
@@ -329,7 +334,7 @@ export function applyTextAlign(alignment) {
   
   activeLayer.style.textAlign = alignment;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Text alignment applied:', alignment);
 }
 
@@ -341,7 +346,7 @@ export function applyTextDecoration(decoration) {
   
   activeLayer.style.textDecoration = decoration;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Text decoration applied:', decoration);
 }
 
@@ -353,7 +358,7 @@ export function applyTextShadow(shadow) {
   
   activeLayer.style.textShadow = shadow;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Text shadow applied:', shadow);
 }
 
@@ -365,7 +370,7 @@ export function applyLetterSpacing(spacing) {
   
   activeLayer.style.letterSpacing = spacing;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Letter spacing applied:', spacing);
 }
 
@@ -377,7 +382,7 @@ export function applyLineHeight(height) {
   
   activeLayer.style.lineHeight = height;
   updateToolbarState();
-  saveProjectDebounced();
+  saveAndRecord();
   console.log('Line height applied:', height);
 }
 
@@ -726,7 +731,7 @@ export function clearAllTextLayers() {
   layers.forEach(layer => layer.remove());
   setActiveLayer(null);
   console.log('✅ All text layers cleared');
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 /**
