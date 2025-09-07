@@ -1,4 +1,4 @@
-// slide-manager.js - COMPLETE FIXED VERSION - No missing imports
+// slide-manager.js - COMPLETE FIXED VERSION - All playback issues resolved
 
 import { getSlides, getActiveIndex, setActiveIndex, setSlides } from './state-manager.js';
 import { imgState, setTransforms } from './image-manager.js';
@@ -367,6 +367,29 @@ export async function switchToSlide(idx) {
   }
 }
 
+// CRITICAL FIX: Direct slide switch that bypasses the switch manager for playback
+async function directSwitchToSlide(idx) {
+  try {
+    ensureSlide(idx);
+    const targetIndex = getActiveIndex();
+    
+    console.log(`🎬 Direct switching to slide ${targetIndex} (playback)`);
+
+    // Load the slide directly without switch manager blocking
+    const slides = getSlides();
+    await loadSlideIntoDOM(slides[targetIndex]);
+    
+    // Update UI
+    updateSlidesUI();
+
+    console.log(`✅ Direct switch to slide ${targetIndex} complete`);
+    
+  } catch (error) {
+    console.error('Failed to direct switch slide:', error);
+    throw error; // Re-throw to stop playback
+  }
+}
+
 /* --------------------------- UI Updates ----------------------------- */
 
 export function updateSlidesUI() {
@@ -587,6 +610,11 @@ export function handleSlideDuration(value) {
   }
 }
 
+export function handleSlideDurationChange(value) {
+  // Alias for backward compatibility
+  handleSlideDuration(value);
+}
+
 /* --------------------------- Slide Playback ----------------------------- */
 
 let slidePlayback = {
@@ -622,7 +650,7 @@ export function playSlides() {
     playBtn.classList.add('active');
   }
   
-  // FIXED: Call async version
+  // Start playback
   playNextSlide();
   console.log('▶️ Started slide playback');
 }
@@ -645,33 +673,122 @@ export function stopSlides() {
   console.log('⏹️ Stopped slide playback');
 }
 
+// CRITICAL FIX: Make playNextSlide async and use direct switching for playback
 async function playNextSlide() {
   if (!slidePlayback.isPlaying) return;
   
   const slides = getSlides();
   if (slidePlayback.currentSlideIndex >= slides.length) {
-    // Loop back to start or stop
+    // Loop back to start
     slidePlayback.currentSlideIndex = 0;
   }
   
   const slide = slides[slidePlayback.currentSlideIndex];
   
   try {
-    // CRITICAL FIX: Await the slide switch to complete before starting timer
-    await switchToSlide(slidePlayback.currentSlideIndex);
+    console.log(`🎬 Playing slide ${slidePlayback.currentSlideIndex + 1} of ${slides.length}`);
     
-    // Only set timeout after slide has fully loaded
-    if (slidePlayback.isPlaying) { // Check if still playing after await
-      const duration = slide?.durationMs || DEFAULT_DUR;
-      slidePlayback.timeoutId = setTimeout(() => {
-        slidePlayback.currentSlideIndex++;
-        playNextSlide(); // This will be async now
-      }, duration);
+    // CRITICAL: Use direct switch to bypass the switch manager blocking
+    await directSwitchToSlide(slidePlayback.currentSlideIndex);
+    
+    // Check if playback is still active after the switch
+    if (!slidePlayback.isPlaying) {
+      console.log('Playback stopped during slide switch');
+      return;
     }
+    
+    const duration = slide?.durationMs || DEFAULT_DUR;
+    console.log(`⏰ Setting timer for ${duration}ms`);
+    
+    // Set timeout for next slide
+    slidePlayback.timeoutId = setTimeout(async () => {
+      if (slidePlayback.isPlaying) {
+        slidePlayback.currentSlideIndex++;
+        await playNextSlide(); // Recursive call, now properly async
+      }
+    }, duration);
+    
   } catch (error) {
     console.error('Error during slide playback:', error);
     // Stop playback on error to prevent getting stuck
     stopSlides();
+  }
+}
+
+/* --------------------------- Slide Navigation ----------------------------- */
+
+export async function previousSlide() {
+  const slides = getSlides();
+  const activeIndex = getActiveIndex();
+  const newIndex = activeIndex > 0 ? activeIndex - 1 : slides.length - 1;
+  await switchToSlide(newIndex);
+}
+
+export async function nextSlide() {
+  const slides = getSlides();
+  const activeIndex = getActiveIndex();
+  const newIndex = activeIndex < slides.length - 1 ? activeIndex + 1 : 0;
+  await switchToSlide(newIndex);
+}
+
+/* --------------------------- Debug and Testing Functions ----------------------------- */
+
+// Debug function to check playback state
+export function getPlaybackState() {
+  return {
+    isPlaying: slidePlayback.isPlaying,
+    currentSlideIndex: slidePlayback.currentSlideIndex,
+    hasTimeout: !!slidePlayback.timeoutId,
+    totalSlides: getSlides().length,
+    switchManagerBusy: switchManager.isSwitching(),
+    timeoutId: slidePlayback.timeoutId
+  };
+}
+
+// Force stop playback and reset state
+export function forceStopPlayback() {
+  console.log('🛑 Force stopping playback');
+  slidePlayback.isPlaying = false;
+  
+  if (slidePlayback.timeoutId) {
+    clearTimeout(slidePlayback.timeoutId);
+    slidePlayback.timeoutId = null;
+  }
+  
+  // Clear any pending switch operations
+  switchManager.clearPendingSwitches();
+  
+  // Update play button
+  const playBtn = document.getElementById('playSlidesBtn');
+  if (playBtn) {
+    playBtn.textContent = 'Play';
+    playBtn.classList.remove('active');
+  }
+  
+  console.log('✅ Playback force stopped');
+}
+
+// Test function for debugging
+export function testPlayback() {
+  console.log('🧪 Testing playback system...');
+  console.log('Current state:', getPlaybackState());
+  
+  const slides = getSlides();
+  console.log(`Total slides: ${slides.length}`);
+  
+  if (slides.length > 1) {
+    console.log('Starting test playback...');
+    playSlides();
+  } else {
+    console.log('Need at least 2 slides for testing');
+  }
+}
+
+// Manual advance for testing
+export function advanceSlide() {
+  if (slidePlayback.isPlaying) {
+    slidePlayback.currentSlideIndex++;
+    playNextSlide();
   }
 }
 
