@@ -429,6 +429,11 @@ export function syncToolbarFromActive() {
     const italicBtn = document.getElementById('italicBtn');
     if (italicBtn) italicBtn.classList.toggle('active', isItalic);
 
+    // Underline
+    const isUnderline = activeLayer.style.textDecoration === 'underline';
+    const underlineBtn = document.getElementById('underlineBtn');
+    if (underlineBtn) underlineBtn.classList.toggle('active', isUnderline);
+
     // Text alignment
     const textAlign = activeLayer.style.textAlign || 'left';
     document.querySelectorAll('[data-align]').forEach(btn => {
@@ -453,6 +458,7 @@ function resetToolbar() {
     const colorInput = document.getElementById('fontColor');
     const boldBtn = document.getElementById('boldBtn');
     const italicBtn = document.getElementById('italicBtn');
+    const underlineBtn = document.getElementById('underlineBtn');
 
     if (fontFamilySelect) fontFamilySelect.value = 'system-ui';
     if (fontSizeInput) fontSizeInput.value = 28;
@@ -460,6 +466,7 @@ function resetToolbar() {
     if (colorInput) colorInput.value = '#ffffff';
     if (boldBtn) boldBtn.classList.remove('active');
     if (italicBtn) italicBtn.classList.remove('active');
+    if (underlineBtn) underlineBtn.classList.remove('active');
 
     document.querySelectorAll('[data-align]').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.align === 'left');
@@ -480,8 +487,8 @@ function updateToolbarState() {
   
   // Enable/disable toolbar controls
   const controls = [
-    'fontFamily', 'fontSize', 'fontColor', 
-    'boldBtn', 'italicBtn', 'deleteLayerBtn'
+    'fontFamily', 'fontSize', 'fontColor',
+    'boldBtn', 'italicBtn', 'underlineBtn', 'deleteLayerBtn'
   ];
 
   controls.forEach(id => {

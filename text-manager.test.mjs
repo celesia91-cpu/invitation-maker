@@ -88,7 +88,8 @@ const {
   handleFontColor,
   handleBold,
   handleItalic,
-  handleUnderline
+  handleUnderline,
+  syncToolbarFromActive
 } = tm;
 
 await addTextLayer('Hello');
@@ -168,7 +169,26 @@ assert.strictEqual(layer.style.fontWeight, 'bold');
 handleItalic();
 assert.strictEqual(layer.style.fontStyle, 'italic');
 
+// Underline toggling and toolbar state
+const underlineBtn = document.getElementById('underlineBtn');
+syncToolbarFromActive();
+assert.strictEqual(layer.style.textDecoration, 'none');
+assert.ok(!underlineBtn.classList.contains('active'));
+
 handleUnderline();
 assert.strictEqual(layer.style.textDecoration, 'underline');
+assert.ok(underlineBtn.classList.contains('active'));
+
+handleUnderline();
+assert.strictEqual(layer.style.textDecoration, 'none');
+assert.ok(!underlineBtn.classList.contains('active'));
+
+// Direct sync from style
+layer.style.textDecoration = 'underline';
+syncToolbarFromActive();
+assert.ok(underlineBtn.classList.contains('active'));
+layer.style.textDecoration = 'none';
+syncToolbarFromActive();
+assert.ok(!underlineBtn.classList.contains('active'));
 
 console.log('Text style handlers apply formatting without errors');
