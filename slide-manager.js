@@ -602,7 +602,7 @@ export function startPlay() {
   }
 }
 
-export async function playSlides() {
+export function playSlides() {
   if (slidePlayback.isPlaying) {
     stopSlides();
     return;
@@ -622,8 +622,8 @@ export async function playSlides() {
     playBtn.classList.add('active');
   }
   
-  // FIXED: Await the first slide to start properly
-  await playNextSlide();
+  // FIXED: Call async version
+  playNextSlide();
   console.log('▶️ Started slide playback');
 }
 
@@ -656,24 +656,23 @@ async function playNextSlide() {
   
   const slide = slides[slidePlayback.currentSlideIndex];
   
-  // FIXED: Await the slide switch to complete before setting timer
   try {
+    // CRITICAL FIX: Await the slide switch to complete before starting timer
     await switchToSlide(slidePlayback.currentSlideIndex);
+    
+    // Only set timeout after slide has fully loaded
+    if (slidePlayback.isPlaying) { // Check if still playing after await
+      const duration = slide?.durationMs || DEFAULT_DUR;
+      slidePlayback.timeoutId = setTimeout(() => {
+        slidePlayback.currentSlideIndex++;
+        playNextSlide(); // This will be async now
+      }, duration);
+    }
   } catch (error) {
-    console.error('Failed to switch slide during playback:', error);
-    // Stop playback on error
+    console.error('Error during slide playback:', error);
+    // Stop playback on error to prevent getting stuck
     stopSlides();
-    return;
   }
-  
-  // Only continue if playback is still active after the switch
-  if (!slidePlayback.isPlaying) return;
-  
-  const duration = slide?.durationMs || DEFAULT_DUR;
-  slidePlayback.timeoutId = setTimeout(() => {
-    slidePlayback.currentSlideIndex++;
-    playNextSlide(); // This will now work properly
-  }, duration);
 }
 
 /* --------------------------- Reset Utilities ----------------------------- */
