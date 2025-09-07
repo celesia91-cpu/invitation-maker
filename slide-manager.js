@@ -126,7 +126,7 @@ class ImageLoader {
   }
 
   /**
-   * FIXED: Load slide image with 100% default scaling
+   * Load slide image defaulting to fit within the work area
    */
   async loadSlideImage(slide) {
     // Cancel any previous load
@@ -167,7 +167,7 @@ class ImageLoader {
           const centerX = workRect.width / 2;
           const centerY = workRect.height / 2;
           
-          // Use saved values or calculate 100% defaults
+          // Use saved values or calculate fit-to-canvas defaults
           if (slide.image && typeof slide.image.scale === 'number') {
             imgState.scale = slide.image.scale;
             imgState.angle = slide.image.angle || 0;
@@ -177,12 +177,12 @@ class ImageLoader {
             imgState.cx = slide.image.cx || centerX;
             imgState.cy = slide.image.cy || centerY;
           } else {
-            // FIXED: Default to 100% scale (full coverage) instead of 95%
+            // Default to scale that keeps entire image visible
             const scaleToFitWidth = workRect.width / imgState.natW;
             const scaleToFitHeight = workRect.height / imgState.natH;
-            
-            // Use the larger scale for 100% coverage
-            imgState.scale = Math.max(scaleToFitWidth, scaleToFitHeight);
+
+            // Use the smaller scale and avoid upscaling beyond 100%
+            imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
             
             imgState.angle = 0;
             imgState.signX = 1;
@@ -193,7 +193,7 @@ class ImageLoader {
           }
           
           setTransforms();
-          console.log('✅ Slide image loaded with 100% scale:', imgState.scale);
+          console.log('✅ Slide image loaded with fit-to-canvas scale:', imgState.scale);
           
         } catch (error) {
           console.warn('Image processing error:', error);
