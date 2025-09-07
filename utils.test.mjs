@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { encodeState, decodeState, workSize, generateId } from './utils.js';
+import { safeProjectForShare } from './share-manager.js';
 
 // A minimal project state containing non-ASCII characters to verify
 // Unicode-safe base64 round-tripping.
@@ -108,6 +109,14 @@ assert.strictEqual(decodedShear.slides[0].image.shearY, -0.456);
 assert.strictEqual(decodedShear.slides[0].image.signX, -1);
 assert.strictEqual(decodedShear.slides[0].image.signY, -1);
 console.log('shear and sign values persist through encode/decode');
+
+// safeProjectForShare should retain shear values before encoding
+const safeShear = safeProjectForShare(projectShear);
+const encodedSafeShear = encodeState(safeShear);
+const decodedSafeShear = decodeState(encodedSafeShear);
+assert.strictEqual(decodedSafeShear.slides[0].image.shearX, 0.123);
+assert.strictEqual(decodedSafeShear.slides[0].image.shearY, -0.456);
+console.log('safeProjectForShare preserves shear values');
 
 // Invalid data should throw a clear error
 assert.throws(() => decodeState('not_base64!'), /Invalid or corrupted/);

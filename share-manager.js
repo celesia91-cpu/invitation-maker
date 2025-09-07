@@ -25,22 +25,48 @@ function getViewerOrigin() {
 }
 
 // Prepare project data for sharing (trim huge inline images, keep remote URLs)
-export function safeProjectForShare() {
-  const p = buildProject();
+// Optionally accepts a project object to operate on for easier testing
+export function safeProjectForShare(project) {
+  const p = project ? JSON.parse(JSON.stringify(project)) : buildProject();
   p.slides = (p.slides || []).map((s) => {
-    const img = s.image ? { ...s.image } : null;
-    if (img) {
-      const src = img.src || '';
-      const isRemote = /^https?:\/\//i.test(src);
-      const isDataUrl = /^data:/i.test(src);
+    let img = null;
+    if (s.image) {
+      const {
+        src,
+        thumb,
+        cx,
+        cy,
+        scale,
+        angle,
+        shearX,
+        shearY,
+        signX,
+        signY,
+        flip,
+        fadeInMs,
+        fadeOutMs,
+        zoomInMs,
+        zoomOutMs
+      } = s.image;
 
-      // Keep remote URLs always (R2, CDN, etc.). Strip only data URLs to avoid giant hashes.
-      if (isDataUrl) {
-        img.src = null;
-      }
-
-      // Don't touch thumb/transformations — viewer needs these.
-      // If both src and thumb end up null, the viewer will just show no image for that slide.
+      const isDataUrl = /^data:/i.test(src || '');
+      img = {
+        src: isDataUrl ? null : (src || null),
+        thumb: thumb ?? null,
+        cx: cx ?? 0,
+        cy: cy ?? 0,
+        scale: scale ?? 1,
+        angle: angle ?? 0,
+        shearX: shearX ?? 0,
+        shearY: shearY ?? 0,
+        signX: signX ?? 1,
+        signY: signY ?? 1,
+        flip: !!flip,
+        fadeInMs,
+        fadeOutMs,
+        zoomInMs,
+        zoomOutMs
+      };
     }
     return { ...s, image: img };
   });
