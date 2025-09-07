@@ -493,7 +493,7 @@ function updateToolbarState() {
   // Enable/disable toolbar controls
   const controls = [
     'fontFamily', 'fontSize', 'fontColor',
-    'boldBtn', 'italicBtn', 'underlineBtn', 'deleteLayerBtn'
+    'boldBtn', 'italicBtn', 'underlineBtn', 'textDelete'
   ];
 
   controls.forEach(id => {
@@ -678,99 +678,6 @@ export function handleTextZoomOutRange(value) {
 }
 
 /**
- * Setup text management event listeners
- */
-export function setupTextEventListeners() {
-  // Font family
-  const fontFamilySelect = document.getElementById('fontFamily');
-  if (fontFamilySelect) {
-    fontFamilySelect.addEventListener('change', (e) => {
-      handleFontFamily(e.target.value);
-    });
-  }
-
-  // Font size
-  const fontSizeInput = document.getElementById('fontSize');
-  if (fontSizeInput) {
-    fontSizeInput.addEventListener('input', (e) => {
-      handleFontSize(e.target.value);
-    });
-  }
-
-  // Color
-  const colorInput = document.getElementById('fontColor');
-  if (colorInput) {
-    colorInput.addEventListener('change', (e) => {
-      handleFontColor(e.target.value);
-    });
-  }
-
-  // Bold button
-  const boldBtn = document.getElementById('boldBtn');
-  if (boldBtn) {
-    boldBtn.addEventListener('click', handleBold);
-  }
-
-  // Italic button
-  const italicBtn = document.getElementById('italicBtn');
-  if (italicBtn) {
-    italicBtn.addEventListener('click', handleItalic);
-  }
-
-  // Underline button
-  const underlineBtn = document.getElementById('underlineBtn');
-  if (underlineBtn) {
-    underlineBtn.addEventListener('click', handleUnderline);
-  }
-
-  // Alignment buttons
-  document.querySelectorAll('[data-align]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      handleTextAlignChange(btn.dataset.align);
-    });
-  });
-
-  // Delete layer button
-  const deleteLayerBtn = document.getElementById('deleteLayerBtn');
-  if (deleteLayerBtn) {
-    deleteLayerBtn.addEventListener('click', deleteActiveLayer);
-  }
-
-  // Add text layer button
-  const addTextBtn = document.getElementById('addTextBtn');
-  if (addTextBtn) {
-    addTextBtn.addEventListener('click', () => {
-      addTextLayer('New Text');
-    });
-  }
-
-  // Global click to deselect
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.layer') && !e.target.closest('.panel-body')) {
-      setActiveLayer(null);
-    }
-  });
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    if (e.target.closest('.layer')) return; // Don't interfere with text editing
-
-    if (e.key === 'Delete' && activeLayer) {
-      e.preventDefault();
-      deleteActiveLayer();
-    } else if (e.key === 'd' && e.ctrlKey && activeLayer) {
-      e.preventDefault();
-      duplicateActiveLayer();
-    } else if (e.key === 't' && e.ctrlKey) {
-      e.preventDefault();
-      addTextLayer('New Text');
-    }
-  });
-
-  console.log('✅ Text event listeners setup complete');
-}
-
-/**
  * Get all text layers
  */
 export function getAllTextLayers() {
@@ -792,14 +699,6 @@ export function clearAllTextLayers() {
  * Initialize text manager
  */
 export function initializeTextManager() {
-  setupTextEventListeners();
   updateToolbarState();
   console.log('✅ Text manager initialized');
-}
-
-// Auto-initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeTextManager);
-} else {
-  initializeTextManager();
 }

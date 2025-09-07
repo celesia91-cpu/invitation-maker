@@ -28,6 +28,7 @@ export class EventHandlersManager {
       this.setupSlideManagementHandlers();
       this.setupTextManagementHandlers();
       this.setupTextStylingHandlers();
+      this.setupTextSelectionHandlers();
       this.setupTextFadeHandlers();
       this.setupTextZoomHandlers();
       this.setupImageManagementHandlers();
@@ -35,6 +36,8 @@ export class EventHandlersManager {
       this.setupImageZoomHandlers();
       this.setupPresetHandlers();
       this.setupKeyboardShortcuts();
+
+      import('./text-manager.js').then(({ updateToolbarState }) => updateToolbarState());
       
       this.isInitialized = true;
       console.log('✅ EventHandlersManager initialized');
@@ -171,6 +174,16 @@ export class EventHandlersManager {
       const { handleUnderline } = await import('./text-manager.js');
       handleUnderline();
     });
+
+    // Alignment buttons
+    document.querySelectorAll('[data-align]').forEach(btn => {
+      const handler = async () => {
+        const { handleTextAlignChange } = await import('./text-manager.js');
+        handleTextAlignChange(btn.dataset.align);
+      };
+      btn.addEventListener('click', handler);
+      this.handlers.set(`align-${btn.dataset.align}`, { element: btn, event: 'click', handler });
+    });
   }
 
   /**
@@ -225,6 +238,37 @@ export class EventHandlersManager {
     });
 
     import('./text-manager.js').then(({ updateTextZoomUI }) => updateTextZoomUI());
+  }
+
+  /**
+   * Setup global text selection and shortcut handlers
+   */
+  setupTextSelectionHandlers() {
+    const clickHandler = async (e) => {
+      if (!e.target.closest('.layer') && !e.target.closest('.panel-body')) {
+        const { setActiveLayer } = await import('./text-manager.js');
+        setActiveLayer(null);
+      }
+    };
+    document.addEventListener('click', clickHandler);
+    this.handlers.set('doc-click-deselect', { element: document, event: 'click', handler: clickHandler });
+
+    const keyHandler = async (e) => {
+      if (e.target.closest('.layer')) return;
+      const tm = await import('./text-manager.js');
+      if (e.key === 'Delete' && tm.getActiveLayer()) {
+        e.preventDefault();
+        tm.deleteActiveLayer();
+      } else if (e.key === 'd' && e.ctrlKey && tm.getActiveLayer()) {
+        e.preventDefault();
+        tm.duplicateActiveLayer();
+      } else if (e.key === 't' && e.ctrlKey) {
+        e.preventDefault();
+        tm.addTextLayer('New Text');
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+    this.handlers.set('doc-keydown-text', { element: document, event: 'keydown', handler: keyHandler });
   }
 
   /**
