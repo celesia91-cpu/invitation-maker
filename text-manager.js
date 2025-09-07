@@ -210,6 +210,11 @@ export function deleteActiveLayer() {
   }
 }
 
+// Wrapper for backward compatibility with event handlers
+export function deleteActiveText() {
+  deleteActiveLayer();
+}
+
 /**
  * Duplicate active text layer
  */
