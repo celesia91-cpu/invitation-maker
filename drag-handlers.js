@@ -81,7 +81,7 @@ export class DragHandlersManager {
       userBgWrap: document.getElementById('userBgWrap'),
       
       // Image state and functions
-      imgState: { has: false, cx: 0, cy: 0, scale: 1, angle: 0, natW: 0, natH: 0 },
+      imgState: { has: false, cx: 0, cy: 0, scale: 1, angle: 0, natW: 0, natH: 0, shearX: 0, shearY: 0 },
       setTransforms: () => console.warn('setTransforms not available'),
       enforceImageBounds: () => console.warn('enforceImageBounds not available'),
       
@@ -461,10 +461,15 @@ export class DragHandlersManager {
    * FIXED: Handle transform operations (scale/rotate)
    */
   async handleTransformPointerMove(e, dx, dy) {
-    const imgState = this.ctx.imgState;
-    const { setTransforms, enforceImageBounds } = this.ctx;
+    let imgState, setTransforms, enforceImageBounds;
+    if (this.ctx) {
+      imgState = this.ctx.imgState;
+      ({ setTransforms, enforceImageBounds } = this.ctx);
+    } else {
+      ({ imgState, setTransforms, enforceImageBounds } = await import('./image-manager.js'));
+    }
     const { handleType, startScale, startAngle, centerX, centerY } = this.dragState;
-    
+
     if (!imgState) return;
 
     if (handleType === 'rotate') {
@@ -476,13 +481,24 @@ export class DragHandlersManager {
       // Calculate scale for corner handles
       const startDistance = Math.hypot(this.dragState.startX - centerX, this.dragState.startY - centerY);
       const currentDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-      
+
       if (startDistance > 0) {
         const scaleFactor = currentDistance / startDistance;
         imgState.scale = Math.max(0.1, startScale * scaleFactor);
       }
+
+      if (handleType.includes('n')) {
+        imgState.signY = e.clientY > centerY ? -1 : 1;
+      } else if (handleType.includes('s')) {
+        imgState.signY = e.clientY < centerY ? -1 : 1;
+      }
+      if (handleType.includes('w')) {
+        imgState.signX = e.clientX > centerX ? -1 : 1;
+      } else if (handleType.includes('e')) {
+        imgState.signX = e.clientX < centerX ? -1 : 1;
+      }
     }
-    
+
     if (enforceImageBounds) enforceImageBounds();
     if (setTransforms) setTransforms();
   }
@@ -494,13 +510,18 @@ export class DragHandlersManager {
     if (!this.dragState) return;
 
     try {
+      const ctx = this.ctx || {};
       // Clean up drag state
       const wasMoving = this.dragState.hasMoved;
       const dragType = this.dragState.type;
       const element = this.dragState.element;
 
+      if (dragType === 'handle' && typeof this.handleTransformPointerUp === 'function') {
+        await this.handleTransformPointerUp(e);
+      }
+
       // Clean up UI classes
-      document.body.classList.remove('dragging');
+      document.body?.classList?.remove?.('dragging');
       
       if (element) {
         element.classList.remove('dragging');
@@ -512,24 +533,24 @@ export class DragHandlersManager {
       }
 
       // Hide guides
-      if (this.ctx.hideGuides) {
-        this.ctx.hideGuides();
+      if (ctx.hideGuides) {
+        ctx.hideGuides();
       }
 
       // Save changes if there was actual movement
       if (wasMoving) {
         setTimeout(() => {
-          if (this.ctx.writeCurrentSlide) this.ctx.writeCurrentSlide();
-          if (this.ctx.saveProjectDebounced) this.ctx.saveProjectDebounced();
+          if (ctx.writeCurrentSlide) ctx.writeCurrentSlide();
+          if (ctx.saveProjectDebounced) ctx.saveProjectDebounced();
         }, 10);
       }
 
       // Clear drag state
       this.dragState = null;
-      
+
       // Release pointer capture
       if (this.capturedPointerId !== null) {
-        const work = this.ctx.work;
+        const work = ctx.work;
         if (work && work.hasPointerCapture(this.capturedPointerId)) {
           work.releasePointerCapture(this.capturedPointerId);
         }
@@ -685,11 +706,21 @@ export class DragHandlersManager {
         a0: Math.atan2(p.y - imgState.cy, p.x - imgState.cx)
       };
     } else if (handle) {
-      this.dragMode = 'scale';
-      this.start = {
-        scale0: imgState.scale,
-        d0: Math.hypot(p.x - imgState.cx, p.y - imgState.cy)
-      };
+      if (['nw', 'ne', 'se', 'sw'].includes(handle) && e.shiftKey) {
+        this.dragMode = 'shear';
+        this.start = {
+          shearX: imgState.shearX || 0,
+          shearY: imgState.shearY || 0,
+          px: p.x,
+          py: p.y
+        };
+      } else {
+        this.dragMode = 'scale';
+        this.start = {
+          scale0: imgState.scale,
+          d0: Math.hypot(p.x - imgState.cx, p.y - imgState.cy)
+        };
+      }
     } else {
       this.dragMode = 'move';
       this.start = {
@@ -752,12 +783,18 @@ export class DragHandlersManager {
       
       if (enforceImageBounds) enforceImageBounds();
       if (setTransforms) setTransforms();
-      
+
     } else if (this.dragMode === 'rotate') {
       const a = Math.atan2(p.y - imgState.cy, p.x - imgState.cx);
       imgState.angle = this.start.angle0 + (a - this.start.a0);
-      
+
       if (enforceImageBounds) enforceImageBounds();
+      if (setTransforms) setTransforms();
+    } else if (this.dragMode === 'shear') {
+      const dx = p.x - this.start.px;
+      const dy = p.y - this.start.py;
+      imgState.shearX = (this.start.shearX || 0) + dx / imgState.natH;
+      imgState.shearY = (this.start.shearY || 0) + dy / imgState.natW;
       if (setTransforms) setTransforms();
     }
   }
@@ -848,6 +885,7 @@ export class DragHandlersManager {
     if (bgBox) {
       bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
       bgBox.removeEventListener('pointermove', this._onBgBoxMove);
+      bgBox.removeEventListener('pointermove', this._onBgBoxUp);
       bgBox.removeEventListener('pointerup', this._onBgBoxUp);
     }
     
