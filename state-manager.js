@@ -593,6 +593,7 @@ export const doRedo = () => stateManager.redo();
 export const updateUndoRedoUI = () => stateManager.updateUndoRedoUI();
 export const pushHistory = () => stateManager.pushHistory();
 export { pushHistoryDebounced };
+export const recordHistory = () => stateManager.pushHistoryDebounced();
 
 // State getters
 export const getIsViewer = () => stateManager.isViewer;

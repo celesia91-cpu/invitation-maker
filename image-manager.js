@@ -2,8 +2,7 @@
 
 import { apiClient } from './api-client.js';
 import { clamp } from './utils.js';
-import { getSlides, getActiveIndex } from './state-manager.js';
-import { saveProjectDebounced } from './state-manager.js';
+import { getSlides, getActiveIndex, saveProjectDebounced, recordHistory } from './state-manager.js';
 
 // Image state management
 export const imgState = {
@@ -46,6 +45,11 @@ export const PRESETS = {
   cool: { blur: 0, brightness: 100, contrast: 105, grayscale: 0, hueRotate: 200, invert: 0, saturate: 110, sepia: 0, opacity: 100 },
   dramatic: { blur: 0, brightness: 95, contrast: 140, grayscale: 0, hueRotate: 0, invert: 0, saturate: 130, sepia: 0, opacity: 100 }
 };
+
+function saveAndRecord() {
+  saveProjectDebounced();
+  recordHistory();
+}
 
 // FIXED: Get slide image helper function (no import needed)
 function getSlideImage() {
@@ -439,7 +443,7 @@ export function applyPreset(name) {
   Object.assign(imgFilters, PRESETS[name] || PRESETS.none);
   highlightPreset(name);
   setTransforms();
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 // Image controls management
@@ -475,7 +479,7 @@ export function handleImageFadeIn() {
   img.fadeInMs = (img.fadeInMs || 0) > 0 ? 0 : 800;
   updateImageFadeUI();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 export function handleImageFadeOut() {
@@ -484,7 +488,7 @@ export function handleImageFadeOut() {
   img.fadeOutMs = (img.fadeOutMs || 0) > 0 ? 0 : 800;
   updateImageFadeUI();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 export function handleImageFadeInRange(value) {
@@ -510,7 +514,7 @@ export function handleImageZoomIn() {
   img.zoomInMs = (img.zoomInMs || 0) > 0 ? 0 : 800;
   updateImageZoomUI();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 export function handleImageZoomOut() {
@@ -519,7 +523,7 @@ export function handleImageZoomOut() {
   img.zoomOutMs = (img.zoomOutMs || 0) > 0 ? 0 : 800;
   updateImageZoomUI();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 export function handleImageZoomInRange(value) {
@@ -545,7 +549,7 @@ export function handleImageScale(value) {
   enforceImageBounds();
   setTransforms();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 // Image rotate handler (UI slider gives degrees; we store radians)
@@ -556,7 +560,7 @@ export function handleImageRotate(value) {
   enforceImageBounds();
   setTransforms();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 // Image flip handler
@@ -565,7 +569,7 @@ export function handleImageFlip() {
   imgState.flip = !imgState.flip;
   setTransforms();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
+  saveAndRecord();
 }
 
 // Preload cache for performance
