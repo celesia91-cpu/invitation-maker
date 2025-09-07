@@ -58,12 +58,18 @@ export function togglePanel() {
 
 export function openPanel() {
   document.body.classList.add('panel-open');
+  const togglePanelBtn = document.getElementById('togglePanelBtn');
+  const previewBtn = document.getElementById('previewBtn');
+  togglePanelBtn?.setAttribute('aria-expanded', 'true');
+  previewBtn?.setAttribute('aria-pressed', 'false');
   sidebarOpen = true;
   syncTopbarHeight();
 }
 
 export function closePanel() {
   document.body.classList.remove('panel-open');
+  const togglePanelBtn = document.getElementById('togglePanelBtn');
+  togglePanelBtn?.setAttribute('aria-expanded', 'false');
   sidebarOpen = false;
   syncTopbarHeight();
 }

@@ -13,6 +13,9 @@ export const imgState = {
   cx: 0,
   cy: 0,
   scale: 1,
+  // Shear components for freeform skewing
+  shearX: 0,
+  shearY: 0,
   angle: 0,
   signX: 1,
   signY: 1,

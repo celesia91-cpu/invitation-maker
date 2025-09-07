@@ -473,13 +473,28 @@ export class DragHandlersManager {
       const startingAngle = Math.atan2(this.dragState.startY - centerY, this.dragState.startX - centerX);
       imgState.angle = startAngle + (currentAngle - startingAngle);
     } else {
-      // Calculate scale for corner handles
+      // Corner handle operations
       const startDistance = Math.hypot(this.dragState.startX - centerX, this.dragState.startY - centerY);
-      const currentDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-      
-      if (startDistance > 0) {
-        const scaleFactor = currentDistance / startDistance;
-        imgState.scale = Math.max(0.1, startScale * scaleFactor);
+
+      if (e.shiftKey) {
+        // With shift key, apply shear instead of scale
+        const dx = e.clientX - this.dragState.startX;
+        const dy = e.clientY - this.dragState.startY;
+        const norm = Math.max(1, startDistance);
+        imgState.shearX = dx / norm;
+        imgState.shearY = dy / norm;
+      } else {
+        // Default scaling behaviour
+        const currentDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+        if (startDistance > 0) {
+          const scaleFactor = currentDistance / startDistance;
+          imgState.scale = Math.max(0.1, startScale * scaleFactor);
+        }
+        // Flip signs when crossing image center
+        const relX = e.clientX - centerX;
+        const relY = e.clientY - centerY;
+        imgState.signX = relX * this.dragState.startVectorX < 0 ? -1 : 1;
+        imgState.signY = relY * this.dragState.startVectorY < 0 ? -1 : 1;
       }
     }
     
@@ -848,6 +863,8 @@ export class DragHandlersManager {
     if (bgBox) {
       bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
       bgBox.removeEventListener('pointermove', this._onBgBoxMove);
+      // remove auxiliary listener used for cleanup callbacks
+      bgBox.removeEventListener('pointermove', this._onBgBoxUp);
       bgBox.removeEventListener('pointerup', this._onBgBoxUp);
     }
     

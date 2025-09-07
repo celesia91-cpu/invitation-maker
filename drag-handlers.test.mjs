@@ -27,7 +27,7 @@ global.document = {
   getElementById(id) {
     return elements[id] || null;
   },
-  body: { classList: { contains: () => false } },
+  body: { classList: { contains: () => false, add() {}, remove() {} } },
   addEventListener() {},
   removeEventListener() {}
 };
@@ -67,12 +67,11 @@ console.log('cleanup removes listeners successfully');
 
 // Verify handlePointerUp handles transform handles
 const manager2 = new DragHandlersManager();
-let transformEnded = false;
-manager2.handleTransformPointerUp = async () => { transformEnded = true; };
+manager2.ctx = { hideGuides: () => {} };
 manager2.dragState = { type: 'handle' };
 await manager2.handlePointerUp();
-assert.strictEqual(transformEnded, true);
-console.log('handlePointerUp handles transform handles successfully');
+assert.strictEqual(manager2.dragState, null);
+console.log('handlePointerUp clears drag state for transform handles');
 
 // ----- Transform handle scaling tests -----
 
@@ -113,8 +112,11 @@ imgState.cy = 100;
 imgState.scale = 1;
 imgState.signX = 1;
 imgState.signY = 1;
+imgState.shearX = 0;
+imgState.shearY = 0;
 
 const manager3 = new DragHandlersManager();
+manager3.ctx = { imgState, enforceImageBounds: () => {}, setTransforms: () => {} };
 
 function setupDrag(handle) {
   const startX = handle.includes('w') ? 50 : 150;
@@ -150,4 +152,34 @@ await manager3.handleTransformPointerMove({ clientX: 150, clientY: 160 });
 assert.strictEqual(imgState.signY, -1);
 
 console.log('transform handle scaling works for all handles and vertical drags');
+
+// ----- Shear vs scale tests -----
+
+// Dragging with shift key should shear instead of scale
+setupDrag('ne');
+imgState.scale = 1;
+imgState.shearX = 0;
+imgState.shearY = 0;
+await manager3.handleTransformPointerMove({
+  clientX: manager3.dragState.startX + 20,
+  clientY: manager3.dragState.startY,
+  shiftKey: true
+});
+assert.notStrictEqual(imgState.shearX, 0);
+assert.strictEqual(imgState.scale, 1);
+
+// Dragging without shift key should scale and not shear
+setupDrag('ne');
+imgState.scale = 1;
+imgState.shearX = 0;
+imgState.shearY = 0;
+await manager3.handleTransformPointerMove({
+  clientX: manager3.dragState.startX + 20,
+  clientY: manager3.dragState.startY
+});
+assert.ok(imgState.scale > 1);
+assert.strictEqual(imgState.shearX, 0);
+assert.strictEqual(imgState.shearY, 0);
+
+console.log('shift-modified drags shear while normal drags scale');
 
