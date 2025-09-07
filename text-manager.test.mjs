@@ -99,6 +99,8 @@ const {
   handleTextZoomOut,
   handleTextZoomInRange,
   handleTextZoomOutRange,
+  handleTextScale,
+  handleTextRotate,
   handleFontFamily,
   handleFontSize,
   handleFontColor,
@@ -195,6 +197,28 @@ assert.strictEqual(zoomOutVal.textContent, '0.8s');
 handleTextZoomOutRange(600);
 assert.strictEqual(layer._zoomOutMs, 600);
 assert.strictEqual(zoomOutVal.textContent, '0.6s');
+
+// Scale and rotate handlers
+handleTextScale(150);
+assert.strictEqual(parseFloat(layer.dataset.scale), 1.5);
+assert.ok(layer.style.transform.includes('scale(1.5'));
+assert.strictEqual(document.getElementById('textScale').value, '150');
+assert.strictEqual(document.getElementById('textScaleVal').textContent, '150%');
+
+handleTextRotate(45);
+assert.strictEqual(parseFloat(layer.dataset.rotate), 45);
+assert.ok(layer.style.transform.includes('rotate(45deg)'));
+assert.strictEqual(document.getElementById('textRotate').value, '45');
+assert.strictEqual(document.getElementById('textRotateVal').textContent, '45°');
+
+// Sync controls from existing transform
+layer.dataset.scale = '2';
+layer.dataset.rotate = '-30';
+syncToolbarFromActive();
+assert.strictEqual(document.getElementById('textScale').value, '200');
+assert.strictEqual(document.getElementById('textScaleVal').textContent, '200%');
+assert.strictEqual(document.getElementById('textRotate').value, '-30');
+assert.strictEqual(document.getElementById('textRotateVal').textContent, '-30°');
 
 // Style handlers
 handleFontFamily('serif');
