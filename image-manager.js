@@ -569,7 +569,7 @@ export function handleImageFlip() {
 }
 
 // Delete image handler
-export function handleImageDelete() {
+export function deleteImage() {
   if (!imgState.has) return;
   
   imgState.has = false;
