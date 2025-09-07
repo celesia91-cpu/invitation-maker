@@ -522,15 +522,16 @@ async function createTextLayerFromData(layerData) {
       lineHeight: layerData.lineHeight || 'normal'
     });
 
-    // Store timing data on the element for animations
+    // Store timing data on the element for smooth animations
     if (textEl) {
       textEl._fadeInMs = layerData.fadeInMs || 0;
       textEl._fadeOutMs = layerData.fadeOutMs || 0;
       textEl._zoomInMs = layerData.zoomInMs || 0;
       textEl._zoomOutMs = layerData.zoomOutMs || 0;
       
-      // Store original transform for animation reference
-      textEl.setAttribute('data-original-transform', textEl.style.transform || '');
+      // Optimize element for smooth animations
+      textEl.style.backfaceVisibility = 'hidden'; // Reduce visual artifacts
+      textEl.style.perspective = '1000px'; // Enable 3D rendering
     }
 
     return textEl;
