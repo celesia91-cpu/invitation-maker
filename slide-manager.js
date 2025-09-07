@@ -216,15 +216,16 @@ function stepFrame(timestamp) {
       imageData.zoomOutMs || 0
     );
     
-    // Get current transform from setTransforms and apply zoom
+    // Get current transform from setTransforms, remove any existing scale
     const currentTransform = userBg.style.transform || '';
-    
+    const base = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
+
     if (zoomScale !== 1) {
       // Apply zoom on top of existing transform
-      userBg.style.transform = `${currentTransform} scale(${zoomScale})`.trim();
+      userBg.style.transform = `${base} scale(${zoomScale})`.trim();
     } else {
       // Reset to just the original transform
-      userBg.style.transform = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
+      userBg.style.transform = base;
     }
   }
   
