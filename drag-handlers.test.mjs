@@ -5,6 +5,10 @@ class MockElement {
   constructor() {
     this.listeners = {};
     this.style = {};
+    this.dataset = {};
+    this.offsetWidth = 0;
+    this.offsetHeight = 0;
+    this.isContentEditable = false;
   }
   addEventListener(type, handler) {
     if (!this.listeners[type]) this.listeners[type] = new Set();
@@ -182,4 +186,26 @@ assert.strictEqual(imgState.shearX, 0);
 assert.strictEqual(imgState.shearY, 0);
 
 console.log('shift-modified drags shear while normal drags scale');
+
+// ----- Text drag ignored when editing -----
+
+const manager4 = new DragHandlersManager();
+manager4.ctx = { getLocked: () => false, setActiveLayer: () => assert.fail('should not set active while editing') };
+const editingEl = {
+  style: { left: '0', top: '0' },
+  offsetWidth: 50,
+  offsetHeight: 20,
+  dataset: { editing: 'true' },
+  isContentEditable: true
+};
+manager4._onTextDown({ currentTarget: editingEl, clientX: 0, clientY: 0 });
+assert.strictEqual(manager4.dragText, null);
+console.log('text dragging ignored while editing');
+
+const manager5 = new DragHandlersManager();
+const elNoHandler = new MockElement();
+elNoHandler.dataset.editing = 'true';
+manager5.attachText(elNoHandler);
+assert.strictEqual(elNoHandler.listenerCount('pointerdown'), 0);
+console.log('attachText skips pointer handlers when editing');
 
