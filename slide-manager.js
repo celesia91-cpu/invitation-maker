@@ -173,8 +173,8 @@ class ImageLoader {
           if (slide.image && typeof slide.image.scale === 'number') {
             imgState.scale = slide.image.scale;
             imgState.angle = slide.image.angle || 0;
-            imgState.shearX = slide.image.shearX || 0;
-            imgState.shearY = slide.image.shearY || 0;
+            imgState.shearX = slide.image.shearX ?? 0;
+            imgState.shearY = slide.image.shearY ?? 0;
             imgState.signX = slide.image.signX ?? 1;
             imgState.signY = slide.image.signY ?? 1;
             imgState.flip = !!slide.image.flip;
@@ -187,7 +187,6 @@ class ImageLoader {
 
             // Use the smaller scale and avoid upscaling beyond 100%
             imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-
             imgState.angle = 0;
             imgState.shearX = 0;
             imgState.shearY = 0;

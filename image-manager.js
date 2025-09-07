@@ -261,7 +261,6 @@ export async function handleImageUpload(file) {
 
           // Use the smaller scale and avoid upscaling beyond 100%
           imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-
           imgState.angle = 0;
           imgState.shearX = 0;
           imgState.shearY = 0;
@@ -333,19 +332,6 @@ function fallbackToLocalUpload(file) {
       // Set default scale so image fits within work area
       const scaleToFitWidth = r.width / imgState.natW;
       const scaleToFitHeight = r.height / imgState.natH;
-
-      // Use the smaller scale and avoid upscaling beyond 100%
-      imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-
-      imgState.angle = 0;
-      imgState.shearX = 0;
-      imgState.shearY = 0;
-      imgState.signX = 1;
-      imgState.signY = 1;
-      imgState.flip = false;
-      imgState.cx = r.width / 2;
-      imgState.cy = r.height / 2;
-      imgState.has = true;
       
       // Reset filters
       Object.assign(imgFilters, PRESETS.none);
