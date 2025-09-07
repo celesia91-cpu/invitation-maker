@@ -245,10 +245,10 @@ export class EventHandlersManager {
       handleImageFlip();
     });
 
-    // Image delete
-    this.registerClickHandler('imgDelete', async () => {
-      const { deleteImage } = await import('./image-manager.js');
-      deleteImage();
+    // Image replace
+    this.registerClickHandler('imgReplace', () => {
+      const bgFileInput = document.getElementById('bgFileInput');
+      bgFileInput?.click();
     });
 
     // Upload background button

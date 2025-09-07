@@ -229,7 +229,7 @@ export function getElements() {
     
     fileInput: document.getElementById('fileInput'),
     fileInputBtn: document.getElementById('fileInputBtn'),
-    imgDelete: document.querySelector('#imgDelete'),
+    imgReplace: document.querySelector('#imgReplace'),
     
     textFadeInBtn: document.getElementById('textFadeInBtn'),
     textFadeOutBtn: document.getElementById('textFadeOutBtn'),

@@ -259,22 +259,26 @@ export async function handleImageUpload(file) {
           }
           
           const r = work.getBoundingClientRect();
-          
+
           // Set default scale so image fits entirely within work area
           const scaleToFitWidth = r.width / imgState.natW;
           const scaleToFitHeight = r.height / imgState.natH;
 
+          const { shearX, shearY } = imgState;
+
           // Use the smaller scale and avoid upscaling beyond 100%
           imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
           imgState.angle = 0;
-          imgState.shearX = 0;
-          imgState.shearY = 0;
+          // imgState.shearX = 0;
+          // imgState.shearY = 0;
           imgState.signX = 1;
           imgState.signY = 1;
           imgState.flip = false;
           imgState.cx = r.width / 2;
           imgState.cy = r.height / 2;
           imgState.has = true;
+          imgState.shearX = shearX;
+          imgState.shearY = shearY;
           
           // Reset filters
           Object.assign(imgFilters, PRESETS.none);
@@ -337,7 +341,19 @@ function fallbackToLocalUpload(file) {
       // Set default scale so image fits within work area
       const scaleToFitWidth = r.width / imgState.natW;
       const scaleToFitHeight = r.height / imgState.natH;
-      
+
+      const { shearX, shearY, signX, signY, flip } = imgState;
+      imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
+      imgState.angle ??= 0;
+      imgState.cx = r.width / 2;
+      imgState.cy = r.height / 2;
+      imgState.has = true;
+      imgState.shearX = shearX;
+      imgState.shearY = shearY;
+      imgState.signX = signX;
+      imgState.signY = signY;
+      imgState.flip = flip;
+
       // Reset filters
       Object.assign(imgFilters, PRESETS.none);
       highlightPreset('none');
@@ -431,7 +447,7 @@ export function enableImageControls(on) {
   const imgScale = document.querySelector('#imgScale');
   const imgRotate = document.querySelector('#imgRotate');
   const imgFlipBtn = document.querySelector('#imgFlip');
-  const imgDeleteBtn = document.querySelector('#imgDelete');
+  const imgReplaceBtn = document.querySelector('#imgReplace');
   const imgFadeInBtn = document.getElementById('imgFadeInBtn');
   const imgFadeOutBtn = document.getElementById('imgFadeOutBtn');
   const imgFadeInRange = document.getElementById('imgFadeInRange');
@@ -442,7 +458,7 @@ export function enableImageControls(on) {
   const imgZoomOutRange = document.getElementById('imgZoomOutRange');
   const presetGrid = document.querySelector('#presetGrid');
 
-  [imgScale, imgRotate, imgFlipBtn, imgDeleteBtn, imgFadeInBtn, imgFadeOutBtn, imgFadeInRange, imgFadeOutRange,
+  [imgScale, imgRotate, imgFlipBtn, imgReplaceBtn, imgFadeInBtn, imgFadeOutBtn, imgFadeInRange, imgFadeOutRange,
    imgZoomInBtn, imgZoomOutBtn, imgZoomInRange, imgZoomOutRange].forEach(el => {
     if (el) el.disabled = !on;
   });
@@ -550,40 +566,6 @@ export function handleImageFlip() {
   setTransforms();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
-}
-
-// Delete image handler
-export function handleImageDelete() {
-  if (!imgState.has) return;
-  
-  imgState.has = false;
-  imgState.natW = 0;
-  imgState.natH = 0;
-  imgState.cx = 0;
-  imgState.cy = 0;
-  imgState.scale = 1;
-  imgState.angle = 0;
-  imgState.shearX = 0;
-  imgState.shearY = 0;
-  imgState.signX = 1;
-  imgState.signY = 1;
-  imgState.flip = false;
-  
-  // Clear backend info
-  delete imgState.backendImageId;
-  delete imgState.backendImageUrl;
-  delete imgState.backendThumbnailUrl;
-  
-  const userBg = document.querySelector('#userBg');
-  if (userBg) userBg.src = '';
-  
-  setTransforms();
-  toggleUploadBtn();
-  
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
-  
-  console.log('✅ Image deleted');
 }
 
 // Preload cache for performance
