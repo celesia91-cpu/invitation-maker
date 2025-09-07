@@ -1,4 +1,4 @@
-// slide-manager.js - COMPLETE FIXED VERSION - All playback issues resolved
+// slide-manager.js - COMPLETE VERSION WITH FADE & ZOOM ANIMATIONS
 
 import { getSlides, getActiveIndex, setActiveIndex, setSlides } from './state-manager.js';
 import { imgState, setTransforms } from './image-manager.js';
@@ -14,6 +14,13 @@ function getSlideImage() {
   const slide = slides[activeIndex];
   return slide?.image || null;
 }
+
+// Animation state for proper fade/zoom during playback
+let animationState = {
+  rafId: null,
+  slideStartTime: 0,
+  isAnimating: false
+};
 
 // Slide switching state management
 class SlideSwitchManager {
@@ -83,6 +90,200 @@ class SlideSwitchManager {
 
 // Create singleton switch manager
 const switchManager = new SlideSwitchManager();
+
+/* ----------------------------- Animation Functions ---------------------------------- */
+
+// Compute opacity based on fade timing
+function computeOpacity(elapsed, duration, fadeInMs, fadeOutMs) {
+  const fadeIn = fadeInMs || 0;
+  const fadeOut = fadeOutMs || 0;
+  
+  let opacity = 1;
+  
+  // Fade in at the beginning
+  if (fadeIn > 0 && elapsed < fadeIn) {
+    opacity = Math.min(1, elapsed / fadeIn);
+  }
+  
+  // Fade out at the end
+  if (fadeOut > 0 && elapsed > (duration - fadeOut)) {
+    const fadeOutProgress = (elapsed - (duration - fadeOut)) / fadeOut;
+    opacity = Math.max(0, 1 - fadeOutProgress);
+  }
+  
+  return Math.max(0, Math.min(1, opacity));
+}
+
+// Compute zoom scale based on zoom timing
+function computeZoomScale(elapsed, duration, zoomInMs, zoomOutMs) {
+  const zoomIn = zoomInMs || 0;
+  const zoomOut = zoomOutMs || 0;
+  
+  let scale = 1;
+  
+  // Zoom in at the beginning (from 0.3 to 1.0)
+  if (zoomIn > 0 && elapsed < zoomIn) {
+    const progress = elapsed / zoomIn;
+    scale = 0.3 + (0.7 * progress); // 0.3 to 1.0
+  }
+  
+  // Zoom out at the end (from 1.0 to 1.5)
+  if (zoomOut > 0 && elapsed > (duration - zoomOut)) {
+    const zoomOutProgress = (elapsed - (duration - zoomOut)) / zoomOut;
+    scale = 1 + (0.5 * zoomOutProgress); // 1.0 to 1.5
+  }
+  
+  return Math.max(0.1, scale);
+}
+
+// Animation frame step function
+function stepFrame(timestamp) {
+  if (!slidePlayback.isPlaying) {
+    animationState.isAnimating = false;
+    animationState.rafId = null;
+    return;
+  }
+  
+  const slides = getSlides();
+  const currentIndex = slidePlayback.currentSlideIndex;
+  const currentSlide = slides[currentIndex];
+  
+  if (!currentSlide) {
+    stopSlides();
+    return;
+  }
+  
+  // Calculate elapsed time for current slide
+  const elapsed = timestamp - animationState.slideStartTime;
+  const duration = currentSlide.durationMs || DEFAULT_DUR;
+  
+  // Apply animations to text layers
+  const workElement = document.getElementById('work');
+  if (workElement) {
+    const layers = workElement.querySelectorAll('.layer');
+    layers.forEach((layer, index) => {
+      const layerData = currentSlide.layers?.[index] || {};
+      
+      // Apply fade animation
+      const opacity = computeOpacity(
+        elapsed, 
+        duration, 
+        layerData.fadeInMs || 0, 
+        layerData.fadeOutMs || 0
+      );
+      layer.style.opacity = opacity.toString();
+      
+      // Apply zoom animation
+      const zoomScale = computeZoomScale(
+        elapsed,
+        duration,
+        layerData.zoomInMs || 0,
+        layerData.zoomOutMs || 0
+      );
+      
+      // Store original transform to avoid conflicts
+      const originalTransform = layer.getAttribute('data-original-transform') || '';
+      
+      if (zoomScale !== 1) {
+        layer.style.transform = `${originalTransform} scale(${zoomScale})`.trim();
+        layer.style.transformOrigin = 'center center';
+      } else {
+        layer.style.transform = originalTransform;
+      }
+    });
+  }
+  
+  // Apply animations to background image
+  const userBgWrap = document.getElementById('userBgWrap');
+  const userBg = document.getElementById('userBg');
+  if (currentSlide.image && userBgWrap && userBg) {
+    const imageData = currentSlide.image;
+    
+    // Apply fade animation to image
+    const opacity = computeOpacity(
+      elapsed,
+      duration,
+      imageData.fadeInMs || 0,
+      imageData.fadeOutMs || 0
+    );
+    userBgWrap.style.opacity = opacity.toString();
+    
+    // Apply zoom animation to image
+    const zoomScale = computeZoomScale(
+      elapsed,
+      duration,
+      imageData.zoomInMs || 0,
+      imageData.zoomOutMs || 0
+    );
+    
+    // Get current transform from setTransforms and apply zoom
+    const currentTransform = userBg.style.transform || '';
+    
+    if (zoomScale !== 1) {
+      // Apply zoom on top of existing transform
+      userBg.style.transform = `${currentTransform} scale(${zoomScale})`.trim();
+    } else {
+      // Reset to just the original transform
+      userBg.style.transform = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
+    }
+  }
+  
+  // Continue animation loop
+  animationState.rafId = requestAnimationFrame(stepFrame);
+}
+
+// Start animation loop
+function startAnimationLoop() {
+  if (animationState.isAnimating) {
+    return; // Already running
+  }
+  
+  animationState.isAnimating = true;
+  animationState.slideStartTime = performance.now();
+  animationState.rafId = requestAnimationFrame(stepFrame);
+  
+  console.log('🎬 Animation loop started');
+}
+
+// Stop animation loop
+function stopAnimationLoop() {
+  animationState.isAnimating = false;
+  
+  if (animationState.rafId) {
+    cancelAnimationFrame(animationState.rafId);
+    animationState.rafId = null;
+  }
+  
+  // Reset all animations to default state
+  resetAnimations();
+  
+  console.log('⏹️ Animation loop stopped');
+}
+
+// Reset all elements to their default state (no fade/zoom)
+function resetAnimations() {
+  // Reset text layers
+  const layers = document.querySelectorAll('.layer');
+  layers.forEach(layer => {
+    layer.style.opacity = '1';
+    const originalTransform = layer.getAttribute('data-original-transform') || '';
+    layer.style.transform = originalTransform;
+  });
+  
+  // Reset background image
+  const userBgWrap = document.getElementById('userBgWrap');
+  const userBg = document.getElementById('userBg');
+  
+  if (userBgWrap) {
+    userBgWrap.style.opacity = '1';
+  }
+  
+  if (userBg) {
+    // Keep the image transforms from setTransforms, just remove animation scales
+    const currentTransform = userBg.style.transform || '';
+    userBg.style.transform = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
+  }
+}
 
 /* ----------------------------- Helper Functions ---------------------------------- */
 
@@ -321,6 +522,17 @@ async function createTextLayerFromData(layerData) {
       lineHeight: layerData.lineHeight || 'normal'
     });
 
+    // Store timing data on the element for animations
+    if (textEl) {
+      textEl._fadeInMs = layerData.fadeInMs || 0;
+      textEl._fadeOutMs = layerData.fadeOutMs || 0;
+      textEl._zoomInMs = layerData.zoomInMs || 0;
+      textEl._zoomOutMs = layerData.zoomOutMs || 0;
+      
+      // Store original transform for animation reference
+      textEl.setAttribute('data-original-transform', textEl.style.transform || '');
+    }
+
     return textEl;
   } catch (error) {
     console.error('Failed to create text layer:', error);
@@ -381,6 +593,11 @@ async function directSwitchToSlide(idx) {
     
     // Update UI
     updateSlidesUI();
+
+    // Restart animation timing for new slide
+    if (slidePlayback.isPlaying) {
+      animationState.slideStartTime = performance.now();
+    }
 
     console.log(`✅ Direct switch to slide ${targetIndex} complete`);
     
@@ -490,7 +707,12 @@ export function writeCurrentSlide() {
       textDecoration: el.style.textDecoration || 'none',
       textShadow: el.style.textShadow || 'none',
       letterSpacing: el.style.letterSpacing || 'normal',
-      lineHeight: el.style.lineHeight || 'normal'
+      lineHeight: el.style.lineHeight || 'normal',
+      // Include timing data
+      fadeInMs: el._fadeInMs || 0,
+      fadeOutMs: el._fadeOutMs || 0,
+      zoomInMs: el._zoomInMs || 0,
+      zoomOutMs: el._zoomOutMs || 0
     }));
 
     slide.layers = layers;
@@ -650,9 +872,12 @@ export function playSlides() {
     playBtn.classList.add('active');
   }
   
+  // Start animation loop for fade/zoom effects
+  startAnimationLoop();
+  
   // Start playback
   playNextSlide();
-  console.log('▶️ Started slide playback');
+  console.log('▶️ Started slide playback with animations');
 }
 
 export function stopSlides() {
@@ -662,6 +887,9 @@ export function stopSlides() {
     clearTimeout(slidePlayback.timeoutId);
     slidePlayback.timeoutId = null;
   }
+  
+  // Stop animation loop
+  stopAnimationLoop();
   
   // Update play button
   const playBtn = document.getElementById('playSlidesBtn');
@@ -741,7 +969,9 @@ export function getPlaybackState() {
     hasTimeout: !!slidePlayback.timeoutId,
     totalSlides: getSlides().length,
     switchManagerBusy: switchManager.isSwitching(),
-    timeoutId: slidePlayback.timeoutId
+    timeoutId: slidePlayback.timeoutId,
+    isAnimating: animationState.isAnimating,
+    animationRafId: animationState.rafId
   };
 }
 
@@ -754,6 +984,9 @@ export function forceStopPlayback() {
     clearTimeout(slidePlayback.timeoutId);
     slidePlayback.timeoutId = null;
   }
+  
+  // Stop animations
+  stopAnimationLoop();
   
   // Clear any pending switch operations
   switchManager.clearPendingSwitches();
@@ -812,6 +1045,7 @@ export function resetOpacities() {
 /* --------------------------- Cleanup ----------------------------- */
 
 export function destroySlideManager() {
+  stopAnimationLoop();
   switchManager.destroy();
   imageLoader.destroy();
   stopSlides();
