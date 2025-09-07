@@ -596,6 +596,12 @@ let slidePlayback = {
   startTime: 0
 };
 
+export function startPlay() {
+  if (!slidePlayback.isPlaying) {
+    playSlides();
+  }
+}
+
 export function playSlides() {
   if (slidePlayback.isPlaying) {
     stopSlides();
