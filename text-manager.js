@@ -94,6 +94,8 @@ function setupTextLayerEvents(textEl) {
   textEl.addEventListener('click', (e) => {
     e.stopPropagation();
     setActiveLayer(textEl);
+    textEl.focus();
+    selectAllText(textEl);
   });
 
   // Double click to edit
