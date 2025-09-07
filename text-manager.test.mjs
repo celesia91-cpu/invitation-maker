@@ -75,6 +75,8 @@ const tm = await import('./text-manager.js');
 const {
   addTextLayer,
   getActiveLayer,
+  setActiveLayer,
+  initializeTextManager,
   handleTextFadeIn,
   handleTextFadeOut,
   handleTextFadeInRange,
@@ -92,8 +94,14 @@ const {
   syncToolbarFromActive
 } = tm;
 
+// Initial toolbar state
+initializeTextManager();
+const deleteBtn = document.getElementById('textDelete');
+assert.ok(deleteBtn.disabled, 'delete button disabled initially');
+
 await addTextLayer('Hello');
 const layer = getActiveLayer();
+assert.ok(!deleteBtn.disabled, 'delete button enabled after adding text');
 
 // Ensure initial UI state
 const fadeInBtn = document.getElementById('textFadeInBtn');
@@ -191,4 +199,9 @@ layer.style.textDecoration = 'none';
 syncToolbarFromActive();
 assert.ok(!underlineBtn.classList.contains('active'));
 
+// Delete button state after deselect
+setActiveLayer(null);
+assert.ok(deleteBtn.disabled, 'delete button disabled after deselecting layer');
+
+console.log('Delete button toggles with text layer selection');
 console.log('Text style handlers apply formatting without errors');

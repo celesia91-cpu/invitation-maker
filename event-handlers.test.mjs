@@ -121,6 +121,10 @@ setActiveLayer(layer);
 const manager = new EventHandlersManager();
 manager.setupTextManagementHandlers();
 
+// Text manager initialization shouldn't add extra handlers
+tm.initializeTextManager();
+assert.strictEqual(elements.textDelete.listeners.click.length, 1, 'single delete handler registered');
+
 // Trigger click on delete button
 const deleteBtn = elements.textDelete;
 await deleteBtn.listeners.click[0]({ target: deleteBtn });
@@ -130,4 +134,4 @@ assert.strictEqual(elements.work.children.length, 0, 'layer removed from work');
 assert.strictEqual(getActiveLayer(), null, 'active layer cleared');
 assert.strictEqual(historyCount, 1, 'history updated');
 
-console.log('#textDelete removes active text layer and updates history');
+console.log('Text delete handler fires once and removes active layer');
