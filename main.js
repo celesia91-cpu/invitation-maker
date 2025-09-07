@@ -1,4 +1,4 @@
-// main.js - FIXED: Complete version with proper drag initialization
+// main.js - Complete implementation with text editing integration
 
 import { PurchasedDesignManager } from './purchased-design-manager.js';
 import { AuthUIManager } from './auth-ui-manager.js';
@@ -21,7 +21,7 @@ import { preloadSlideImageAt } from './image-manager.js';
 import { workSize } from './utils.js';
 
 /**
- * Main Application Class
+ * Main Application Class with Enhanced Text Editing Support
  * Orchestrates the initialization and coordination of all app modules
  */
 class InvitationMakerApp {
@@ -39,6 +39,13 @@ class InvitationMakerApp {
     
     // Store text drag data
     this.textDragData = null;
+    
+    // Element references
+    this.elements = {
+      work: null,
+      bgBox: null,
+      userBgWrap: null
+    };
   }
 
   /**
@@ -70,6 +77,9 @@ class InvitationMakerApp {
     try {
       console.log('🚀 Initializing Invitation Maker App...', this.mode);
 
+      // Cache DOM elements
+      this.cacheElements();
+
       // Initialize core UI systems first
       await this.initializeCoreUI();
 
@@ -90,6 +100,17 @@ class InvitationMakerApp {
       console.error('❌ App initialization failed:', error);
       this.handleInitializationError(error);
     }
+  }
+
+  /**
+   * Cache frequently used DOM elements
+   */
+  cacheElements() {
+    this.elements = {
+      work: document.getElementById('work'),
+      bgBox: document.getElementById('bgBox'),
+      userBgWrap: document.getElementById('userBgWrap')
+    };
   }
 
   /**
@@ -147,7 +168,7 @@ class InvitationMakerApp {
   }
 
   /**
-   * FIXED: Initialize features common to all modes with proper drag setup
+   * Initialize features common to all modes with enhanced text editing support
    */
   async initializeCommonFeatures() {
     console.log('🔧 Initializing common features...');
@@ -156,7 +177,7 @@ class InvitationMakerApp {
     this.managers.eventHandlers = new EventHandlersManager();
     this.managers.eventHandlers.initialize();
     
-    // FIXED: Setup drag handlers with complete context
+    // Setup drag handlers with complete text editing context
     await this.initializeDragHandlers();
     
     // RSVP system
@@ -176,13 +197,16 @@ class InvitationMakerApp {
     
     // Start background video
     this.startBackgroundVideo();
+    
+    // Setup global keyboard shortcuts for text editing
+    this.setupGlobalKeyboardShortcuts();
   }
 
   /**
-   * FIXED: Initialize drag handlers with complete context
+   * Enhanced drag handlers initialization with complete text editing context
    */
   async initializeDragHandlers() {
-    console.log('🎯 Initializing drag handlers...');
+    console.log('🎯 Initializing drag handlers with text editing support...');
     
     try {
       // Import all required modules with error handling
@@ -190,7 +214,7 @@ class InvitationMakerApp {
       const stateManager = await import('./state-manager.js');
       const uiManager = await import('./ui-manager.js');
       
-      // Try to import text manager with fallback
+      // Import text manager with complete editing support
       let textManager;
       try {
         textManager = await import('./text-manager.js');
@@ -199,12 +223,12 @@ class InvitationMakerApp {
         textManager = this.createTextManagerFallback();
       }
       
-      // Create comprehensive drag context
+      // Create comprehensive drag context with text editing functions
       const dragContext = {
         // Core DOM elements
-        work: document.getElementById('work'),
-        bgBox: document.getElementById('bgBox'),
-        userBgWrap: document.getElementById('userBgWrap'),
+        work: this.elements.work,
+        bgBox: this.elements.bgBox,
+        userBgWrap: this.elements.userBgWrap,
         
         // Image state and functions
         imgState: imageManager.imgState,
@@ -219,13 +243,22 @@ class InvitationMakerApp {
         writeCurrentSlide: stateManager.writeCurrentSlide || (() => {}),
         saveProjectDebounced: stateManager.saveProjectDebounced || (() => {}),
         
-        // Text functions
+        // Text layer functions
         setActiveLayer: textManager.setActiveLayer || this.setActiveLayerFallback.bind(this),
         getLocked: textManager.getLocked || (() => false),
+        
+        // NEW: Text editing functions
+        enterTextEditMode: textManager.enterTextEditMode || (() => {}),
+        exitTextEditMode: textManager.exitTextEditMode || (() => {}),
+        isInEditMode: textManager.isInEditMode || (() => false),
+        getEditingElement: textManager.getEditingElement || (() => null),
         
         // Drag helpers
         beginDragText: this.beginDragText.bind(this),
         endDragText: this.endDragText.bind(this),
+        
+        // Toolbar sync
+        syncToolbarFromActive: textManager.syncToolbarFromActive || (() => {}),
         
         // Configuration
         snapThreshold: 8,
@@ -240,7 +273,7 @@ class InvitationMakerApp {
       // Setup transform handles
       this.setupTransformHandles();
       
-      console.log('✅ Drag handlers initialized successfully');
+      console.log('✅ Drag handlers with text editing initialized successfully');
       
     } catch (error) {
       console.error('❌ Failed to initialize drag handlers:', error);
@@ -250,17 +283,64 @@ class InvitationMakerApp {
   }
 
   /**
-   * FIXED: Create text manager fallback
+   * Setup global keyboard shortcuts for text editing
+   */
+  setupGlobalKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // F2 to edit selected text layer
+      if (e.key === 'F2') {
+        e.preventDefault();
+        const activeLayer = document.querySelector('.layer.active');
+        if (activeLayer && activeLayer.classList.contains('text-layer')) {
+          import('./text-manager.js').then(({ enterTextEditMode }) => {
+            enterTextEditMode(activeLayer);
+          });
+        }
+      }
+      
+      // Escape to exit edit mode
+      if (e.key === 'Escape') {
+        import('./text-manager.js').then(({ exitTextEditMode, isInEditMode }) => {
+          if (isInEditMode()) {
+            exitTextEditMode();
+          }
+        });
+      }
+      
+      // Ctrl+E to toggle edit mode for active layer
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        const activeLayer = document.querySelector('.layer.active');
+        if (activeLayer && activeLayer.classList.contains('text-layer')) {
+          import('./text-manager.js').then(({ enterTextEditMode, exitTextEditMode, isInEditMode, getEditingElement }) => {
+            if (isInEditMode() && getEditingElement() === activeLayer) {
+              exitTextEditMode();
+            } else {
+              enterTextEditMode(activeLayer);
+            }
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * Create text manager fallback
    */
   createTextManagerFallback() {
     return {
       setActiveLayer: this.setActiveLayerFallback.bind(this),
-      getLocked: () => false
+      getLocked: () => false,
+      enterTextEditMode: () => {},
+      exitTextEditMode: () => {},
+      isInEditMode: () => false,
+      getEditingElement: () => null,
+      syncToolbarFromActive: () => {}
     };
   }
 
   /**
-   * FIXED: Fallback for setting active layer
+   * Fallback for setting active layer with enhanced state preservation
    */
   setActiveLayerFallback(layer) {
     if (!layer) return;
@@ -273,22 +353,40 @@ class InvitationMakerApp {
     // Add active class to the specified layer
     layer.classList.add('active');
     
+    // Force repaint to ensure CSS is applied
+    layer.offsetHeight; // Trigger reflow
+    
+    // Double-check the active class is still there
+    setTimeout(() => {
+      if (!layer.classList.contains('active')) {
+        layer.classList.add('active');
+        console.warn('Had to re-add active class to layer');
+      }
+    }, 0);
+    
     console.log('Set active layer (fallback):', layer);
   }
 
   /**
-   * FIXED: Text drag helper methods
+   * Enhanced text drag helper with edit mode checking
    */
   beginDragText(e) {
     try {
       const layer = e.target.closest('.layer');
       if (!layer) return false;
       
+      // CRITICAL: Don't start drag if in edit mode
+      if (layer.dataset.editing === 'true' || layer.contentEditable === 'true') {
+        console.log('🚫 Text is in edit mode - skipping drag');
+        return false;
+      }
+      
       // Set as active layer
       this.setActiveLayerFallback(layer);
       
       // Add dragging class
       layer.classList.add('dragging');
+      document.body.classList.add('dragging');
       
       // Store drag data
       this.textDragData = {
@@ -308,13 +406,34 @@ class InvitationMakerApp {
   }
 
   /**
-   * FIXED: End text drag
+   * Enhanced end text drag with active state preservation
    */
   endDragText() {
     try {
       if (this.textDragData?.element) {
-        this.textDragData.element.classList.remove('dragging');
+        const element = this.textDragData.element;
+        
+        // Remove dragging class
+        element.classList.remove('dragging');
+        
+        // CRITICAL: Ensure element stays active
+        if (!element.classList.contains('active')) {
+          element.classList.add('active');
+        }
+        
+        // Force visual update
+        element.style.outline = '2px solid rgba(37, 99, 235, 0.8)';
+        element.style.outlineOffset = '2px';
+        element.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.15)';
+        
+        // Clear the inline styles after a brief moment to let CSS take over
+        setTimeout(() => {
+          element.style.outline = '';
+          element.style.outlineOffset = '';
+          element.style.boxShadow = '';
+        }, 50);
       }
+      
       this.textDragData = null;
       console.log('✅ Ended text drag');
     } catch (error) {
@@ -323,10 +442,10 @@ class InvitationMakerApp {
   }
 
   /**
-   * FIXED: Setup transform handles for image manipulation
+   * Setup transform handles for image manipulation
    */
   setupTransformHandles() {
-    const bgBox = document.getElementById('bgBox');
+    const bgBox = this.elements.bgBox;
     if (!bgBox) {
       console.warn('Background box not found for transform handles');
       return;
@@ -372,12 +491,12 @@ class InvitationMakerApp {
   }
 
   /**
-   * FIXED: Basic drag fallback system
+   * Basic drag fallback system with edit mode awareness
    */
   setupBasicDragFallback() {
     console.log('🔄 Setting up basic drag fallback...');
     
-    const work = document.getElementById('work');
+    const work = this.elements.work;
     if (!work) {
       console.error('Work element not found');
       return;
@@ -394,8 +513,14 @@ class InvitationMakerApp {
         return;
       }
       
-      const bgBox = document.getElementById('bgBox');
       const layer = e.target.closest('.layer');
+      
+      // Check if in edit mode
+      if (layer && (layer.dataset.editing === 'true' || layer.contentEditable === 'true')) {
+        return; // Allow text editing
+      }
+      
+      const bgBox = this.elements.bgBox;
       const isImageArea = e.target === work || e.target.closest('#userBgWrap') || e.target === bgBox;
       
       // Import image state
@@ -476,6 +601,8 @@ class InvitationMakerApp {
       
       if (dragState.element) {
         dragState.element.classList.remove('dragging');
+        // Ensure element stays active
+        dragState.element.classList.add('active');
       }
       
       // Save changes
@@ -500,7 +627,7 @@ class InvitationMakerApp {
     work.addEventListener('pointerup', handlePointerUp);
     work.addEventListener('pointercancel', handlePointerUp);
     
-    console.log('✅ Basic drag fallback initialized');
+    console.log('✅ Basic drag fallback with edit mode support initialized');
   }
 
   /**
@@ -579,6 +706,33 @@ class InvitationMakerApp {
    */
   isReady() {
     return this.isInitialized;
+  }
+
+  /**
+   * Get current edit mode status
+   */
+  isInEditMode() {
+    try {
+      // Try to get from text manager
+      return import('./text-manager.js').then(({ isInEditMode }) => {
+        return isInEditMode();
+      });
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Exit edit mode programmatically
+   */
+  exitEditMode() {
+    try {
+      import('./text-manager.js').then(({ exitTextEditMode }) => {
+        exitTextEditMode();
+      });
+    } catch (error) {
+      console.warn('Could not exit edit mode');
+    }
   }
 
   /**

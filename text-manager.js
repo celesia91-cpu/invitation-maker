@@ -1,4 +1,4 @@
-// text-manager.js - COMPLETE FIXED VERSION - All text management functions
+// text-manager.js - Complete implementation with editable text support
 
 import { saveProjectDebounced, recordHistory } from './state-manager.js';
 import { generateId, clamp } from './utils.js';
@@ -7,9 +7,90 @@ import { generateId, clamp } from './utils.js';
 let activeLayer = null;
 let isLocked = false;
 
+// Editing mode management
+let editingMode = false;
+let editingElement = null;
+
 function saveAndRecord() {
   saveProjectDebounced();
   recordHistory();
+}
+
+/**
+ * Enter text editing mode
+ */
+export function enterTextEditMode(element) {
+  if (!element) return false;
+  
+  try {
+    // Exit any existing edit mode
+    exitTextEditMode();
+    
+    editingMode = true;
+    editingElement = element;
+    
+    // Make element editable
+    element.contentEditable = true;
+    element.dataset.editing = 'true';
+    
+    // Update styles for editing
+    element.style.userSelect = 'text';
+    element.style.cursor = 'text';
+    element.classList.add('editing');
+    
+    // Focus and select text
+    element.focus();
+    selectAllText(element);
+    
+    console.log('✅ Entered text edit mode');
+    return true;
+  } catch (error) {
+    console.error('Failed to enter edit mode:', error);
+    return false;
+  }
+}
+
+/**
+ * Exit text editing mode
+ */
+export function exitTextEditMode() {
+  if (!editingElement) return;
+  
+  try {
+    // Restore normal mode
+    editingElement.contentEditable = false;
+    editingElement.dataset.editing = 'false';
+    
+    // Restore drag functionality
+    editingElement.style.userSelect = 'none';
+    editingElement.style.cursor = 'move';
+    editingElement.classList.remove('editing');
+    
+    // Clear selection
+    window.getSelection()?.removeAllRanges();
+    
+    editingMode = false;
+    editingElement = null;
+    
+    console.log('✅ Exited text edit mode');
+    saveAndRecord();
+  } catch (error) {
+    console.error('Failed to exit edit mode:', error);
+  }
+}
+
+/**
+ * Check if currently in editing mode
+ */
+export function isInEditMode() {
+  return editingMode;
+}
+
+/**
+ * Get the currently editing element
+ */
+export function getEditingElement() {
+  return editingElement;
 }
 
 /**
@@ -26,7 +107,7 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     // Create text element
     const textEl = document.createElement('div');
     textEl.className = 'layer text-layer';
-    textEl.contentEditable = 'false';
+    textEl.contentEditable = false; // Start non-editable
     textEl.dataset.editing = 'false';
     textEl.textContent = text;
     textEl.id = generateId('layer');
@@ -51,7 +132,7 @@ export async function addTextLayer(text = 'New Text', options = {}) {
       letterSpacing: 'normal',
       lineHeight: 'normal',
       cursor: 'move',
-      userSelect: 'text',
+      userSelect: 'none', // Start with no selection for dragging
       outline: 'none',
       minWidth: '20px',
       minHeight: '20px',
@@ -71,8 +152,13 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     // Add to work area
     work.appendChild(textEl);
 
-    // Set as active layer
+    // Set as active layer and immediately enter edit mode for new text
     setActiveLayer(textEl);
+    
+    // Auto-enter edit mode for new text layers
+    setTimeout(() => {
+      enterTextEditMode(textEl);
+    }, 50);
 
     console.log('✅ Text layer added:', text);
     
@@ -90,63 +176,98 @@ export async function addTextLayer(text = 'New Text', options = {}) {
 }
 
 /**
- * Setup event listeners for text layer
+ * Setup event listeners for text layer with proper edit/drag mode handling
  */
 function setupTextLayerEvents(textEl) {
-  // Click to select
+  let clickTimeout = null;
+  let clickCount = 0;
+  
+  // Enhanced click handling - single vs double click
   textEl.addEventListener('click', (e) => {
-    e.stopPropagation();
-    setActiveLayer(textEl);
+    clickCount++;
+    
+    if (clickCount === 1) {
+      clickTimeout = setTimeout(() => {
+        // Single click - select layer but don't edit
+        if (!isInEditMode()) {
+          e.stopPropagation();
+          setActiveLayer(textEl);
+        }
+        clickCount = 0;
+      }, 250);
+    }
   });
 
   // Double click to edit
   textEl.addEventListener('dblclick', (e) => {
+    clearTimeout(clickTimeout);
+    clickCount = 0;
+    
     e.stopPropagation();
-    textEl.contentEditable = 'true';
-    textEl.dataset.editing = 'true';
-    textEl.style.cursor = 'text';
-    textEl.focus();
-    selectAllText(textEl);
+    e.preventDefault();
+    
+    setActiveLayer(textEl);
+    enterTextEditMode(textEl);
+  });
+  
+  // Mouse down handling for drag vs edit detection
+  textEl.addEventListener('mousedown', (e) => {
+    // If in edit mode, allow text selection
+    if (isInEditMode() && editingElement === textEl) {
+      e.stopPropagation();
+      return;
+    }
   });
 
   // Text input changes
   textEl.addEventListener('input', () => {
-    saveAndRecord();
+    if (isInEditMode()) {
+      saveAndRecord();
+    }
   });
 
-  // Blur to save changes and exit edit mode
+  // Blur to exit edit mode
   textEl.addEventListener('blur', () => {
-    textEl.contentEditable = 'false';
-    textEl.dataset.editing = 'false';
-    textEl.style.cursor = 'move';
-    const selection = window.getSelection?.();
-    selection?.removeAllRanges();
-    saveAndRecord();
+    if (isInEditMode() && editingElement === textEl) {
+      exitTextEditMode();
+    }
   });
 
-  // Keyboard shortcuts
+  // Enhanced keyboard shortcuts
   textEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      textEl.blur();
-    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (isInEditMode() && editingElement === textEl) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        exitTextEditMode();
+        setActiveLayer(null);
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        exitTextEditMode();
+      }
+      // Allow normal text editing keys
+      return;
+    }
+    
+    // Non-editing mode shortcuts
+    if (e.key === 'Delete' || e.key === 'Backspace') {
       if (textEl.textContent.trim() === '') {
         e.preventDefault();
         deleteTextLayer(textEl);
       }
-    } else if (e.key === 'Enter' && e.ctrlKey) {
+    } else if (e.key === 'F2') {
       e.preventDefault();
-      textEl.blur();
+      enterTextEditMode(textEl);
     }
   });
 
-  // Prevent default drag behavior
+  // Prevent default drag behavior when editing
   textEl.addEventListener('dragstart', (e) => {
     e.preventDefault();
   });
 }
 
 /**
- * Set active text layer
+ * Set active text layer with enhanced state management
  */
 export function setActiveLayer(layer) {
   // Remove active class from all layers
@@ -159,14 +280,25 @@ export function setActiveLayer(layer) {
 
   if (layer) {
     layer.classList.add('active');
+    
+    // Force repaint to ensure CSS is applied
+    layer.offsetHeight; // Trigger reflow
+    
+    // Double-check the active class is still there
+    setTimeout(() => {
+      if (!layer.classList.contains('active')) {
+        layer.classList.add('active');
+        console.warn('Had to re-add active class to layer');
+      }
+    }, 0);
+    
     applyTextTransform(layer);
     syncToolbarFromActive();
     console.log('Active layer set:', layer.textContent);
   }
+  
   updateTextFadeUI();
   updateTextZoomUI();
-
-  // Update toolbar state
   updateToolbarState();
 }
 
@@ -201,6 +333,10 @@ export function deleteTextLayer(textEl) {
   try {
     if (textEl === activeLayer) {
       setActiveLayer(null);
+    }
+
+    if (textEl === editingElement) {
+      exitTextEditMode();
     }
 
     textEl.remove();
@@ -242,8 +378,10 @@ export function duplicateActiveLayer() {
     newLayer.style.left = left + 'px';
     newLayer.style.top = top + 'px';
 
-    // Remove active class
+    // Remove active class and ensure not editing
     newLayer.classList.remove('active');
+    newLayer.contentEditable = false;
+    newLayer.dataset.editing = 'false';
 
     // Setup events for new layer
     setupTextLayerEvents(newLayer);
@@ -360,52 +498,12 @@ export function applyTextAlign(alignment) {
   console.log('Text alignment applied:', alignment);
 }
 
-/**
- * Apply text decoration
- */
-export function applyTextDecoration(decoration) {
-  if (!activeLayer) return;
-  
-  activeLayer.style.textDecoration = decoration;
-  updateToolbarState();
-  saveAndRecord();
-  console.log('Text decoration applied:', decoration);
-}
-
-/**
- * Apply text shadow
- */
-export function applyTextShadow(shadow) {
-  if (!activeLayer) return;
-  
-  activeLayer.style.textShadow = shadow;
-  updateToolbarState();
-  saveAndRecord();
-  console.log('Text shadow applied:', shadow);
-}
-
-/**
- * Apply letter spacing
- */
-export function applyLetterSpacing(spacing) {
-  if (!activeLayer) return;
-  
-  activeLayer.style.letterSpacing = spacing;
-  updateToolbarState();
-  saveAndRecord();
-  console.log('Letter spacing applied:', spacing);
-}
-
-/**
- * Apply line height
- */
-export function applyLineHeight(height) {
-  if (!activeLayer) return;
-  
-  activeLayer.style.lineHeight = height;
-  updateToolbarState();
-  saveAndRecord();
-  console.log('Line height applied:', height);
+// Apply scale/rotation to active text layer
+function applyTextTransform(layer = activeLayer) {
+  if (!layer) return;
+  const scale = parseFloat(layer.dataset.scale || '1');
+  const rotate = parseFloat(layer.dataset.rotate || '0');
+  layer.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
 }
 
 /**
@@ -588,80 +686,49 @@ export function updateTextZoomUI() {
   if (zoomOutVal) zoomOutVal.textContent = fmtSec(zoomOut);
 }
 
-/**
- * Handle font family change
- */
+// Event handlers for UI controls
 export function handleFontFamily(value) {
   applyFontFamily(value);
   saveProjectDebounced();
 }
 
-/**
- * Handle font size change
- */
 export function handleFontSize(value) {
   const fontSize = parseInt(value, 10);
   if (fontSize && fontSize > 0) {
     applyFontSize(fontSize);
-
-    // Update display value
     const fontSizeVal = document.getElementById('fontSizeVal');
     if (fontSizeVal) fontSizeVal.textContent = fontSize + 'px';
     saveProjectDebounced();
   }
 }
 
-/**
- * Handle color change
- */
 export function handleFontColor(value) {
   applyColor(value);
   saveProjectDebounced();
 }
 
-/**
- * Handle text alignment change
- */
 export function handleTextAlignChange(alignment) {
   applyTextAlign(alignment);
 }
 
-/**
- * Handle bold toggle
- */
 export function handleBold() {
   toggleBold();
   syncToolbarFromActive();
   saveProjectDebounced();
 }
 
-/**
- * Handle italic toggle
- */
 export function handleItalic() {
   toggleItalic();
   syncToolbarFromActive();
   saveProjectDebounced();
 }
 
-/**
- * Handle underline toggle
- */
 export function handleUnderline() {
   toggleUnderline();
   syncToolbarFromActive();
   saveProjectDebounced();
 }
 
-// Apply scale/rotation to active text layer
-function applyTextTransform(layer = activeLayer) {
-  if (!layer) return;
-  const scale = parseFloat(layer.dataset.scale || '1');
-  const rotate = parseFloat(layer.dataset.rotate || '0');
-  layer.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
-}
-
-// Text transform handlers
 export function handleTextScale(value) {
   if (!activeLayer) return;
   const scale = clamp(parseInt(value, 10) / 100, 0.1, 10);
@@ -754,7 +821,6 @@ export function getAllTextLayers() {
 /**
  * Clear all text layers
  */
-
 export function clearAllTextLayers() {
   const layers = getAllTextLayers();
   layers.forEach(layer => layer.remove());
@@ -768,5 +834,31 @@ export function clearAllTextLayers() {
  */
 export function initializeTextManager() {
   updateToolbarState();
+  
+  // Setup global keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // F2 to edit selected text layer
+    if (e.key === 'F2') {
+      e.preventDefault();
+      if (activeLayer && activeLayer.classList.contains('text-layer')) {
+        enterTextEditMode(activeLayer);
+      }
+    }
+    
+    // Escape to exit edit mode
+    if (e.key === 'Escape') {
+      if (isInEditMode()) {
+        exitTextEditMode();
+      }
+    }
+  });
+  
   console.log('✅ Text manager initialized');
+}
+
+// Auto-initialize when imported
+if (typeof document !== 'undefined' && document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeTextManager);
+} else if (typeof document !== 'undefined') {
+  initializeTextManager();
 }

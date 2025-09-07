@@ -826,60 +826,125 @@ input[type="color"]:hover {
   transition: opacity var(--transition-base);
 }
 
-/* ===== ENHANCED TEXT LAYER STYLES ===== */
+/* ===== ENHANCED TEXT LAYER STYLES WITH EDITING SUPPORT ===== */
 .layer {
   min-width: 20px;
   min-height: 20px;
   word-wrap: break-word;
   position: absolute;
   cursor: move;
-  transition: outline var(--transition-fast), box-shadow var(--transition-fast);
   user-select: none;
   -webkit-user-select: none;
+  outline: none;
+  z-index: 30;
+}
+
+/* Base text layer styles */
+.layer.text-layer {
+  cursor: move;
+  resize: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  transition: all 0.2s ease;
+  position: relative;
+  min-width: 20px;
+  min-height: 20px;
+  word-wrap: break-word;
+  outline: none;
 }
 
 /* Enhanced hover state for layers */
-.layer:hover:not(.active):not(.dragging):not(.resizing) {
+.layer:hover:not(.active):not(.dragging):not(.resizing):not(.editing) {
   outline: 1px solid rgba(96, 165, 250, 0.6);
   outline-offset: 1px;
 }
 
-/* Enhanced active layer styling */
-.layer.active {
-  outline: 2px solid rgba(37, 99, 235, 0.8);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+/* CRITICAL: Enhanced active layer styling with persistent bounding box */
+.layer.active:not(.editing):not(.dragging),
+.layer.text-layer.active:not(.editing):not(.dragging) {
+  outline: 2px solid rgba(37, 99, 235, 0.8) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15) !important;
+  transition: outline 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Enhanced specificity for active state persistence */
+.layer.text-layer[class*="active"]:not(.editing):not(.dragging) {
+  outline: 2px solid rgba(37, 99, 235, 0.8) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15) !important;
+}
+
+/* CRITICAL: Text editing state styles */
+.layer.text-layer.editing {
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  outline: 2px solid rgba(16, 185, 129, 0.8) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(2px);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  z-index: 50;
+}
+
+/* Text selection in edit mode */
+.layer.text-layer.editing::selection {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.layer.text-layer.editing::-moz-selection {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+/* Focus styles for editing */
+.layer.text-layer.editing:focus {
+  outline: 2px solid rgba(16, 185, 129, 1) !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Placeholder text styling for empty editing layers */
+.layer.text-layer.editing:empty::before {
+  content: 'Type your text here...';
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Hide resize handle and tooltip when editing */
+.layer.text-layer.editing::after,
+.layer.text-layer.editing::before {
+  display: none !important;
 }
 
 /* Dragging state */
-.layer.dragging {
+.layer.dragging,
+.layer.text-layer.dragging {
   cursor: grabbing !important;
   outline: 2px solid rgba(124, 58, 237, 0.8) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 4px rgba(124, 58, 237, 0.2) !important;
   z-index: 100;
   transition: none; /* Disable transitions during drag */
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
-/* Resizing state */
-.layer.resizing {
-  cursor: ew-resize !important;
-  outline: 2px solid rgba(16, 185, 129, 0.8) !important;
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
-  transition: none; /* Disable transitions during resize */
+/* Prevent editing interactions when dragging */
+.layer.text-layer.dragging {
+  pointer-events: none;
 }
 
-/* Text layer specific styles */
-.layer.text-layer {
-  cursor: move;
-  resize: none; /* Disable native resize */
+.layer.text-layer.dragging * {
+  pointer-events: none;
 }
 
-.layer.text-layer:hover {
-  cursor: move;
-}
-
-/* Custom resize handle for text layers */
-.layer.text-layer::after {
+/* Custom resize handle for non-editing active text layers */
+.layer.text-layer.active:not(.editing):not(.dragging)::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -888,18 +953,60 @@ input[type="color"]:hover {
   height: 12px;
   background: linear-gradient(-45deg, transparent 40%, #2563eb 40%, #2563eb 60%, transparent 60%);
   cursor: se-resize;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-  pointer-events: none;
-}
-
-.layer.text-layer.active::after {
   opacity: 0.7;
   pointer-events: auto;
+  transition: opacity 0.2s ease;
+  z-index: 1;
 }
 
-.layer.text-layer.active:hover::after {
+.layer.text-layer.active:not(.editing):not(.dragging):hover::after {
   opacity: 1;
+}
+
+/* Visual feedback tooltip for double-click to edit */
+.layer.text-layer:not(.editing):not(.dragging)::before {
+  content: 'Double-click to edit';
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 500;
+}
+
+.layer.text-layer.active:not(.editing):not(.dragging):hover::before {
+  opacity: 1;
+}
+
+/* Ensure proper text rendering in edit mode */
+.layer.text-layer.editing[contenteditable="true"] {
+  overflow: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: inherit;
+}
+
+/* Smooth transitions between states */
+.layer.text-layer:not(.dragging):not(.editing) {
+  transition: outline 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* Resizing state */
+.layer.resizing {
+  cursor: ew-resize !important;
+  outline: 2px solid rgba(16, 185, 129, 0.8) !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+  transition: none; /* Disable transitions during resize */
 }
 
 /* Selection state improvements */
@@ -1126,35 +1233,6 @@ input[type="color"]:hover {
   transform: translate(-50%, -50%);
 }
 
-/* ===== SNAP INDICATORS ===== */
-.snap-indicator {
-  position: absolute;
-  pointer-events: none;
-  z-index: 45;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-}
-
-.snap-indicator.active {
-  opacity: 1;
-}
-
-.snap-indicator.vertical {
-  width: 2px;
-  height: 20px;
-  background: rgba(96, 165, 250, 0.9);
-  border-radius: 1px;
-  box-shadow: 0 0 4px rgba(96, 165, 250, 0.5);
-}
-
-.snap-indicator.horizontal {
-  width: 20px;
-  height: 2px;
-  background: rgba(96, 165, 250, 0.9);
-  border-radius: 1px;
-  box-shadow: 0 0 4px rgba(96, 165, 250, 0.5);
-}
-
 /* ===== ENHANCED RSVP STYLES ===== */
 .rsvp {
   position: absolute;
@@ -1261,50 +1339,6 @@ input[type="color"]:hover {
   background: linear-gradient(135deg, #6b7280, #4b5563) !important;
 }
 
-/* Loading state for buttons */
-.rsvp-btn.loading {
-  opacity: 0.7;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.rsvp-btn.loading::after {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* Success states */
-.rsvp-btn.success {
-  background: linear-gradient(135deg, var(--success), #059669);
-  border-color: transparent;
-  color: white;
-}
-
-.rsvp-btn.success::before {
-  content: '✓ ';
-  font-weight: bold;
-}
-
-/* Pulse animation for call-to-action */
-@keyframes rsvp-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
-}
-
-.rsvp-btn.pulse {
-  animation: rsvp-pulse 2s infinite;
-}
-
 /* CRITICAL FIX: Viewer mode RSVP styling */
 body.viewer .rsvp,
 body.preview .rsvp,
@@ -1324,49 +1358,6 @@ body.preview .rsvp,
   -webkit-backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Override any conflicting styles */
-body.viewer .rsvp {
-  animation: rsvpFadeIn 0.4s ease-out;
-}
-
-/* Animation for RSVP appearance in viewer mode */
-@keyframes rsvpFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Ensure RSVP buttons are properly styled in viewer mode */
-body.viewer .rsvp-btn,
-body.preview .rsvp-btn {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  display: inline-flex !important;
-  height: 44px !important; /* Better touch target */
-}
-
-/* Fix RSVP button active states in viewer mode */
-body.viewer .rsvp-btn.active,
-body.viewer .rsvp-btn.confirmed,
-body.preview .rsvp-btn.active,
-body.preview .rsvp-btn.confirmed {
-  background: linear-gradient(135deg, var(--success), #059669) !important;
-  color: white !important;
-  border-color: transparent !important;
-}
-
-/* Prevent RSVP from being hidden by panel */
-body.panel-open.viewer .rsvp,
-body.panel-open.preview .rsvp {
-  opacity: 1 !important;
-  pointer-events: auto !important;
 }
 
 /* Background upload button */
@@ -1494,111 +1485,6 @@ body.viewer .layer:hover {
   outline: none !important;
 }
 
-/* Auto-rotate for mobile */
-body.auto-rotate .wrap {
-  transition: transform 0.28s ease, width 0.28s ease;
-}
-
-@media (max-width: 768px) and (orientation: portrait) {
-  body.auto-rotate.preview .stage,
-  body.auto-rotate.viewer .stage {
-    min-height: 100dvh;
-    padding: 0;
-  }
-  
-  body.auto-rotate.preview .wrap,
-  body.auto-rotate.viewer .wrap {
-    width: 100dvh;
-    transform: rotate(90deg);
-    border-radius: 0;
-  }
-}
-
-/* ===== FULLSCREEN OVERLAY ===== */
-.fs-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 24px;
-  background: linear-gradient(180deg, #0b0b22f0, #0b0b22e6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.fs-overlay.show {
-  display: flex;
-  animation: fadeIn 0.3s ease;
-}
-
-.fs-card {
-  max-width: min(92vw, 480px);
-  color: #eef1ff;
-  background: #111432cc;
-  border: 1px solid #ffffff26;
-  border-radius: 18px;
-  padding: 20px;
-  box-shadow: var(--shadow-xl), inset 0 0 80px #ffffff0a;
-  animation: slideUp 0.3s ease;
-}
-
-.fs-card h2 {
-  margin: 0.1em 0 0.35em;
-  font-size: 1.35rem;
-  font-weight: 800;
-}
-
-.fs-card p {
-  margin: 0.25em 0 0.9em;
-  color: #cfd2ff;
-  line-height: 1.6;
-}
-
-.fs-btn {
-  appearance: none;
-  border: 0;
-  cursor: pointer;
-  padding: 0.85rem 1.15rem;
-  border-radius: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #0b0b22;
-  background: var(--accent);
-  box-shadow: 0 10px 30px #2563eb55, 0 1px 0 #ffffffcc inset;
-  width: 100%;
-  transition: all var(--transition-fast);
-}
-
-.fs-btn:hover {
-  background: #3b82f6;
-  transform: translateY(-2px);
-  box-shadow: 0 12px 35px #2563eb66, 0 1px 0 #ffffffcc inset;
-}
-
-/* ===== ANIMATIONS ===== */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes spin {
-  to { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
 /* ===== MOBILE & TOUCH OPTIMIZATIONS ===== */
 @media (max-width: 768px) {
   .handle {
@@ -1617,6 +1503,19 @@ body.auto-rotate .wrap {
     top: -36px;
   }
   
+  .layer.text-layer.active:not(.editing)::after {
+    width: 16px;
+    height: 16px;
+    bottom: -4px;
+    right: -4px;
+  }
+  
+  .layer.text-layer:not(.editing)::before {
+    font-size: 11px;
+    padding: 3px 6px;
+    top: -28px;
+  }
+  
   /* Better touch targets for mobile */
   .rsvp-btn {
     height: 48px !important;
@@ -1629,6 +1528,10 @@ body.auto-rotate .wrap {
 @media (pointer: coarse) {
   .layer {
     cursor: pointer; /* Better for touch */
+  }
+  
+  .layer.text-layer {
+    cursor: pointer;
   }
   
   .handle {
@@ -1645,6 +1548,18 @@ body.auto-rotate .wrap {
     width: 24px;
     height: 24px;
     top: -40px;
+  }
+  
+  .layer.text-layer.active:not(.editing)::after {
+    width: 18px;
+    height: 18px;
+    bottom: -5px;
+    right: -5px;
+    opacity: 0.8;
+  }
+  
+  .layer.text-layer:not(.editing)::before {
+    content: 'Tap twice to edit';
   }
   
   /* Larger touch targets */
@@ -1757,8 +1672,13 @@ body.auto-rotate .wrap {
 
 /* ===== ACCESSIBILITY IMPROVEMENTS ===== */
 .layer:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.8);
-  outline-offset: 2px;
+  outline: 3px solid rgba(37, 99, 235, 0.8) !important;
+  outline-offset: 2px !important;
+}
+
+.layer.text-layer.editing:focus-visible {
+  outline: 3px solid rgba(16, 185, 129, 0.8) !important;
+  outline-offset: 2px !important;
 }
 
 .handle:focus-visible {
@@ -1779,9 +1699,19 @@ body.auto-rotate .wrap {
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-  .layer.active {
-    outline: 3px solid #ffffff;
+  .layer.active:not(.editing) {
+    outline: 3px solid #ffffff !important;
     background: rgba(0, 0, 0, 0.1);
+  }
+  
+  .layer.text-layer.editing {
+    outline: 3px solid #00ff00 !important;
+    background: rgba(0, 255, 0, 0.1);
+  }
+  
+  .layer.text-layer.dragging {
+    outline: 3px solid #ff00ff !important;
+    background: rgba(255, 0, 255, 0.1);
   }
   
   .handle {
@@ -1827,8 +1757,10 @@ body.auto-rotate .wrap {
     scroll-behavior: auto !important;
   }
   
-  .rsvp-btn.pulse {
-    animation: none !important;
+  .layer.text-layer,
+  .layer.text-layer::before,
+  .layer.text-layer::after {
+    transition: none !important;
   }
 }
 
@@ -1840,9 +1772,19 @@ body.auto-rotate .wrap {
     --text-muted: #94a3b8;
   }
   
-  .layer.active {
-    outline-color: rgba(96, 165, 250, 0.9);
-    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.2);
+  .layer.active:not(.editing) {
+    outline-color: rgba(96, 165, 250, 0.9) !important;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.2) !important;
+  }
+  
+  .layer.text-layer.editing {
+    outline-color: rgba(34, 197, 94, 0.9) !important;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2) !important;
+  }
+  
+  .layer.text-layer.dragging {
+    outline-color: rgba(147, 51, 234, 0.9) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(147, 51, 234, 0.3) !important;
   }
   
   .handle {
@@ -1907,6 +1849,102 @@ body.resizing {
   }
 }
 
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rsvpFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ===== FULLSCREEN OVERLAY ===== */
+.fs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #0b0b22f0, #0b0b22e6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.fs-overlay.show {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+.fs-card {
+  max-width: min(92vw, 480px);
+  color: #eef1ff;
+  background: #111432cc;
+  border: 1px solid #ffffff26;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow-xl), inset 0 0 80px #ffffff0a;
+  animation: slideUp 0.3s ease;
+}
+
+.fs-card h2 {
+  margin: 0.1em 0 0.35em;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.fs-card p {
+  margin: 0.25em 0 0.9em;
+  color: #cfd2ff;
+  line-height: 1.6;
+}
+
+.fs-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.85rem 1.15rem;
+  border-radius: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0b0b22;
+  background: var(--accent);
+  box-shadow: 0 10px 30px #2563eb55, 0 1px 0 #ffffffcc inset;
+  width: 100%;
+  transition: all var(--transition-fast);
+}
+
+.fs-btn:hover {
+  background: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px #2563eb66, 0 1px 0 #ffffffcc inset;
+}
+
 /* ===== PRINT STYLES ===== */
 @media print {
   .topbar,
@@ -1916,7 +1954,9 @@ body.resizing {
   #bgBox,
   .handle,
   .guide,
-  #uploadBgBtn {
+  #uploadBgBtn,
+  .layer.text-layer::before,
+  .layer.text-layer::after {
     display: none !important;
   }
   
@@ -1937,6 +1977,12 @@ body.resizing {
     border-radius: 0 !important;
     box-shadow: none !important;
     page-break-inside: avoid;
+  }
+  
+  .layer {
+    outline: none !important;
+    box-shadow: none !important;
+    background: none !important;
   }
 }
 
@@ -1990,17 +2036,6 @@ body.resizing {
 .opacity-0 { opacity: 0; }
 .opacity-50 { opacity: 0.5; }
 .opacity-100 { opacity: 1; }
-
-/* Smooth scrolling for focus management */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Better focus management */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 
 /* Skip link for accessibility */
 .skip-link {
