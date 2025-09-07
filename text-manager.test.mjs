@@ -4,6 +4,7 @@ function createStubElement(id) {
   return {
     id,
     style: {},
+    dataset: {},
     classList: {
       classes: new Set(),
       add(c) { this.classes.add(c); },
@@ -63,7 +64,8 @@ global.document = {
   querySelectorAll() { return []; },
   createElement(tag) { return createStubElement(tag); },
   addEventListener() {},
-  removeEventListener() {}
+  removeEventListener() {},
+  createRange() { return { selectNodeContents() {} }; }
 };
 
 global.window = {
@@ -77,7 +79,8 @@ global.window = {
     setItem(k, v) { this.store[k] = v; },
     getItem(k) { return this.store[k]; },
     removeItem(k) { delete this.store[k]; }
-  }
+  },
+  getSelection() { return { removeAllRanges() {}, addRange() {} }; }
 };
 
 global.localStorage = window.localStorage;
@@ -113,6 +116,28 @@ assert.ok(deleteBtn.disabled, 'delete button disabled initially');
 await addTextLayer('Hello');
 const layer = getActiveLayer();
 assert.ok(!deleteBtn.disabled, 'delete button enabled after adding text');
+
+// Single click selects but does not enter edit mode
+setActiveLayer(null);
+layer.dispatchEvent({ type: 'click', stopPropagation() {} });
+assert.strictEqual(getActiveLayer(), layer);
+assert.strictEqual(layer.contentEditable, 'false');
+assert.strictEqual(layer.dataset.editing, 'false');
+assert.strictEqual(layer.style.cursor, 'move');
+
+// Double click enables editing
+layer.dispatchEvent({ type: 'dblclick', stopPropagation() {} });
+assert.strictEqual(layer.contentEditable, 'true');
+assert.strictEqual(layer.dataset.editing, 'true');
+assert.strictEqual(layer.style.cursor, 'text');
+assert.strictEqual(document.activeElement, layer);
+
+// Blur exits edit mode
+layer.blur();
+layer.dispatchEvent({ type: 'blur' });
+assert.strictEqual(layer.contentEditable, 'false');
+assert.strictEqual(layer.dataset.editing, 'false');
+assert.strictEqual(layer.style.cursor, 'move');
 
 // Ensure initial UI state
 const fadeInBtn = document.getElementById('textFadeInBtn');
@@ -209,21 +234,6 @@ assert.ok(underlineBtn.classList.contains('active'));
 layer.style.textDecoration = 'none';
 syncToolbarFromActive();
 assert.ok(!underlineBtn.classList.contains('active'));
-
-// Single-click restores editing and allows typing
-const layer2 = await addTextLayer('Temp');
-layer2.blur();
-setActiveLayer(null);
-assert.notStrictEqual(document.activeElement, layer2);
-
-// simulate single click
-layer2.listeners.click.forEach(h => h({ stopPropagation() {} }));
-assert.strictEqual(document.activeElement, layer2);
-
-// simulate typing
-layer2.textContent = 'Edited';
-layer2.listeners.input.forEach(h => h());
-assert.strictEqual(layer2.textContent, 'Edited');
 
 // Delete button state after deselect
 setActiveLayer(null);
