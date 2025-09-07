@@ -30,7 +30,7 @@ export function enterTextEditMode(element) {
     editingElement = element;
     
     // Make element editable
-    element.contentEditable = true;
+    element.contentEditable = 'true';
     element.dataset.editing = 'true';
     
     // Update styles for editing
@@ -58,7 +58,7 @@ export function exitTextEditMode() {
   
   try {
     // Restore normal mode
-    editingElement.contentEditable = false;
+    editingElement.contentEditable = 'false';
     editingElement.dataset.editing = 'false';
     
     // Restore drag functionality
@@ -107,7 +107,7 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     // Create text element
     const textEl = document.createElement('div');
     textEl.className = 'layer text-layer';
-    textEl.contentEditable = false; // Start non-editable
+    textEl.contentEditable = 'false'; // Start non-editable
     textEl.dataset.editing = 'false';
     textEl.textContent = text;
     textEl.id = generateId('layer');
@@ -179,33 +179,19 @@ export async function addTextLayer(text = 'New Text', options = {}) {
  * Setup event listeners for text layer with proper edit/drag mode handling
  */
 function setupTextLayerEvents(textEl) {
-  let clickTimeout = null;
-  let clickCount = 0;
-  
-  // Enhanced click handling - single vs double click
+  // Single click selects layer without entering edit mode
   textEl.addEventListener('click', (e) => {
-    clickCount++;
-    
-    if (clickCount === 1) {
-      clickTimeout = setTimeout(() => {
-        // Single click - select layer but don't edit
-        if (!isInEditMode()) {
-          e.stopPropagation();
-          setActiveLayer(textEl);
-        }
-        clickCount = 0;
-      }, 250);
+    if (!isInEditMode()) {
+      e.stopPropagation();
+      setActiveLayer(textEl);
     }
   });
 
-  // Double click to edit
+  // Double click enters edit mode
   textEl.addEventListener('dblclick', (e) => {
-    clearTimeout(clickTimeout);
-    clickCount = 0;
-    
     e.stopPropagation();
-    e.preventDefault();
-    
+    e.preventDefault?.();
+
     setActiveLayer(textEl);
     enterTextEditMode(textEl);
   });
@@ -380,7 +366,7 @@ export function duplicateActiveLayer() {
 
     // Remove active class and ensure not editing
     newLayer.classList.remove('active');
-    newLayer.contentEditable = false;
+    newLayer.contentEditable = 'false';
     newLayer.dataset.editing = 'false';
 
     // Setup events for new layer
