@@ -37,7 +37,12 @@ import { initializeApp, appInstance } from './main.js';
 await initializeApp();
 // `appInstance` is a live binding to the running application
 ```
+ 
+## Image Editing Controls
+The editor supports basic background image adjustments:
 
+- Drag corner handles to resize the background image or bounding box.
+- Hold **Shift** while dragging a corner to shear the background image/bounding box.
 
 ## Backend API
 Start the development server:
