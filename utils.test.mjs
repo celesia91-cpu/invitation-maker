@@ -74,6 +74,41 @@ assert.strictEqual(decodedZoom.slides[0].image.zoomInMs, 300);
 assert.strictEqual(decodedZoom.slides[0].layers[0].zoomOutMs, 40);
 console.log('zoom timing fields persist through encode/decode');
 
+// Shear and sign values should survive round-trip
+const projectShear = {
+  v: 1,
+  slides: [
+    {
+      image: {
+        src: 'http://example.com/a.jpg',
+        thumb: null,
+        cx: 0,
+        cy: 0,
+        scale: 1,
+        angle: 0,
+        flip: false,
+        shearX: 0.123,
+        shearY: -0.456,
+        signX: -1,
+        signY: -1
+      },
+      layers: [],
+      workSize: { w: 100, h: 100 },
+      durationMs: 1000
+    }
+  ],
+  activeIndex: 0,
+  defaults: {},
+};
+
+const encodedShear = encodeState(projectShear);
+const decodedShear = decodeState(encodedShear);
+assert.strictEqual(decodedShear.slides[0].image.shearX, 0.123);
+assert.strictEqual(decodedShear.slides[0].image.shearY, -0.456);
+assert.strictEqual(decodedShear.slides[0].image.signX, -1);
+assert.strictEqual(decodedShear.slides[0].image.signY, -1);
+console.log('shear and sign values persist through encode/decode');
+
 // Invalid data should throw a clear error
 assert.throws(() => decodeState('not_base64!'), /Invalid or corrupted/);
 console.log('decodeState rejects malformed input');

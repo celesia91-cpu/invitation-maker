@@ -146,6 +146,10 @@ function compressProjectData(project) {
         cy: Math.round((slide.image.cy || 0) * 100) / 100,
         scale: Math.round((slide.image.scale || 1) * 1000) / 1000, // Round to 3 decimal places
         angle: Math.round((slide.image.angle || 0) * 100) / 100,
+        shearX: Math.round((slide.image.shearX || 0) * 1000) / 1000,
+        shearY: Math.round((slide.image.shearY || 0) * 1000) / 1000,
+        signX: slide.image.signX === -1 ? -1 : undefined,
+        signY: slide.image.signY === -1 ? -1 : undefined,
         flip: slide.image.flip || false,
         fadeInMs: slide.image.fadeInMs,
         fadeOutMs: slide.image.fadeOutMs,
