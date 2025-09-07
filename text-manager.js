@@ -520,7 +520,7 @@ function resetToolbar() {
 /**
  * Update toolbar state based on active layer
  */
-function updateToolbarState() {
+export function updateToolbarState() {
   const hasActiveLayer = !!activeLayer;
   
   // Enable/disable toolbar controls
@@ -754,6 +754,7 @@ export function getAllTextLayers() {
 /**
  * Clear all text layers
  */
+
 export function clearAllTextLayers() {
   const layers = getAllTextLayers();
   layers.forEach(layer => layer.remove());
