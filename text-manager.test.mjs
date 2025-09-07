@@ -23,13 +23,23 @@ function createStubElement(id) {
     disabled: false,
     attributes: {},
     children: [],
+    listeners: {},
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k]; },
     appendChild(child) { this.children.push(child); },
     remove() {},
-    addEventListener() {},
-    removeEventListener() {},
-    focus() {},
+    addEventListener(type, handler) {
+      if (!this.listeners[type]) this.listeners[type] = new Set();
+      this.listeners[type].add(handler);
+    },
+    removeEventListener(type, handler) {
+      this.listeners[type]?.delete(handler);
+    },
+    focus() { document.activeElement = this; },
+    blur() { if (document.activeElement === this) document.activeElement = null; },
+    dispatchEvent(evt) {
+      (this.listeners[evt.type] || []).forEach(h => h.call(this, evt));
+    },
     closest() { return null; },
     querySelector() { return null; },
     querySelectorAll() { return []; }
@@ -41,6 +51,7 @@ const elements = { body: createStubElement('body'), work: createStubElement('wor
 global.document = {
   readyState: 'loading',
   body: elements.body,
+  activeElement: null,
   getElementById(id) {
     if (!elements[id]) elements[id] = createStubElement(id);
     return elements[id];
@@ -198,6 +209,21 @@ assert.ok(underlineBtn.classList.contains('active'));
 layer.style.textDecoration = 'none';
 syncToolbarFromActive();
 assert.ok(!underlineBtn.classList.contains('active'));
+
+// Single-click restores editing and allows typing
+const layer2 = await addTextLayer('Temp');
+layer2.blur();
+setActiveLayer(null);
+assert.notStrictEqual(document.activeElement, layer2);
+
+// simulate single click
+layer2.listeners.click.forEach(h => h({ stopPropagation() {} }));
+assert.strictEqual(document.activeElement, layer2);
+
+// simulate typing
+layer2.textContent = 'Edited';
+layer2.listeners.input.forEach(h => h());
+assert.strictEqual(layer2.textContent, 'Edited');
 
 // Delete button state after deselect
 setActiveLayer(null);
