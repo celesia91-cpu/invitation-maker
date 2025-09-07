@@ -1,7 +1,7 @@
 // text-manager.js - COMPLETE FIXED VERSION - All text management functions
 
 import { saveProjectDebounced, recordHistory } from './state-manager.js';
-import { generateId } from './utils.js';
+import { generateId, clamp } from './utils.js';
 
 // Active layer management
 let activeLayer = null;
@@ -31,6 +31,10 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     textEl.textContent = text;
     textEl.id = generateId('layer');
 
+    // Initial transform data
+    textEl.dataset.scale = '1';
+    textEl.dataset.rotate = '0';
+
     // Apply default styles
     const defaultStyles = {
       position: 'absolute',
@@ -54,6 +58,7 @@ export async function addTextLayer(text = 'New Text', options = {}) {
       wordWrap: 'break-word',
       whiteSpace: 'pre-wrap',
       zIndex: '30',
+      transform: 'scale(1) rotate(0deg)',
       ...options
     };
 
@@ -154,6 +159,7 @@ export function setActiveLayer(layer) {
 
   if (layer) {
     layer.classList.add('active');
+    applyTextTransform(layer);
     syncToolbarFromActive();
     console.log('Active layer set:', layer.textContent);
   }
@@ -429,6 +435,20 @@ export function syncToolbarFromActive() {
     const colorInput = document.getElementById('fontColor');
     if (colorInput) colorInput.value = color;
 
+    // Scale
+    const scaleInput = document.getElementById('textScale');
+    const scaleVal = document.getElementById('textScaleVal');
+    const scale = parseFloat(activeLayer.dataset.scale || '1');
+    if (scaleInput) scaleInput.value = String(Math.round(scale * 100));
+    if (scaleVal) scaleVal.textContent = Math.round(scale * 100) + '%';
+
+    // Rotation
+    const rotateInput = document.getElementById('textRotate');
+    const rotateVal = document.getElementById('textRotateVal');
+    const rotate = parseFloat(activeLayer.dataset.rotate || '0');
+    if (rotateInput) rotateInput.value = String(Math.round(rotate));
+    if (rotateVal) rotateVal.textContent = Math.round(rotate) + '°';
+
     // Bold
     const isBold = activeLayer.style.fontWeight === 'bold' || activeLayer.style.fontWeight === '700';
     const boldBtn = document.getElementById('boldBtn');
@@ -469,6 +489,10 @@ function resetToolbar() {
     const boldBtn = document.getElementById('boldBtn');
     const italicBtn = document.getElementById('italicBtn');
     const underlineBtn = document.getElementById('underlineBtn');
+    const scaleInput = document.getElementById('textScale');
+    const scaleVal = document.getElementById('textScaleVal');
+    const rotateInput = document.getElementById('textRotate');
+    const rotateVal = document.getElementById('textRotateVal');
 
     if (fontFamilySelect) fontFamilySelect.value = 'system-ui';
     if (fontSizeInput) fontSizeInput.value = 28;
@@ -477,6 +501,10 @@ function resetToolbar() {
     if (boldBtn) boldBtn.classList.remove('active');
     if (italicBtn) italicBtn.classList.remove('active');
     if (underlineBtn) underlineBtn.classList.remove('active');
+    if (scaleInput) scaleInput.value = '100';
+    if (scaleVal) scaleVal.textContent = '100%';
+    if (rotateInput) rotateInput.value = '0';
+    if (rotateVal) rotateVal.textContent = '0°';
 
     document.querySelectorAll('[data-align]').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.align === 'left');
@@ -498,7 +526,8 @@ function updateToolbarState() {
   // Enable/disable toolbar controls
   const controls = [
     'fontFamily', 'fontSize', 'fontColor',
-    'boldBtn', 'italicBtn', 'underlineBtn', 'textDelete'
+    'boldBtn', 'italicBtn', 'underlineBtn', 'textDelete',
+    'textScale', 'textRotate'
   ];
 
   controls.forEach(id => {
@@ -621,6 +650,39 @@ export function handleItalic() {
 export function handleUnderline() {
   toggleUnderline();
   syncToolbarFromActive();
+  saveProjectDebounced();
+}
+
+// Apply scale/rotation to active text layer
+function applyTextTransform(layer = activeLayer) {
+  if (!layer) return;
+  const scale = parseFloat(layer.dataset.scale || '1');
+  const rotate = parseFloat(layer.dataset.rotate || '0');
+  layer.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
+}
+
+// Text transform handlers
+export function handleTextScale(value) {
+  if (!activeLayer) return;
+  const scale = clamp(parseInt(value, 10) / 100, 0.1, 10);
+  activeLayer.dataset.scale = String(scale);
+  applyTextTransform();
+  const scaleInput = document.getElementById('textScale');
+  const scaleVal = document.getElementById('textScaleVal');
+  if (scaleInput) scaleInput.value = String(Math.round(scale * 100));
+  if (scaleVal) scaleVal.textContent = Math.round(scale * 100) + '%';
+  saveProjectDebounced();
+}
+
+export function handleTextRotate(value) {
+  if (!activeLayer) return;
+  const deg = parseInt(value, 10) || 0;
+  activeLayer.dataset.rotate = String(deg);
+  applyTextTransform();
+  const rotateInput = document.getElementById('textRotate');
+  const rotateVal = document.getElementById('textRotateVal');
+  if (rotateInput) rotateInput.value = String(deg);
+  if (rotateVal) rotateVal.textContent = deg + '°';
   saveProjectDebounced();
 }
 

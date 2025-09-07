@@ -31,6 +31,7 @@ export class EventHandlersManager {
       this.setupTextSelectionHandlers();
       this.setupTextFadeHandlers();
       this.setupTextZoomHandlers();
+      this.setupTextTransformHandlers();
       this.setupImageManagementHandlers();
       this.setupImageFadeHandlers();
       this.setupImageZoomHandlers();
@@ -238,6 +239,21 @@ export class EventHandlersManager {
     });
 
     import('./text-manager.js').then(({ updateTextZoomUI }) => updateTextZoomUI());
+  }
+
+  /**
+   * Setup text scale/rotate handlers
+   */
+  setupTextTransformHandlers() {
+    this.registerInputHandler('textScale', async (e) => {
+      const { handleTextScale } = await import('./text-manager.js');
+      handleTextScale(e.target.value);
+    });
+
+    this.registerInputHandler('textRotate', async (e) => {
+      const { handleTextRotate } = await import('./text-manager.js');
+      handleTextRotate(e.target.value);
+    });
   }
 
   /**

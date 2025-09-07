@@ -23,6 +23,7 @@ function createStubElement(id) {
     attributes: {},
     children: [],
     parent: null,
+    dataset: {},
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k]; },
     appendChild(child) { child.parent = this; this.children.push(child); },
