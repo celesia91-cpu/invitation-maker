@@ -458,9 +458,17 @@ class ApplicationStateManager {
     
     for (const [key, value] of Object.entries(updates)) {
       if (key in this.state) {
-        this.state[key] = value;
+        const target = this.state[key];
+        if (
+          target && typeof target === 'object' && !Array.isArray(target) &&
+          value && typeof value === 'object' && !Array.isArray(value)
+        ) {
+          this.state[key] = { ...target, ...value };
+        } else {
+          this.state[key] = value;
+        }
         if (!silent) {
-          this.notify(key, value);
+          this.notify(key, this.state[key]);
         }
       }
     }
@@ -481,6 +489,21 @@ class ApplicationStateManager {
     if (!this.mapQuery) return '';
     const encoded = encodeURIComponent(this.mapQuery);
     return `https://www.google.com/maps?q=${encoded}`;
+  }
+
+  deepMerge(target, source) {
+    if (Array.isArray(source)) {
+      return [...source];
+    }
+    if (source && typeof source === 'object' && source.constructor === Object) {
+      const base = target && typeof target === 'object' ? target : {};
+      const result = { ...base };
+      for (const [k, v] of Object.entries(source)) {
+        result[k] = this.deepMerge(base[k], v);
+      }
+      return result;
+    }
+    return source;
   }
 
   /**
