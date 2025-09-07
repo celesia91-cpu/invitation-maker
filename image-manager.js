@@ -201,7 +201,12 @@ export function setTransforms() {
   const h = imgState.natH * imgState.scale;
   const sx = (imgState.flip ? -1 : 1) * (imgState.signX ?? 1);
   const sy = imgState.signY ?? 1;
-  const base = `translate(-50%,-50%) rotate(${imgState.angle}rad) skew(${imgState.shearX}rad, ${imgState.shearY}rad) scale(${imgState.scale * sx}, ${imgState.scale * sy})`;
+  const base = [
+    'translate(-50%,-50%)',
+    `rotate(${imgState.angle}rad)`,
+    `skew(${imgState.shearX}rad, ${imgState.shearY}rad)`,
+    `scale(${imgState.scale * sx}, ${imgState.scale * sy})`
+  ].join(' ');
 
   if (userBgWrap) {
     userBgWrap.style.width = w + 'px';

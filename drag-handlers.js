@@ -362,6 +362,8 @@ export class DragHandlersManager {
         startY: e.clientY,
         startScale: imgState.scale,
         startAngle: imgState.angle,
+        startShearX: imgState.shearX || 0,
+        startShearY: imgState.shearY || 0,
         startCx: imgState.cx,
         startCy: imgState.cy,
         centerX: imgState.cx,
@@ -474,7 +476,7 @@ export class DragHandlersManager {
     } else {
       ({ imgState, setTransforms, enforceImageBounds } = await import('./image-manager.js'));
     }
-    const { handleType, startScale, startAngle, centerX, centerY, startVectorX, startVectorY } = this.dragState;
+    const { handleType, startScale, startAngle, centerX, centerY, startVectorX, startVectorY, startShearX = 0, startShearY = 0 } = this.dragState;
 
     if (!imgState) return;
 
@@ -489,11 +491,15 @@ export class DragHandlersManager {
 
       if (e.shiftKey) {
         // With shift key, apply shear instead of scale
-        const dx = e.clientX - this.dragState.startX;
-        const dy = e.clientY - this.dragState.startY;
-        const norm = Math.max(1, startDistance);
-        imgState.shearX = dx / norm;
-        imgState.shearY = dy / norm;
+        const dxp = e.clientX - this.dragState.startX;
+        const dyp = e.clientY - this.dragState.startY;
+        const h = imgState.natH || 1;
+        const w = imgState.natW || 1;
+        imgState.shearX = startShearX + Math.atan2(dxp, h);
+        imgState.shearY = startShearY + Math.atan2(dyp, w);
+        if (enforceImageBounds) enforceImageBounds();
+        if (setTransforms) setTransforms();
+        return;
       } else {
         // Default scaling behavior
         const currentDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
