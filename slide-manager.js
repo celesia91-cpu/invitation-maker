@@ -887,6 +887,7 @@ export function playSlides() {
   if (playBtn) {
     playBtn.textContent = 'Stop';
     playBtn.classList.add('active');
+    playBtn.setAttribute('aria-pressed', 'true');
   }
   
   // Start animation loop for fade/zoom effects
@@ -913,6 +914,7 @@ export function stopSlides() {
   if (playBtn) {
     playBtn.textContent = 'Play';
     playBtn.classList.remove('active');
+    playBtn.setAttribute('aria-pressed', 'false');
   }
   
   console.log('⏹️ Stopped slide playback');
