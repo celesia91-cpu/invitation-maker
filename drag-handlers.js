@@ -686,6 +686,7 @@ export class DragHandlersManager {
    */
   attachText(el) {
     if (!el) return;
+    if (el.isContentEditable || el.dataset?.editing === 'true') return;
     el.addEventListener('pointerdown', this._onTextDown);
   }
 
@@ -695,10 +696,11 @@ export class DragHandlersManager {
   _onTextDown(e) {
     const getLocked = this.ctx.getLocked;
     const setActiveLayer = this.ctx.setActiveLayer;
-    
+
     if (getLocked && getLocked()) return;
 
     const t = e.currentTarget;
+    if (t.isContentEditable || t.dataset?.editing === 'true') return;
     if (setActiveLayer) setActiveLayer(t);
     
     this.dragText = {
