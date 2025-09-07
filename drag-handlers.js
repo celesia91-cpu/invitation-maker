@@ -1,240 +1,250 @@
-// drag-handlers.js - Complete implementation with text editing awareness
+// drag-handlers.js - COMPLETE FIXED VERSION - Allows text editing while preserving drag functionality
 
 /**
- * Enhanced Drag Handlers Manager with Text Editing Support
- * Properly handles the distinction between drag mode and edit mode for text layers
+ * Enhanced Drag Handlers Manager
+ * Handles image transforms, text positioning/resizing, snap guides, touch support
+ * FIXED: Allows double-click text editing without drag interference
  */
 export class DragHandlersManager {
   constructor() {
-    this.ctx = null;
     this.isInitialized = false;
     this.dragState = null;
+    this.potentialDrag = null; // NEW: For delayed drag activation
     this.capturedPointerId = null;
     this.preventNextClick = false;
     
-    // Text drag fallback
-    this.dragText = null;
+    // Context object for operations
+    this.ctx = null;
     
-    // Bound methods for event handling
+    // Drag modes
+    this.dragMode = null; // 'move' | 'scale' | 'rotate'
+    this.start = {};
+    this.dragText = null;
+
+    // Bind methods to preserve context
     this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handlePointerMove = this.handlePointerMove.bind(this);
     this.handlePointerUp = this.handlePointerUp.bind(this);
     this.handlePointerCancel = this.handlePointerCancel.bind(this);
     this.handleWorkClick = this.handleWorkClick.bind(this);
     this.handleEscapeKey = this.handleEscapeKey.bind(this);
-    this._onTextDown = this._onTextDown.bind(this);
+
+    // Background box handlers
     this._onBgBoxDown = this._onBgBoxDown.bind(this);
     this._onBgBoxMove = this._onBgBoxMove.bind(this);
     this._onBgBoxUp = this._onBgBoxUp.bind(this);
-    
-    // Touch support
+
+    // Text handlers
+    this._onTextDown = this._onTextDown.bind(this);
+    this._onWorkMove = this._onWorkMove.bind(this);
+    this._onWorkUp = this._onWorkUp.bind(this);
+
+    // Touch handler references
     this.boundTouchStart = null;
     this.boundTouchMove = null;
+    this.lastTap = 0;
   }
 
   /**
-   * Initialize drag handlers with context
+   * Initialize with proper context validation
    */
-  initialize(context = {}) {
+  initialize(ctx) {
     if (this.isInitialized) {
       console.warn('DragHandlersManager already initialized');
       return;
     }
 
-    this.ctx = {
+    // Validate and store context
+    this.ctx = this.validateContext(ctx || {});
+    
+    try {
+      this.setupWorkAreaHandlers();
+      this.setupBackgroundHandlers();
+      this.setupTouchHandlers();
+      this.setupGlobalHandlers();
+      
+      this.isInitialized = true;
+      console.log('✅ DragHandlersManager initialized successfully');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize DragHandlersManager:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate and provide fallbacks for context
+   */
+  validateContext(ctx) {
+    const defaultCtx = {
       work: null,
       bgBox: null,
       userBgWrap: null,
       imgState: null,
+      setTransforms: () => {},
+      enforceImageBounds: () => {},
       showGuides: () => {},
       hideGuides: () => {},
       writeCurrentSlide: () => {},
       saveProjectDebounced: () => {},
       setActiveLayer: () => {},
       getLocked: () => false,
-      beginDragText: () => false,
+      beginDragText: () => true,
       endDragText: () => {},
-      // NEW: Text editing functions
-      enterTextEditMode: () => {},
-      exitTextEditMode: () => {},
-      isInEditMode: () => false,
-      getEditingElement: () => null,
       snapThreshold: 8,
       enableSnapping: true,
-      enableGuides: true,
-      ...context
+      enableGuides: true
     };
 
-    // Validate required elements
-    if (!this.ctx.work) {
-      console.error('Work element required for drag handlers');
+    return { ...defaultCtx, ...ctx };
+  }
+
+  /**
+   * Setup work area handlers with enhanced pointer support
+   */
+  setupWorkAreaHandlers() {
+    const work = this.ctx.work;
+    if (!work) {
+      console.warn('Work element not found');
       return;
     }
 
-    this.setupEventListeners();
-    this.isInitialized = true;
-    console.log('✅ DragHandlersManager initialized');
-  }
+    // Remove existing listeners to prevent duplicates
+    work.removeEventListener('pointerdown', this.handlePointerDown);
+    work.removeEventListener('pointermove', this.handlePointerMove);
+    work.removeEventListener('pointerup', this.handlePointerUp);
+    work.removeEventListener('pointercancel', this.handlePointerCancel);
+    work.removeEventListener('click', this.handleWorkClick);
 
-  /**
-   * Setup all event listeners
-   */
-  setupEventListeners() {
-    const { work, bgBox } = this.ctx;
-
-    // Work area events
-    if (work) {
-      work.addEventListener('pointerdown', this.handlePointerDown);
-      work.addEventListener('pointermove', this.handlePointerMove);
-      work.addEventListener('pointerup', this.handlePointerUp);
-      work.addEventListener('pointercancel', this.handlePointerCancel);
-      work.addEventListener('click', this.handleWorkClick);
-      
-      // Touch support for mobile
-      this.boundTouchStart = (e) => {
-        if (e.touches.length === 1) {
-          const touch = e.touches[0];
-          const pointerEvent = new PointerEvent('pointerdown', {
-            pointerId: touch.identifier,
-            clientX: touch.clientX,
-            clientY: touch.clientY,
-            button: 0
-          });
-          this.handlePointerDown(pointerEvent);
-        }
-      };
-      
-      this.boundTouchMove = (e) => {
-        if (e.touches.length === 1) {
-          const touch = e.touches[0];
-          const pointerEvent = new PointerEvent('pointermove', {
-            pointerId: touch.identifier,
-            clientX: touch.clientX,
-            clientY: touch.clientY
-          });
-          this.handlePointerMove(pointerEvent);
-        }
-      };
-      
-      work.addEventListener('touchstart', this.boundTouchStart, { passive: false });
-      work.addEventListener('touchmove', this.boundTouchMove, { passive: false });
-      work.addEventListener('touchend', this.handlePointerUp);
-    }
-
-    // Background box events
-    if (bgBox) {
-      bgBox.addEventListener('pointerdown', this._onBgBoxDown);
-      bgBox.addEventListener('pointermove', this._onBgBoxMove);
-      bgBox.addEventListener('pointerup', this._onBgBoxUp);
-    }
-
-    // Global escape key
-    document.addEventListener('keydown', this.handleEscapeKey);
-  }
-
-  /**
-   * Main pointer down handler with edit mode awareness
-   */
-  handlePointerDown(e) {
-    if (e.button !== 0) return; // Only handle left mouse button
+    // Add enhanced pointer handlers
+    work.addEventListener('pointerdown', this.handlePointerDown);
+    work.addEventListener('pointermove', this.handlePointerMove);
+    work.addEventListener('pointerup', this.handlePointerUp);
+    work.addEventListener('pointercancel', this.handlePointerCancel);
+    work.addEventListener('click', this.handleWorkClick);
     
+    // Disable text selection during drags
+    work.style.userSelect = 'none';
+    work.style.webkitUserSelect = 'none';
+    work.style.touchAction = 'none';
+    
+    console.log('✅ Work area handlers setup complete');
+  }
+
+  /**
+   * Setup background image handlers with proper validation
+   */
+  setupBackgroundHandlers() {
+    const bgBox = this.ctx.bgBox;
+    if (!bgBox) {
+      console.warn('Background box element not found');
+      return;
+    }
+
+    // Remove existing listeners
+    bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
+
+    // Add pointer handler
+    bgBox.addEventListener('pointerdown', this._onBgBoxDown);
+    
+    // Add cleanup handlers
+    ['pointerup', 'pointermove', 'pointercancel', 'lostpointercapture'].forEach(ev => {
+      bgBox.removeEventListener(ev, this._onBgBoxUp);
+      bgBox.addEventListener(ev, this._onBgBoxUp, { passive: true });
+    });
+    
+    console.log('✅ Background handlers setup complete');
+  }
+
+  /**
+   * Setup touch handlers for mobile devices
+   */
+  setupTouchHandlers() {
+    const work = this.ctx.work;
+    if (!work || this.boundTouchStart) return;
+
+    this.boundTouchStart = (e) => {
+      if (e.touches.length === 1 && this.isDragging()) {
+        e.preventDefault();
+      }
+    };
+    
+    this.boundTouchMove = (e) => {
+      if (this.isDragging()) {
+        e.preventDefault();
+      }
+    };
+
+    work.addEventListener('touchstart', this.boundTouchStart, { passive: false });
+    work.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+    work.addEventListener('touchend', this.handlePointerUp);
+    
+    console.log('✅ Touch handlers setup complete');
+  }
+
+  /**
+   * Setup global handlers
+   */
+  setupGlobalHandlers() {
+    document.addEventListener('keydown', this.handleEscapeKey);
+    
+    // Prevent context menu during drag
+    document.addEventListener('contextmenu', (e) => {
+      if (this.isDragging()) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  /**
+   * FIXED: Enhanced pointer down handler with proper mode detection
+   */
+  async handlePointerDown(e) {
     const body = document.body;
     if (body.classList.contains('preview') || body.classList.contains('viewer')) {
       return;
     }
 
-    // Check if user is in text editing mode
-    if (this.ctx.isInEditMode && this.ctx.isInEditMode()) {
-      const editingElement = this.ctx.getEditingElement ? this.ctx.getEditingElement() : null;
-      
-      // If clicking on the editing element, allow text selection
-      if (editingElement && (e.target === editingElement || editingElement.contains(e.target))) {
-        return; // Let text editing proceed normally
-      }
-      
-      // If clicking elsewhere, exit edit mode
-      if (this.ctx.exitTextEditMode) {
-        this.ctx.exitTextEditMode();
-      }
+    // Ignore right clicks and multi-touch
+    if (e.button !== 0 || this.isDragging()) {
+      return;
     }
 
-    const layer = e.target.closest('.layer.text-layer');
-    const handle = e.target.closest('.handle');
-    const bgBox = this.ctx.bgBox;
-    const isImageArea = e.target === this.ctx.work || 
-                       e.target.closest('#userBgWrap') || 
-                       e.target === bgBox;
-
-    if (layer) {
-      this.startTextDrag(e);
-    } else if (handle) {
-      this.startHandleTransform(e, handle);
-    } else if (isImageArea && this.ctx.imgState?.has) {
-      this.startImageDrag(e);
-    }
-  }
-
-  /**
-   * Start text layer drag with edit mode checking
-   */
-  startTextDrag(e) {
     try {
-      const layer = e.target.closest('.layer.text-layer');
-      if (!layer) return;
-      
-      // CRITICAL: Don't start drag if in editing mode
-      if (layer.dataset.editing === 'true' || layer.contentEditable === 'true') {
-        console.log('🚫 Skipping drag - text is in edit mode');
-        return;
-      }
-      
-      const getLocked = this.ctx.getLocked;
-      if (getLocked && getLocked()) return;
-      
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Set as active layer
-      if (this.ctx.setActiveLayer) {
-        this.ctx.setActiveLayer(layer);
-      }
-      
-      // Try to use context's beginDragText
-      let success = false;
-      if (this.ctx.beginDragText) {
-        success = this.ctx.beginDragText(e);
-      }
-      
-      if (success || !this.ctx.beginDragText) {
-        this.dragState = {
-          type: 'text',
-          element: layer,
-          startX: e.clientX,
-          startY: e.clientY,
-          startLeft: parseFloat(layer.style.left || '0'),
-          startTop: parseFloat(layer.style.top || '0'),
-          hasMoved: false
-        };
-        
-        this.capturePointer(e);
-        document.body.classList.add('dragging');
-        layer.classList.add('dragging');
-        
-        console.log('📝 Started text drag');
+      const handle = e.target.closest('.handle');
+      const layer = e.target.closest('.layer');
+      const bgBox = this.ctx.bgBox;
+      const isBackgroundArea = e.target === this.ctx.work || 
+                              e.target.closest('#userBgWrap') || 
+                              e.target === bgBox;
+
+      if (handle && bgBox && !bgBox.classList.contains('hidden')) {
+        // Handle transform operation
+        await this.startHandleTransform(e, handle);
+      } else if (isBackgroundArea && bgBox && !bgBox.classList.contains('hidden')) {
+        // Handle image drag
+        await this.startImageDrag(e);
+      } else if (layer) {
+        // FIXED: Handle text layer drag with delay for editing
+        await this.startTextDrag(e, layer);
       }
     } catch (error) {
-      console.error('Failed to start text drag:', error);
+      console.error('Failed to handle pointer down:', error);
       this.forceEndDrag();
     }
   }
 
   /**
-   * Start image drag
+   * Start image drag operation with validation
    */
-  startImageDrag(e) {
+  async startImageDrag(e) {
     try {
       const imgState = this.ctx.imgState;
-      if (!imgState || !imgState.has) return;
+      
+      if (!imgState?.has) {
+        console.log('No image to drag');
+        return;
+      }
       
       e.preventDefault();
       e.stopPropagation();
@@ -259,7 +269,78 @@ export class DragHandlersManager {
   }
 
   /**
-   * Start handle transform operation
+   * FIXED: Start text layer drag operation - delayed to allow editing
+   */
+  async startTextDrag(e, layer) {
+    try {
+      // DON'T prevent default immediately - let clicks/double-clicks work
+      e.stopPropagation();
+      
+      // Set as active layer first
+      if (this.ctx.setActiveLayer) {
+        this.ctx.setActiveLayer(layer);
+      }
+      
+      // Store initial drag state but don't start dragging yet
+      this.potentialDrag = {
+        layer: layer,
+        startX: e.clientX,
+        startY: e.clientY,
+        startLeft: parseFloat(layer.style.left || '0'),
+        startTop: parseFloat(layer.style.top || '0'),
+        startTime: Date.now(),
+        pointerId: e.pointerId
+      };
+      
+      console.log('📝 Prepared for potential text drag');
+    } catch (error) {
+      console.error('Failed to prepare text drag:', error);
+    }
+  }
+
+  /**
+   * NEW: Activate text drag when threshold is met
+   */
+  async activateTextDrag(e) {
+    if (!this.potentialDrag) return;
+    
+    const layer = this.potentialDrag.layer;
+    
+    // Now we actually start dragging
+    this.dragState = {
+      type: 'text',
+      element: layer,
+      startX: this.potentialDrag.startX,
+      startY: this.potentialDrag.startY,
+      startLeft: this.potentialDrag.startLeft,
+      startTop: this.potentialDrag.startTop,
+      hasMoved: false
+    };
+    
+    // Clear potential drag
+    this.potentialDrag = null;
+    
+    // Now prevent default behavior and capture pointer
+    e.preventDefault();
+    this.capturePointer(e);
+    document.body.classList.add('dragging');
+    layer.classList.add('dragging');
+    
+    // Blur the text to stop editing during drag
+    if (document.activeElement === layer) {
+      layer.blur();
+    }
+    
+    // Call context's beginDragText if available
+    if (this.ctx.beginDragText) {
+      this.ctx.beginDragText(e);
+    }
+    
+    console.log('🚀 Activated text drag');
+  }
+
+  /**
+   * Start handle transform operation with vector tracking
    */
   async startHandleTransform(e, handle) {
     try {
@@ -271,6 +352,8 @@ export class DragHandlersManager {
       e.stopPropagation();
       
       const handleType = handle.dataset.handle;
+      const work = this.ctx.work;
+      const workRect = work.getBoundingClientRect();
       
       // Calculate initial vector for sign tracking
       const startVectorX = e.clientX - imgState.cx;
@@ -305,168 +388,177 @@ export class DragHandlersManager {
   }
 
   /**
-   * Handle pointer move with edit mode awareness
+   * FIXED: Enhanced pointer move handler with drag threshold
    */
-  handlePointerMove(e) {
-    if (!this.dragState) return;
-    
-    // Don't interfere with text editing
-    const element = this.dragState.element;
-    if (element && (element.dataset.editing === 'true' || element.contentEditable === 'true')) {
-      return;
+  async handlePointerMove(e) {
+    // Handle potential text drag activation
+    if (this.potentialDrag && !this.dragState) {
+      const dx = e.clientX - this.potentialDrag.startX;
+      const dy = e.clientY - this.potentialDrag.startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const timeElapsed = Date.now() - this.potentialDrag.startTime;
+      
+      // Start actual drag if moved enough distance OR held down long enough
+      if (distance > 5 || timeElapsed > 150) {
+        await this.activateTextDrag(e);
+      }
     }
     
+    // Continue with existing move logic
+    if (!this.dragState) return;
+
+    const dx = e.clientX - this.dragState.startX;
+    const dy = e.clientY - this.dragState.startY;
+    
+    // Mark as moved if significant movement
+    if (!this.dragState.hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      this.dragState.hasMoved = true;
+    }
+
     try {
-      const { type, startX, startY } = this.dragState;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      
-      // Mark as moved if threshold exceeded
-      if (!this.dragState.hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-        this.dragState.hasMoved = true;
+      if (this.dragState.type === 'image') {
+        await this.handleImagePointerMove(e, dx, dy);
+      } else if (this.dragState.type === 'text') {
+        await this.handleTextPointerMove(e, dx, dy);
+      } else if (this.dragState.type === 'transform') {
+        await this.handleTransformPointerMove(e, dx, dy);
       }
-      
-      if (type === 'text') {
-        this.handleTextDrag(e, dx, dy);
-      } else if (type === 'image') {
-        this.handleImageDrag(e, dx, dy);
-      } else if (type === 'transform') {
-        this.handleTransformDrag(e);
-      }
-      
     } catch (error) {
       console.error('Failed to handle pointer move:', error);
     }
   }
 
   /**
-   * Handle text layer dragging
+   * Handle image movement with snapping
    */
-  handleTextDrag(e, dx, dy) {
-    const { element, startLeft, startTop } = this.dragState;
-    
-    if (element) {
-      element.style.left = (startLeft + dx) + 'px';
-      element.style.top = (startTop + dy) + 'px';
-      
-      // Show guides if enabled
-      if (this.ctx.enableGuides && this.ctx.showGuides) {
-        this.ctx.showGuides();
-      }
-    }
-  }
-
-  /**
-   * Handle image dragging
-   */
-  handleImageDrag(e, dx, dy) {
+  async handleImagePointerMove(e, dx, dy) {
     const imgState = this.ctx.imgState;
-    const { startCx, startCy } = this.dragState;
-    
-    if (imgState) {
-      imgState.cx = startCx + dx;
-      imgState.cy = startCy + dy;
-      
-      if (this.ctx.enforceImageBounds) {
-        this.ctx.enforceImageBounds();
-      }
-      
-      if (this.ctx.setTransforms) {
-        this.ctx.setTransforms();
-      }
-    }
-  }
-
-  /**
-   * Handle transform dragging (scaling/rotation)
-   */
-  async handleTransformDrag(e) {
-    const imgState = this.ctx.imgState;
-    const { handleType, centerX, centerY, startScale, startShearX, startShearY } = this.dragState;
+    const { setTransforms, enforceImageBounds, showGuides } = this.ctx;
     
     if (!imgState) return;
+
+    let newCx = this.dragState.startCx + dx;
+    let newCy = this.dragState.startCy + dy;
+
+    // Snap to center with guides
+    const work = this.ctx.work;
+    const workRect = work.getBoundingClientRect();
+    const centerX = workRect.width / 2;
+    const centerY = workRect.height / 2;
+    const threshold = this.ctx.snapThreshold || 8;
+
+    let snapV = false, snapH = false;
     
+    if (this.ctx.enableSnapping) {
+      if (Math.abs(newCx - centerX) <= threshold) {
+        newCx = centerX;
+        snapV = true;
+      }
+      if (Math.abs(newCy - centerY) <= threshold) {
+        newCy = centerY;
+        snapH = true;
+      }
+    }
+
+    imgState.cx = newCx;
+    imgState.cy = newCy;
+    
+    if (enforceImageBounds) enforceImageBounds();
+    if (setTransforms) setTransforms();
+    if (showGuides && this.ctx.enableGuides) {
+      showGuides({ v: snapV, h: snapH });
+    }
+  }
+
+  /**
+   * Handle text movement
+   */
+  async handleTextPointerMove(e, dx, dy) {
+    if (!this.dragState.element) return;
+
+    const newLeft = this.dragState.startLeft + dx;
+    const newTop = this.dragState.startTop + dy;
+
+    this.dragState.element.style.left = newLeft + 'px';
+    this.dragState.element.style.top = newTop + 'px';
+  }
+
+  /**
+   * Handle transform operations
+   */
+  async handleTransformPointerMove(e, dx, dy) {
+    const imgState = this.ctx.imgState;
+    const { setTransforms, enforceImageBounds } = this.ctx;
+    
+    if (!imgState || !this.dragState) return;
+
+    const handleType = this.dragState.handleType;
+    const centerX = this.dragState.centerX;
+    const centerY = this.dragState.centerY;
+
     if (handleType === 'rotate') {
       // Rotation logic
       const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      const startAngle = this.dragState.startAngle || 0;
-      const deltaAngle = angle - (this.dragState.startPointerAngle || angle);
-      imgState.angle = startAngle + deltaAngle * (180 / Math.PI);
+      const startAngle = Math.atan2(this.dragState.startY - centerY, this.dragState.startX - centerX);
+      const deltaAngle = angle - startAngle;
+      
+      imgState.angle = this.dragState.startAngle + deltaAngle;
     } else if (['nw', 'ne', 'se', 'sw'].includes(handleType)) {
-      // Scale/shear logic
-      if (e.shiftKey) {
-        // Shear mode
-        const dx = e.clientX - this.dragState.startX;
-        const dy = e.clientY - this.dragState.startY;
-        imgState.shearX = startShearX + dx * 0.001;
-        imgState.shearY = startShearY + dy * 0.001;
-      } else {
-        // Scale mode
-        const distance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-        const startDistance = this.dragState.startDistance || distance;
-        const scaleFactor = distance / (startDistance || 1);
-        imgState.scale = Math.max(0.1, startScale * scaleFactor);
+      // Scale logic
+      const startDistance = Math.sqrt(
+        Math.pow(this.dragState.startX - centerX, 2) + 
+        Math.pow(this.dragState.startY - centerY, 2)
+      );
+      const currentDistance = Math.sqrt(
+        Math.pow(e.clientX - centerX, 2) + 
+        Math.pow(e.clientY - centerY, 2)
+      );
+      
+      if (startDistance > 0) {
+        const scaleFactor = currentDistance / startDistance;
+        imgState.scale = Math.max(0.1, this.dragState.startScale * scaleFactor);
         
-        // Handle sign changes for flipping
-        const currentVectorX = e.clientX - centerX;
-        const currentVectorY = e.clientY - centerY;
+        // Update sign tracking for proper scaling direction
+        const startVectorX = this.dragState.startVectorX;
+        const startVectorY = this.dragState.startVectorY;
         
-        if (this.dragState.startVectorX * currentVectorX < 0) {
-          imgState.signX = -imgState.signX;
-          this.dragState.startVectorX = currentVectorX;
-        }
-        
-        if (this.dragState.startVectorY * currentVectorY < 0) {
-          imgState.signY = -imgState.signY;
-          this.dragState.startVectorY = currentVectorY;
+        if (startVectorX !== 0 && startVectorY !== 0) {
+          const relX = e.clientX - centerX;
+          const relY = e.clientY - centerY;
+          imgState.signX = relX * startVectorX < 0 ? -1 : 1;
+          imgState.signY = relY * startVectorY < 0 ? -1 : 1;
         }
       }
     }
-    
-    if (this.ctx.setTransforms) {
-      this.ctx.setTransforms();
-    }
-    
-    if (this.ctx.enforceImageBounds) {
-      this.ctx.enforceImageBounds();
-    }
+
+    if (enforceImageBounds) enforceImageBounds();
+    if (setTransforms) setTransforms();
   }
 
   /**
-   * Handle pointer up with enhanced active state preservation
+   * FIXED: Enhanced pointer up handler
    */
-  handlePointerUp(e) {
-    try {
-      if (!this.dragState) return;
+  async handlePointerUp(e) {
+    // Clear potential drag if it never activated
+    if (this.potentialDrag) {
+      console.log('👆 Cleared potential drag - allowing click/double-click');
+      this.potentialDrag = null;
+      return; // Let the natural click events proceed
+    }
+    
+    if (!this.dragState) return;
 
-      const { type: dragType, element, hasMoved } = this.dragState;
-      const ctx = this.ctx;
-      const wasMoving = hasMoved;
-      
-      // Remove body dragging class
-      document.body.classList.remove('dragging');
+    try {
+      const ctx = this.ctx || {};
+      const wasMoving = this.dragState.hasMoved;
+      const dragType = this.dragState.type;
+      const element = this.dragState.element;
+
+      // Clean up UI classes
+      document.body?.classList?.remove?.('dragging');
       
       if (element) {
         element.classList.remove('dragging');
-        
-        // CRITICAL FIX: Ensure text layers remain active after drag
-        if (dragType === 'text' && element.classList.contains('text-layer')) {
-          // Force the element to stay active
-          element.classList.add('active');
-          
-          // Update the active layer in text manager if available
-          if (ctx.setActiveLayer) {
-            ctx.setActiveLayer(element);
-          }
-          
-          // Trigger a repaint to ensure CSS is applied
-          setTimeout(() => {
-            element.classList.add('active');
-            if (ctx.syncToolbarFromActive) {
-              ctx.syncToolbarFromActive();
-            }
-          }, 0);
-        }
       }
 
       // End text drag if needed
@@ -515,7 +607,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * Handle work area clicks with edit mode awareness
+   * Handle work area clicks
    */
   handleWorkClick(e) {
     if (this.preventNextClick) {
@@ -525,25 +617,10 @@ export class DragHandlersManager {
       return;
     }
     
-    // Check if clicking on a text layer in edit mode
-    const textLayer = e.target.closest('.layer.text-layer');
-    if (textLayer && textLayer.dataset.editing === 'true') {
-      // Allow the click to proceed for text editing
-      return;
-    }
-    
     // Clear active layer if clicking on empty space
     if (e.target === this.ctx.work) {
       const layers = document.querySelectorAll('.layer');
-      layers.forEach(layer => {
-        layer.classList.remove('active');
-        // Exit edit mode if active
-        if (layer.dataset.editing === 'true') {
-          if (this.ctx.exitTextEditMode) {
-            this.ctx.exitTextEditMode();
-          }
-        }
-      });
+      layers.forEach(layer => layer.classList.remove('active'));
     }
   }
 
@@ -554,71 +631,11 @@ export class DragHandlersManager {
     if (e.key === 'Escape') {
       if (this.isDragging()) {
         this.forceEndDrag();
-      } else if (this.ctx.isInEditMode && this.ctx.isInEditMode()) {
-        if (this.ctx.exitTextEditMode) {
-          this.ctx.exitTextEditMode();
-        }
+      } else if (this.potentialDrag) {
+        this.potentialDrag = null;
+        console.log('🔄 Cancelled potential drag');
       }
     }
-  }
-
-  /**
-   * Background box pointer down
-   */
-  _onBgBoxDown(e) {
-    const bgBox = this.ctx.bgBox;
-    const imgState = this.ctx.imgState;
-    const getLocked = this.ctx.getLocked;
-    
-    if (!imgState?.has || (getLocked && getLocked())) return;
-    
-    this.startHandleTransform(e, e.target);
-  }
-
-  /**
-   * Background box pointer move
-   */
-  _onBgBoxMove(e) {
-    // Handle background box move if needed
-  }
-
-  /**
-   * Background box pointer up
-   */
-  _onBgBoxUp(e) {
-    // Handle background box up if needed
-  }
-
-  /**
-   * Text element pointer down (fallback)
-   */
-  _onTextDown(e) {
-    const getLocked = this.ctx.getLocked;
-    const setActiveLayer = this.ctx.setActiveLayer;
-    
-    if (getLocked && getLocked()) return;
-
-    const t = e.currentTarget;
-    
-    // Don't start drag if in edit mode
-    if (t.dataset.editing === 'true' || t.contentEditable === 'true') {
-      return;
-    }
-    
-    if (setActiveLayer) setActiveLayer(t);
-    
-    this.dragText = {
-      t,
-      x: e.clientX,
-      y: e.clientY,
-      left: parseFloat(t.style.left || '0'),
-      top: parseFloat(t.style.top || '0'),
-      w: t.offsetWidth,
-      h: t.offsetHeight
-    };
-    
-    this.capturePointer(e);
-    console.log('📝 Started text drag operation');
   }
 
   /**
@@ -644,20 +661,14 @@ export class DragHandlersManager {
   }
 
   /**
-   * Utility: Force end drag operation with edit mode respect
+   * Utility: Force end drag operation
    */
   forceEndDrag() {
     try {
       document.body?.classList?.remove?.('dragging');
-      
+
       if (this.dragState?.element?.classList) {
-        const element = this.dragState.element;
-        element.classList.remove('dragging');
-        
-        // Don't interfere with edit mode
-        if (element.dataset.editing !== 'true') {
-          element.classList.add('active');
-        }
+        this.dragState.element.classList.remove('dragging');
       }
 
       if (this.ctx.hideGuides) {
@@ -669,6 +680,7 @@ export class DragHandlersManager {
       }
       
       this.dragState = null;
+      this.potentialDrag = null;
       this.capturedPointerId = null;
       
       console.log('🛑 Forced end drag');
@@ -682,54 +694,123 @@ export class DragHandlersManager {
    */
   attachText(el) {
     if (!el) return;
-    
-    // Don't attach if already in edit mode
-    if (el.dataset.editing === 'true') {
-      return;
-    }
-    
     el.addEventListener('pointerdown', this._onTextDown);
   }
 
   /**
-   * Cleanup method
+   * Text element pointer down
    */
-  cleanup() {
-    const work = this.ctx?.work;
+  _onTextDown(e) {
+    const getLocked = this.ctx.getLocked;
+    const setActiveLayer = this.ctx.setActiveLayer;
     
-    if (work) {
-      work.removeEventListener('pointerdown', this.handlePointerDown);
-      work.removeEventListener('pointermove', this.handlePointerMove);
-      work.removeEventListener('pointerup', this.handlePointerUp);
-      work.removeEventListener('pointercancel', this.handlePointerCancel);
-      work.removeEventListener('click', this.handleWorkClick);
-      
-      if (this.boundTouchStart) {
-        work.removeEventListener('touchstart', this.boundTouchStart);
-        work.removeEventListener('touchmove', this.boundTouchMove);
-        work.removeEventListener('touchend', this.handlePointerUp);
-      }
-    }
+    if (getLocked && getLocked()) return;
+
+    const t = e.currentTarget;
+    if (setActiveLayer) setActiveLayer(t);
     
-    const bgBox = this.ctx?.bgBox;
-    if (bgBox) {
-      bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
-      bgBox.removeEventListener('pointermove', this._onBgBoxMove);
-      bgBox.removeEventListener('pointerup', this._onBgBoxUp);
-    }
+    this.dragText = {
+      t,
+      x: e.clientX,
+      y: e.clientY,
+      left: parseFloat(t.style.left || '0'),
+      top: parseFloat(t.style.top || '0'),
+      w: t.offsetWidth,
+      h: t.offsetHeight
+    };
     
-    document.removeEventListener('keydown', this.handleEscapeKey);
-    
-    this.forceEndDrag();
-    this.isInitialized = false;
-    
-    console.log('✅ DragHandlersManager cleanup complete');
+    this.capturePointer(e);
+    console.log('📝 Started text drag operation');
   }
 
   /**
-   * Destroy the manager
+   * Background box pointer down
    */
-  destroy() {
-    this.cleanup();
+  _onBgBoxDown(e) {
+    const bgBox = this.ctx.bgBox;
+    const imgState = this.ctx.imgState;
+    const getLocked = this.ctx.getLocked;
+    
+    if (!imgState?.has || (getLocked && getLocked())) return;
+    
+    e.preventDefault();
+    this.capturePointer(e);
+
+    const p = this._getPoint(e);
+    const handle = e.target.dataset.handle;
+
+    if (handle === 'rotate') {
+      this.dragMode = 'rotate';
+      this.start = {
+        angle0: imgState.angle,
+        a0: Math.atan2(p.y - imgState.cy, p.x - imgState.cx)
+      };
+    } else if (handle) {
+      if (['nw', 'ne', 'se', 'sw'].includes(handle)) {
+        this.dragMode = 'scale';
+        this.start = {
+          scale0: imgState.scale,
+          cx: imgState.cx,
+          cy: imgState.cy,
+          dist0: Math.sqrt(Math.pow(p.x - imgState.cx, 2) + Math.pow(p.y - imgState.cy, 2))
+        };
+      }
+    } else {
+      this.dragMode = 'move';
+      this.start = {
+        cx0: imgState.cx,
+        cy0: imgState.cy,
+        x0: p.x,
+        y0: p.y
+      };
+    }
+    
+    console.log(`🎯 Background drag mode: ${this.dragMode}`);
+  }
+
+  /**
+   * Background box pointer up
+   */
+  _onBgBoxUp(e) {
+    if (this.dragMode) {
+      console.log(`✅ Ended background ${this.dragMode} operation`);
+      this.dragMode = null;
+      this.start = {};
+    }
+  }
+
+  /**
+   * Get point coordinates relative to work area
+   */
+  _getPoint(e) {
+    const work = this.ctx.work;
+    const rect = work.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  }
+
+  /**
+   * Work area pointer move
+   */
+  _onWorkMove(e) {
+    if (!this.dragText) return;
+    
+    const dx = e.clientX - this.dragText.x;
+    const dy = e.clientY - this.dragText.y;
+    
+    this.dragText.t.style.left = (this.dragText.left + dx) + 'px';
+    this.dragText.t.style.top = (this.dragText.top + dy) + 'px';
+  }
+
+  /**
+   * Work area pointer up
+   */
+  _onWorkUp(e) {
+    if (this.dragText) {
+      console.log('✅ Ended text drag');
+      this.dragText = null;
+    }
   }
 }
