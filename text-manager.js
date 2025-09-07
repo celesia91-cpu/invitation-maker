@@ -26,7 +26,8 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     // Create text element
     const textEl = document.createElement('div');
     textEl.className = 'layer text-layer';
-    textEl.contentEditable = true;
+    textEl.contentEditable = 'false';
+    textEl.dataset.editing = 'false';
     textEl.textContent = text;
     textEl.id = generateId('layer');
 
@@ -68,9 +69,6 @@ export async function addTextLayer(text = 'New Text', options = {}) {
     // Set as active layer
     setActiveLayer(textEl);
 
-    // Focus for immediate editing
-    textEl.focus();
-
     console.log('✅ Text layer added:', text);
     
     // Save changes
@@ -94,13 +92,14 @@ function setupTextLayerEvents(textEl) {
   textEl.addEventListener('click', (e) => {
     e.stopPropagation();
     setActiveLayer(textEl);
-    textEl.focus();
-    selectAllText(textEl);
   });
 
   // Double click to edit
   textEl.addEventListener('dblclick', (e) => {
     e.stopPropagation();
+    textEl.contentEditable = 'true';
+    textEl.dataset.editing = 'true';
+    textEl.style.cursor = 'text';
     textEl.focus();
     selectAllText(textEl);
   });
@@ -110,8 +109,13 @@ function setupTextLayerEvents(textEl) {
     saveAndRecord();
   });
 
-  // Blur to save changes
+  // Blur to save changes and exit edit mode
   textEl.addEventListener('blur', () => {
+    textEl.contentEditable = 'false';
+    textEl.dataset.editing = 'false';
+    textEl.style.cursor = 'move';
+    const selection = window.getSelection?.();
+    selection?.removeAllRanges();
     saveAndRecord();
   });
 
@@ -119,7 +123,6 @@ function setupTextLayerEvents(textEl) {
   textEl.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       textEl.blur();
-      setActiveLayer(null);
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       if (textEl.textContent.trim() === '') {
         e.preventDefault();
