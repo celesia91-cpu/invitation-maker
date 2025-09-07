@@ -147,6 +147,8 @@ export function setActiveLayer(layer) {
     syncToolbarFromActive();
     console.log('Active layer set:', layer.textContent);
   }
+  updateTextFadeUI();
+  updateTextZoomUI();
 
   // Update toolbar state
   updateToolbarState();
@@ -484,6 +486,51 @@ function updateToolbarState() {
   });
 }
 
+// Format milliseconds as seconds string
+function fmtSec(ms) {
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+// Update text fade timing UI
+export function updateTextFadeUI() {
+  const fadeInBtn = document.getElementById('textFadeInBtn');
+  const fadeOutBtn = document.getElementById('textFadeOutBtn');
+  const fadeInRange = document.getElementById('textFadeInRange');
+  const fadeOutRange = document.getElementById('textFadeOutRange');
+  const fadeInVal = document.getElementById('textFadeInVal');
+  const fadeOutVal = document.getElementById('textFadeOutVal');
+
+  const fadeIn = activeLayer?._fadeInMs || 0;
+  const fadeOut = activeLayer?._fadeOutMs || 0;
+
+  if (fadeInBtn) fadeInBtn.classList.toggle('active', fadeIn > 0);
+  if (fadeOutBtn) fadeOutBtn.classList.toggle('active', fadeOut > 0);
+  if (fadeInRange) fadeInRange.value = fadeIn;
+  if (fadeOutRange) fadeOutRange.value = fadeOut;
+  if (fadeInVal) fadeInVal.textContent = fmtSec(fadeIn);
+  if (fadeOutVal) fadeOutVal.textContent = fmtSec(fadeOut);
+}
+
+// Update text zoom timing UI
+export function updateTextZoomUI() {
+  const zoomInBtn = document.getElementById('textZoomInBtn');
+  const zoomOutBtn = document.getElementById('textZoomOutBtn');
+  const zoomInRange = document.getElementById('textZoomInRange');
+  const zoomOutRange = document.getElementById('textZoomOutRange');
+  const zoomInVal = document.getElementById('textZoomInVal');
+  const zoomOutVal = document.getElementById('textZoomOutVal');
+
+  const zoomIn = activeLayer?._zoomInMs || 0;
+  const zoomOut = activeLayer?._zoomOutMs || 0;
+
+  if (zoomInBtn) zoomInBtn.classList.toggle('active', zoomIn > 0);
+  if (zoomOutBtn) zoomOutBtn.classList.toggle('active', zoomOut > 0);
+  if (zoomInRange) zoomInRange.value = zoomIn;
+  if (zoomOutRange) zoomOutRange.value = zoomOut;
+  if (zoomInVal) zoomInVal.textContent = fmtSec(zoomIn);
+  if (zoomOutVal) zoomOutVal.textContent = fmtSec(zoomOut);
+}
+
 /**
  * Handle font family change
  */
@@ -517,6 +564,64 @@ export function handleColorChange(value) {
  */
 export function handleTextAlignChange(alignment) {
   applyTextAlign(alignment);
+}
+
+// Text fade handlers
+export function handleTextFadeIn() {
+  if (!activeLayer) return;
+  activeLayer._fadeInMs = (activeLayer._fadeInMs || 0) > 0 ? 0 : 800;
+  updateTextFadeUI();
+  saveProjectDebounced();
+}
+
+export function handleTextFadeOut() {
+  if (!activeLayer) return;
+  activeLayer._fadeOutMs = (activeLayer._fadeOutMs || 0) > 0 ? 0 : 800;
+  updateTextFadeUI();
+  saveProjectDebounced();
+}
+
+export function handleTextFadeInRange(value) {
+  if (!activeLayer) return;
+  activeLayer._fadeInMs = parseInt(value, 10) || 0;
+  updateTextFadeUI();
+  saveProjectDebounced();
+}
+
+export function handleTextFadeOutRange(value) {
+  if (!activeLayer) return;
+  activeLayer._fadeOutMs = parseInt(value, 10) || 0;
+  updateTextFadeUI();
+  saveProjectDebounced();
+}
+
+// Text zoom handlers
+export function handleTextZoomIn() {
+  if (!activeLayer) return;
+  activeLayer._zoomInMs = (activeLayer._zoomInMs || 0) > 0 ? 0 : 800;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+export function handleTextZoomOut() {
+  if (!activeLayer) return;
+  activeLayer._zoomOutMs = (activeLayer._zoomOutMs || 0) > 0 ? 0 : 800;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+export function handleTextZoomInRange(value) {
+  if (!activeLayer) return;
+  activeLayer._zoomInMs = parseInt(value, 10) || 0;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+export function handleTextZoomOutRange(value) {
+  if (!activeLayer) return;
+  activeLayer._zoomOutMs = parseInt(value, 10) || 0;
+  updateTextZoomUI();
+  saveProjectDebounced();
 }
 
 /**
