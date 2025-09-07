@@ -341,7 +341,19 @@ function fallbackToLocalUpload(file) {
       // Set default scale so image fits within work area
       const scaleToFitWidth = r.width / imgState.natW;
       const scaleToFitHeight = r.height / imgState.natH;
-      
+
+      const { shearX, shearY, signX, signY, flip } = imgState;
+      imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
+      imgState.angle ??= 0;
+      imgState.cx = r.width / 2;
+      imgState.cy = r.height / 2;
+      imgState.has = true;
+      imgState.shearX = shearX;
+      imgState.shearY = shearY;
+      imgState.signX = signX;
+      imgState.signY = signY;
+      imgState.flip = flip;
+
       // Reset filters
       Object.assign(imgFilters, PRESETS.none);
       highlightPreset('none');
