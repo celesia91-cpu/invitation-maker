@@ -82,7 +82,13 @@ const {
   handleTextZoomIn,
   handleTextZoomOut,
   handleTextZoomInRange,
-  handleTextZoomOutRange
+  handleTextZoomOutRange,
+  handleFontFamily,
+  handleFontSize,
+  handleFontColor,
+  handleBold,
+  handleItalic,
+  handleUnderline
 } = tm;
 
 await addTextLayer('Hello');
@@ -145,4 +151,24 @@ handleTextZoomOutRange(600);
 assert.strictEqual(layer._zoomOutMs, 600);
 assert.strictEqual(zoomOutVal.textContent, '0.6s');
 
-console.log('Text fade and zoom handlers update layer properties and UI');
+// Style handlers
+handleFontFamily('serif');
+assert.strictEqual(layer.style.fontFamily, 'serif');
+
+handleFontSize(30);
+assert.strictEqual(layer.style.fontSize, '30px');
+assert.strictEqual(document.getElementById('fontSizeVal').textContent, '30px');
+
+handleFontColor('#ff0000');
+assert.strictEqual(layer.style.color, '#ff0000');
+
+handleBold();
+assert.strictEqual(layer.style.fontWeight, 'bold');
+
+handleItalic();
+assert.strictEqual(layer.style.fontStyle, 'italic');
+
+handleUnderline();
+assert.strictEqual(layer.style.textDecoration, 'underline');
+
+console.log('Text style handlers apply formatting without errors');
