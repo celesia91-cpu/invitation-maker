@@ -447,7 +447,7 @@ export function enableImageControls(on) {
   const imgScale = document.querySelector('#imgScale');
   const imgRotate = document.querySelector('#imgRotate');
   const imgFlipBtn = document.querySelector('#imgFlip');
-  const imgDeleteBtn = document.querySelector('#imgDelete');
+  const imgReplaceBtn = document.querySelector('#imgReplace');
   const imgFadeInBtn = document.getElementById('imgFadeInBtn');
   const imgFadeOutBtn = document.getElementById('imgFadeOutBtn');
   const imgFadeInRange = document.getElementById('imgFadeInRange');
@@ -458,7 +458,7 @@ export function enableImageControls(on) {
   const imgZoomOutRange = document.getElementById('imgZoomOutRange');
   const presetGrid = document.querySelector('#presetGrid');
 
-  [imgScale, imgRotate, imgFlipBtn, imgDeleteBtn, imgFadeInBtn, imgFadeOutBtn, imgFadeInRange, imgFadeOutRange,
+  [imgScale, imgRotate, imgFlipBtn, imgReplaceBtn, imgFadeInBtn, imgFadeOutBtn, imgFadeInRange, imgFadeOutRange,
    imgZoomInBtn, imgZoomOutBtn, imgZoomInRange, imgZoomOutRange].forEach(el => {
     if (el) el.disabled = !on;
   });
@@ -566,40 +566,6 @@ export function handleImageFlip() {
   setTransforms();
   import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
-}
-
-// Delete image handler
-export function deleteImage() {
-  if (!imgState.has) return;
-  
-  imgState.has = false;
-  imgState.natW = 0;
-  imgState.natH = 0;
-  imgState.cx = 0;
-  imgState.cy = 0;
-  imgState.scale = 1;
-  imgState.angle = 0;
-  imgState.shearX = 0;
-  imgState.shearY = 0;
-  imgState.signX = 1;
-  imgState.signY = 1;
-  imgState.flip = false;
-  
-  // Clear backend info
-  delete imgState.backendImageId;
-  delete imgState.backendImageUrl;
-  delete imgState.backendThumbnailUrl;
-  
-  const userBg = document.querySelector('#userBg');
-  if (userBg) userBg.src = '';
-  
-  setTransforms();
-  toggleUploadBtn();
-  
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
-  saveProjectDebounced();
-  
-  console.log('✅ Image deleted');
 }
 
 // Preload cache for performance
