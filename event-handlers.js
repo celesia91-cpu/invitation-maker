@@ -196,6 +196,8 @@ export class EventHandlersManager {
       const { handleTextFadeOutRange } = await import('./text-manager.js');
       handleTextFadeOutRange(e.target.value);
     });
+
+    import('./text-manager.js').then(({ updateTextFadeUI }) => updateTextFadeUI());
   }
 
   /**
@@ -221,6 +223,8 @@ export class EventHandlersManager {
       const { handleTextZoomOutRange } = await import('./text-manager.js');
       handleTextZoomOutRange(e.target.value);
     });
+
+    import('./text-manager.js').then(({ updateTextZoomUI }) => updateTextZoomUI());
   }
 
   /**
