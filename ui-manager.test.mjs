@@ -61,7 +61,7 @@ global.window = {
 };
 
 const ui = await import('./ui-manager.js');
-const { setMobileTopbarCollapsed, togglePanel } = ui;
+const { setMobileTopbarCollapsed, togglePanel, enterPreview, exitPreview } = ui;
 
 const body = document.body;
 const topbarToggle = document.getElementById('topbarToggle');
@@ -90,3 +90,13 @@ togglePanel(); // closes panel
 assert.ok(!body.classList.contains('panel-open'));
 assert.strictEqual(togglePanelBtn.getAttribute('aria-expanded'), 'false');
 console.log('togglePanel opens and closes the editor panel');
+
+// --- enterPreview / exitPreview ---
+enterPreview();
+assert.ok(body.classList.contains('preview'));
+assert.strictEqual(previewBtn.getAttribute('aria-pressed'), 'true');
+
+exitPreview();
+assert.ok(!body.classList.contains('preview'));
+assert.strictEqual(previewBtn.getAttribute('aria-pressed'), 'false');
+console.log('enterPreview and exitPreview toggle preview mode and aria-pressed');

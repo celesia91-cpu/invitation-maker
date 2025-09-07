@@ -84,14 +84,18 @@ export function togglePreview() {
 
 export function enterPreview() {
   document.body.classList.add('preview');
+  const previewBtn = document.getElementById('previewBtn');
+  previewBtn?.setAttribute('aria-pressed', 'true');
   previewMode = true;
-  
+
   // Ensure RSVP bar is visible in preview mode
   ensureRsvpVisibility();
 }
 
 export function exitPreview() {
   document.body.classList.remove('preview');
+  const previewBtn = document.getElementById('previewBtn');
+  previewBtn?.setAttribute('aria-pressed', 'false');
   previewMode = false;
 }
 
