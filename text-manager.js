@@ -265,10 +265,9 @@ function selectAllText(element) {
  */
 export function applyFontFamily(fontFamily) {
   if (!activeLayer) return;
-  
+
   activeLayer.style.fontFamily = fontFamily;
   updateToolbarState();
-  saveAndRecord();
   console.log('Font family applied:', fontFamily);
 }
 
@@ -277,10 +276,9 @@ export function applyFontFamily(fontFamily) {
  */
 export function applyFontSize(fontSize) {
   if (!activeLayer) return;
-  
+
   activeLayer.style.fontSize = fontSize + 'px';
   updateToolbarState();
-  saveAndRecord();
   console.log('Font size applied:', fontSize);
 }
 
@@ -289,10 +287,9 @@ export function applyFontSize(fontSize) {
  */
 export function applyColor(color) {
   if (!activeLayer) return;
-  
+
   activeLayer.style.color = color;
   updateToolbarState();
-  saveAndRecord();
   console.log('Color applied:', color);
 }
 
@@ -306,8 +303,6 @@ export function toggleBold() {
   const newWeight = (currentWeight === 'bold' || currentWeight === '700') ? 'normal' : 'bold';
   
   activeLayer.style.fontWeight = newWeight;
-  updateToolbarState();
-  saveAndRecord();
   console.log('Bold toggled:', newWeight);
 }
 
@@ -321,9 +316,20 @@ export function toggleItalic() {
   const newStyle = currentStyle === 'italic' ? 'normal' : 'italic';
   
   activeLayer.style.fontStyle = newStyle;
-  updateToolbarState();
-  saveAndRecord();
   console.log('Italic toggled:', newStyle);
+}
+
+/**
+ * Toggle underline decoration
+ */
+export function toggleUnderline() {
+  if (!activeLayer) return;
+
+  const current = activeLayer.style.textDecoration;
+  const newDeco = current === 'underline' ? 'none' : 'underline';
+
+  activeLayer.style.textDecoration = newDeco;
+  console.log('Underline toggled:', newDeco);
 }
 
 /**
@@ -539,29 +545,32 @@ export function updateTextZoomUI() {
 /**
  * Handle font family change
  */
-export function handleFontFamilyChange(value) {
+export function handleFontFamily(value) {
   applyFontFamily(value);
+  saveProjectDebounced();
 }
 
 /**
  * Handle font size change
  */
-export function handleFontSizeChange(value) {
+export function handleFontSize(value) {
   const fontSize = parseInt(value, 10);
   if (fontSize && fontSize > 0) {
     applyFontSize(fontSize);
-    
+
     // Update display value
     const fontSizeVal = document.getElementById('fontSizeVal');
     if (fontSizeVal) fontSizeVal.textContent = fontSize + 'px';
+    saveProjectDebounced();
   }
 }
 
 /**
  * Handle color change
  */
-export function handleColorChange(value) {
+export function handleFontColor(value) {
   applyColor(value);
+  saveProjectDebounced();
 }
 
 /**
@@ -569,6 +578,33 @@ export function handleColorChange(value) {
  */
 export function handleTextAlignChange(alignment) {
   applyTextAlign(alignment);
+}
+
+/**
+ * Handle bold toggle
+ */
+export function handleBold() {
+  toggleBold();
+  syncToolbarFromActive();
+  saveProjectDebounced();
+}
+
+/**
+ * Handle italic toggle
+ */
+export function handleItalic() {
+  toggleItalic();
+  syncToolbarFromActive();
+  saveProjectDebounced();
+}
+
+/**
+ * Handle underline toggle
+ */
+export function handleUnderline() {
+  toggleUnderline();
+  syncToolbarFromActive();
+  saveProjectDebounced();
 }
 
 // Text fade handlers
@@ -637,7 +673,7 @@ export function setupTextEventListeners() {
   const fontFamilySelect = document.getElementById('fontFamily');
   if (fontFamilySelect) {
     fontFamilySelect.addEventListener('change', (e) => {
-      handleFontFamilyChange(e.target.value);
+      handleFontFamily(e.target.value);
     });
   }
 
@@ -645,7 +681,7 @@ export function setupTextEventListeners() {
   const fontSizeInput = document.getElementById('fontSize');
   if (fontSizeInput) {
     fontSizeInput.addEventListener('input', (e) => {
-      handleFontSizeChange(e.target.value);
+      handleFontSize(e.target.value);
     });
   }
 
@@ -653,20 +689,26 @@ export function setupTextEventListeners() {
   const colorInput = document.getElementById('fontColor');
   if (colorInput) {
     colorInput.addEventListener('change', (e) => {
-      handleColorChange(e.target.value);
+      handleFontColor(e.target.value);
     });
   }
 
   // Bold button
   const boldBtn = document.getElementById('boldBtn');
   if (boldBtn) {
-    boldBtn.addEventListener('click', toggleBold);
+    boldBtn.addEventListener('click', handleBold);
   }
 
   // Italic button
   const italicBtn = document.getElementById('italicBtn');
   if (italicBtn) {
-    italicBtn.addEventListener('click', toggleItalic);
+    italicBtn.addEventListener('click', handleItalic);
+  }
+
+  // Underline button
+  const underlineBtn = document.getElementById('underlineBtn');
+  if (underlineBtn) {
+    underlineBtn.addEventListener('click', handleUnderline);
   }
 
   // Alignment buttons
