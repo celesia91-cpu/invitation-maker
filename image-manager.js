@@ -226,7 +226,7 @@ export function setTransforms() {
   syncImageControls();
 }
 
-// FIXED: Handle image upload with 100% default scaling
+// Handle image upload defaulting to fit within work area
 export async function handleImageUpload(file) {
   // Validate file size first
   const maxSize = 10 * 1024 * 1024; // 10MB limit
@@ -253,12 +253,12 @@ export async function handleImageUpload(file) {
           
           const r = work.getBoundingClientRect();
           
-          // FIXED: Set default scale to 100% coverage instead of 95%
+          // Set default scale so image fits entirely within work area
           const scaleToFitWidth = r.width / imgState.natW;
           const scaleToFitHeight = r.height / imgState.natH;
-          
-          // Use the larger scale to ensure full coverage (100%)
-          imgState.scale = Math.max(scaleToFitWidth, scaleToFitHeight);
+
+          // Use the smaller scale and avoid upscaling beyond 100%
+          imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
           
           imgState.angle = 0;
           imgState.signX = 1;
@@ -285,7 +285,7 @@ export async function handleImageUpload(file) {
             writeCurrentSlide();
           });
           
-          console.log('✅ Image uploaded to cloud at 100% scale');
+          console.log('✅ Image uploaded to cloud with fit-to-canvas scale');
           
         } catch (error) {
           console.error('Error processing uploaded image:', error);
@@ -310,7 +310,7 @@ export async function handleImageUpload(file) {
   fallbackToLocalUpload(file);
 }
 
-// FIXED: Local upload fallback with 100% scaling
+// Local upload fallback with fit-to-canvas scaling
 function fallbackToLocalUpload(file) {
   const userBgEl = document.querySelector('#userBg');
   const work = document.querySelector('#work');
@@ -326,12 +326,12 @@ function fallbackToLocalUpload(file) {
       
       const r = work.getBoundingClientRect();
       
-      // FIXED: Set default scale to 100% coverage
+      // Set default scale so image fits within work area
       const scaleToFitWidth = r.width / imgState.natW;
       const scaleToFitHeight = r.height / imgState.natH;
-      
-      // Use the larger scale for full coverage
-      imgState.scale = Math.max(scaleToFitWidth, scaleToFitHeight);
+
+      // Use the smaller scale and avoid upscaling beyond 100%
+      imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
       
       imgState.angle = 0;
       imgState.signX = 1;
@@ -358,7 +358,7 @@ function fallbackToLocalUpload(file) {
         writeCurrentSlide();
       });
       
-      console.log('✅ Local image loaded at 100% scale');
+        console.log('✅ Local image loaded with fit-to-canvas scale');
       
     } catch (error) {
       console.error('Error processing local image:', error);

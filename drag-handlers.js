@@ -605,16 +605,16 @@ export class DragHandlersManager {
    */
   forceEndDrag() {
     try {
-      document.body.classList.remove('dragging');
-      
-      if (this.dragState?.element) {
+      document.body?.classList?.remove?.('dragging');
+
+      if (this.dragState?.element?.classList) {
         this.dragState.element.classList.remove('dragging');
       }
-      
+
       if (this.ctx.hideGuides) {
         this.ctx.hideGuides();
       }
-      
+
       if (this.ctx.endDragText) {
         this.ctx.endDragText();
       }
