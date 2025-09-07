@@ -85,10 +85,12 @@ togglePanel(); // opens panel
 assert.ok(body.classList.contains('panel-open'));
 assert.strictEqual(togglePanelBtn.getAttribute('aria-expanded'), 'true');
 assert.strictEqual(previewBtn.getAttribute('aria-pressed'), 'false');
+assert.ok(togglePanelBtn.classList.contains('active'));
 
 togglePanel(); // closes panel
 assert.ok(!body.classList.contains('panel-open'));
 assert.strictEqual(togglePanelBtn.getAttribute('aria-expanded'), 'false');
+assert.ok(!togglePanelBtn.classList.contains('active'));
 console.log('togglePanel opens and closes the editor panel');
 
 // --- enterPreview / exitPreview ---
