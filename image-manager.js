@@ -14,6 +14,8 @@ export const imgState = {
   cy: 0,
   scale: 1,
   angle: 0,
+  shearX: 0,
+  shearY: 0,
   signX: 1,
   signY: 1,
   flip: false,
@@ -261,6 +263,8 @@ export async function handleImageUpload(file) {
           imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
           
           imgState.angle = 0;
+          imgState.shearX = 0;
+          imgState.shearY = 0;
           imgState.signX = 1;
           imgState.signY = 1;
           imgState.flip = false;
@@ -334,6 +338,8 @@ function fallbackToLocalUpload(file) {
       imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
       
       imgState.angle = 0;
+      imgState.shearX = 0;
+      imgState.shearY = 0;
       imgState.signX = 1;
       imgState.signY = 1;
       imgState.flip = false;
@@ -566,6 +572,8 @@ export function handleImageDelete() {
   imgState.cy = 0;
   imgState.scale = 1;
   imgState.angle = 0;
+  imgState.shearX = 0;
+  imgState.shearY = 0;
   imgState.signX = 1;
   imgState.signY = 1;
   imgState.flip = false;
