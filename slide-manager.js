@@ -602,7 +602,7 @@ export function startPlay() {
   }
 }
 
-export function playSlides() {
+export async function playSlides() {
   if (slidePlayback.isPlaying) {
     stopSlides();
     return;
@@ -612,7 +612,7 @@ export function playSlides() {
   if (slides.length === 0) return;
   
   slidePlayback.isPlaying = true;
-  slidePlayback.currentSlideIndex = 0;
+  slidePlayback.currentSlideIndex = getActiveIndex();
   slidePlayback.startTime = Date.now();
   
   // Update play button
@@ -622,7 +622,8 @@ export function playSlides() {
     playBtn.classList.add('active');
   }
   
-  playNextSlide();
+  // FIXED: Await the first slide to start properly
+  await playNextSlide();
   console.log('▶️ Started slide playback');
 }
 
@@ -644,7 +645,7 @@ export function stopSlides() {
   console.log('⏹️ Stopped slide playback');
 }
 
-function playNextSlide() {
+async function playNextSlide() {
   if (!slidePlayback.isPlaying) return;
   
   const slides = getSlides();
@@ -654,12 +655,24 @@ function playNextSlide() {
   }
   
   const slide = slides[slidePlayback.currentSlideIndex];
-  switchToSlide(slidePlayback.currentSlideIndex);
+  
+  // FIXED: Await the slide switch to complete before setting timer
+  try {
+    await switchToSlide(slidePlayback.currentSlideIndex);
+  } catch (error) {
+    console.error('Failed to switch slide during playback:', error);
+    // Stop playback on error
+    stopSlides();
+    return;
+  }
+  
+  // Only continue if playback is still active after the switch
+  if (!slidePlayback.isPlaying) return;
   
   const duration = slide?.durationMs || DEFAULT_DUR;
   slidePlayback.timeoutId = setTimeout(() => {
     slidePlayback.currentSlideIndex++;
-    playNextSlide();
+    playNextSlide(); // This will now work properly
   }, duration);
 }
 
