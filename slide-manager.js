@@ -91,6 +91,15 @@ class SlideSwitchManager {
 // Create singleton switch manager
 const switchManager = new SlideSwitchManager();
 
+// Capture the original transform of each layer so animations can be applied
+// without permanently overwriting existing transforms.
+function storeOriginalLayerTransforms() {
+  const layers = document.querySelectorAll('.layer');
+  layers.forEach(layer => {
+    layer.setAttribute('data-original-transform', layer.style.transform || '');
+  });
+}
+
 /* ----------------------------- Animation Functions ---------------------------------- */
 
 // Compute opacity based on fade timing
@@ -238,7 +247,10 @@ function startAnimationLoop() {
   if (animationState.isAnimating) {
     return; // Already running
   }
-  
+
+  // Capture original transforms before animations modify them
+  storeOriginalLayerTransforms();
+
   animationState.isAnimating = true;
   animationState.slideStartTime = performance.now();
   animationState.rafId = requestAnimationFrame(stepFrame);
@@ -493,6 +505,9 @@ export async function loadSlideIntoDOM(slide) {
         await createTextLayerFromData(layer);
       }
     }
+
+    // Record original transforms for all layers after creation
+    storeOriginalLayerTransforms();
 
     console.log('✅ Slide loaded into DOM');
 
