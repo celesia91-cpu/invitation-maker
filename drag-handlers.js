@@ -478,11 +478,44 @@ export class DragHandlersManager {
   async handleTextPointerMove(e, dx, dy) {
     if (!this.dragState.element) return;
 
-    const newLeft = this.dragState.startLeft + dx;
-    const newTop = this.dragState.startTop + dy;
+    const { showGuides, hideGuides } = this.ctx;
+    const element = this.dragState.element;
 
-    this.dragState.element.style.left = newLeft + 'px';
-    this.dragState.element.style.top = newTop + 'px';
+    let newLeft = this.dragState.startLeft + dx;
+    let newTop = this.dragState.startTop + dy;
+
+    const work = this.ctx.work;
+    const workRect = work.getBoundingClientRect();
+    const centerX = workRect.width / 2;
+    const centerY = workRect.height / 2;
+    const threshold = this.ctx.snapThreshold || 8;
+
+    let snapV = false, snapH = false;
+
+    if (this.ctx.enableSnapping) {
+      const elemWidth = element.offsetWidth;
+      const elemHeight = element.offsetHeight;
+      const elemCenterX = newLeft + elemWidth / 2;
+      const elemCenterY = newTop + elemHeight / 2;
+
+      if (Math.abs(elemCenterX - centerX) <= threshold) {
+        newLeft = centerX - elemWidth / 2;
+        snapV = true;
+      }
+      if (Math.abs(elemCenterY - centerY) <= threshold) {
+        newTop = centerY - elemHeight / 2;
+        snapH = true;
+      }
+    }
+
+    element.style.left = newLeft + 'px';
+    element.style.top = newTop + 'px';
+
+    if (this.ctx.enableGuides && showGuides && (snapV || snapH)) {
+      showGuides({ v: snapV, h: snapH });
+    } else if (hideGuides) {
+      hideGuides();
+    }
   }
 
   /**
@@ -503,32 +536,43 @@ export class DragHandlersManager {
       const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
       const startAngle = Math.atan2(this.dragState.startY - centerY, this.dragState.startX - centerX);
       const deltaAngle = angle - startAngle;
-      
+
       imgState.angle = this.dragState.startAngle + deltaAngle;
     } else if (['nw', 'ne', 'se', 'sw'].includes(handleType)) {
-      // Scale logic
-      const startDistance = Math.sqrt(
-        Math.pow(this.dragState.startX - centerX, 2) + 
-        Math.pow(this.dragState.startY - centerY, 2)
-      );
-      const currentDistance = Math.sqrt(
-        Math.pow(e.clientX - centerX, 2) + 
-        Math.pow(e.clientY - centerY, 2)
-      );
-      
-      if (startDistance > 0) {
-        const scaleFactor = currentDistance / startDistance;
-        imgState.scale = Math.max(0.1, this.dragState.startScale * scaleFactor);
-        
-        // Update sign tracking for proper scaling direction
-        const startVectorX = this.dragState.startVectorX;
-        const startVectorY = this.dragState.startVectorY;
-        
-        if (startVectorX !== 0 && startVectorY !== 0) {
-          const relX = e.clientX - centerX;
-          const relY = e.clientY - centerY;
-          imgState.signX = relX * startVectorX < 0 ? -1 : 1;
-          imgState.signY = relY * startVectorY < 0 ? -1 : 1;
+      if (e.shiftKey) {
+        // Shear instead of scale
+        const deltaX = e.clientX - this.dragState.startX;
+        const deltaY = e.clientY - this.dragState.startY;
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          imgState.shearX = this.dragState.startShearX + deltaX / 100;
+        } else {
+          imgState.shearY = this.dragState.startShearY + deltaY / 100;
+        }
+      } else {
+        // Scale logic
+        const startDistance = Math.sqrt(
+          Math.pow(this.dragState.startX - centerX, 2) +
+          Math.pow(this.dragState.startY - centerY, 2)
+        );
+        const currentDistance = Math.sqrt(
+          Math.pow(e.clientX - centerX, 2) +
+          Math.pow(e.clientY - centerY, 2)
+        );
+
+        if (startDistance > 0) {
+          const scaleFactor = currentDistance / startDistance;
+          imgState.scale = Math.max(0.1, this.dragState.startScale * scaleFactor);
+
+          // Update sign tracking for proper scaling direction
+          const startVectorX = this.dragState.startVectorX;
+          const startVectorY = this.dragState.startVectorY;
+
+          if (startVectorX !== 0 && startVectorY !== 0) {
+            const relX = e.clientX - centerX;
+            const relY = e.clientY - centerY;
+            imgState.signX = relX * startVectorX < 0 ? -1 : 1;
+            imgState.signY = relY * startVectorY < 0 ? -1 : 1;
+          }
         }
       }
     }
@@ -641,6 +685,33 @@ export class DragHandlersManager {
   }
 
   /**
+   * Cleanup event listeners
+   */
+  cleanup() {
+    const work = this.ctx.work;
+    const bgBox = this.ctx.bgBox;
+
+    if (work) {
+      work.removeEventListener('pointerdown', this.handlePointerDown);
+      work.removeEventListener('pointermove', this.handlePointerMove);
+      work.removeEventListener('pointerup', this.handlePointerUp);
+      work.removeEventListener('pointercancel', this.handlePointerCancel);
+      work.removeEventListener('click', this.handleWorkClick);
+      work.removeEventListener('touchstart', this.boundTouchStart);
+      work.removeEventListener('touchmove', this.boundTouchMove);
+      work.removeEventListener('touchend', this.handlePointerUp);
+    }
+
+    if (bgBox) {
+      bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
+      bgBox.removeEventListener('pointermove', this._onBgBoxMove);
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => {
+        bgBox.removeEventListener(ev, this._onBgBoxUp);
+      });
+    }
+  }
+
+  /**
    * Utility: Capture pointer
    */
   capturePointer(e) {
@@ -695,7 +766,7 @@ export class DragHandlersManager {
    * Attach text drag handlers to element
    */
   attachText(el) {
-    if (!el) return;
+    if (!el || el.dataset?.editing === 'true') return;
     el.addEventListener('pointerdown', this._onTextDown);
   }
 
@@ -705,12 +776,13 @@ export class DragHandlersManager {
   _onTextDown(e) {
     const getLocked = this.ctx.getLocked;
     const setActiveLayer = this.ctx.setActiveLayer;
-    
+
     if (getLocked && getLocked()) return;
 
     const t = e.currentTarget;
+    if (t.dataset?.editing === 'true') return;
     if (setActiveLayer) setActiveLayer(t);
-    
+
     this.dragText = {
       t,
       x: e.clientX,
@@ -720,7 +792,7 @@ export class DragHandlersManager {
       w: t.offsetWidth,
       h: t.offsetHeight
     };
-    
+
     this.capturePointer(e);
     console.log('📝 Started text drag operation');
   }
