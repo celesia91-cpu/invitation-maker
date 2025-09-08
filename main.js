@@ -626,10 +626,10 @@ class InvitationMakerApp {
     };
     
     // Add event listeners
-    work.addEventListener('pointerdown', handlePointerDown);
-    work.addEventListener('pointermove', handlePointerMove);
-    work.addEventListener('pointerup', handlePointerUp);
-    work.addEventListener('pointercancel', handlePointerUp);
+    //work.addEventListener('pointerdown', handlePointerDown);
+    //work.addEventListener('pointermove', handlePointerMove);
+    //work.addEventListener('pointerup', handlePointerUp);
+    //work.addEventListener('pointercancel', handlePointerUp);
     
     console.log('✅ Basic drag fallback with edit mode support initialized');
   }
