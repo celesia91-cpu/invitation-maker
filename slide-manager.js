@@ -1,13 +1,13 @@
-// slide-manager.js - COMPLETE VERSION WITH FADE & ZOOM ANIMATIONS
+// slide-manager.js - COMPLETE FIXED VERSION WITH IMAGE PERSISTENCE
 
-import { getSlides, getActiveIndex, setActiveIndex, setSlides, recordHistory } from './state-manager.js';
-import { imgState, setTransforms } from './image-manager.js';
+import { getSlides, getActiveIndex, setActiveIndex, setSlides, recordHistory, saveProjectDebounced } from './state-manager.js';
+import { imgState, setTransforms, enforceImageBounds, toggleUploadBtn } from './image-manager.js';
 import { clamp } from './utils.js';
 
 // Constants
 const DEFAULT_DUR = 3000;
 
-// FIXED: Get slide image helper function (no import needed)
+// Get slide image helper function
 function getSlideImage() {
   const slides = getSlides();
   const activeIndex = getActiveIndex();
@@ -29,19 +29,13 @@ class SlideSwitchManager {
     this.isDestroyed = false;
   }
 
-  /**
-   * Check if a switch operation is in progress
-   */
   isSwitching() {
     return !this.isDestroyed && !!this.currentSwitch;
   }
 
-  /**
-   * Start a new switch operation if none is in progress
-   */
   beginSwitch() {
     if (this.isSwitching()) {
-      return false; // Switch already in progress
+      return false;
     }
     
     this.currentSwitch = {
@@ -52,9 +46,6 @@ class SlideSwitchManager {
     return this.currentSwitch;
   }
 
-  /**
-   * End the current switch operation
-   */
   endSwitch(switchId) {
     if (this.currentSwitch && this.currentSwitch.id === switchId) {
       this.currentSwitch = null;
@@ -63,25 +54,16 @@ class SlideSwitchManager {
     return false;
   }
 
-  /**
-   * Check if the provided switch is the current one
-   */
   isCurrentSwitch(switchOperation) {
     return this.currentSwitch && 
            this.currentSwitch.id === switchOperation?.id && 
            !this.isDestroyed;
   }
 
-  /**
-   * Force clear any pending switches (for cleanup)
-   */
   clearPendingSwitches() {
     this.currentSwitch = null;
   }
 
-  /**
-   * Destroy the manager
-   */
   destroy() {
     this.isDestroyed = true;
     this.clearPendingSwitches();
@@ -91,8 +73,7 @@ class SlideSwitchManager {
 // Create singleton switch manager
 const switchManager = new SlideSwitchManager();
 
-// Capture the original transform of each layer so animations can be applied
-// without permanently overwriting existing transforms.
+// Store original transforms for animations
 function storeOriginalLayerTransforms() {
   const layers = document.querySelectorAll('.layer');
   layers.forEach(layer => {
@@ -102,19 +83,16 @@ function storeOriginalLayerTransforms() {
 
 /* ----------------------------- Animation Functions ---------------------------------- */
 
-// Compute opacity based on fade timing
 function computeOpacity(elapsed, duration, fadeInMs, fadeOutMs) {
   const fadeIn = fadeInMs || 0;
   const fadeOut = fadeOutMs || 0;
   
   let opacity = 1;
   
-  // Fade in at the beginning
   if (fadeIn > 0 && elapsed < fadeIn) {
     opacity = Math.min(1, elapsed / fadeIn);
   }
   
-  // Fade out at the end
   if (fadeOut > 0 && elapsed > (duration - fadeOut)) {
     const fadeOutProgress = (elapsed - (duration - fadeOut)) / fadeOut;
     opacity = Math.max(0, 1 - fadeOutProgress);
@@ -123,29 +101,25 @@ function computeOpacity(elapsed, duration, fadeInMs, fadeOutMs) {
   return Math.max(0, Math.min(1, opacity));
 }
 
-// Compute zoom scale based on zoom timing
 function computeZoomScale(elapsed, duration, zoomInMs, zoomOutMs) {
   const zoomIn = zoomInMs || 0;
   const zoomOut = zoomOutMs || 0;
   
   let scale = 1;
   
-  // Zoom in at the beginning (from 0.3 to 1.0)
   if (zoomIn > 0 && elapsed < zoomIn) {
     const progress = elapsed / zoomIn;
-    scale = 0.3 + (0.7 * progress); // 0.3 to 1.0
+    scale = 0.3 + (0.7 * progress);
   }
   
-  // Zoom out at the end (from 1.0 to 1.5)
   if (zoomOut > 0 && elapsed > (duration - zoomOut)) {
     const zoomOutProgress = (elapsed - (duration - zoomOut)) / zoomOut;
-    scale = 1 + (0.5 * zoomOutProgress); // 1.0 to 1.5
+    scale = 1 + (0.5 * zoomOutProgress);
   }
   
   return Math.max(0.1, scale);
 }
 
-// Animation frame step function
 function stepFrame(timestamp) {
   if (!slidePlayback.isPlaying) {
     animationState.isAnimating = false;
@@ -162,7 +136,6 @@ function stepFrame(timestamp) {
     return;
   }
   
-  // Calculate elapsed time for current slide
   const elapsed = timestamp - animationState.slideStartTime;
   const duration = currentSlide.durationMs || DEFAULT_DUR;
   
@@ -173,7 +146,6 @@ function stepFrame(timestamp) {
     layers.forEach((layer, index) => {
       const layerData = currentSlide.layers?.[index] || {};
       
-      // Apply fade animation
       const opacity = computeOpacity(
         elapsed, 
         duration, 
@@ -182,7 +154,6 @@ function stepFrame(timestamp) {
       );
       layer.style.opacity = opacity.toString();
       
-      // Apply zoom animation
       const zoomScale = computeZoomScale(
         elapsed,
         duration,
@@ -190,7 +161,6 @@ function stepFrame(timestamp) {
         layerData.zoomOutMs || 0
       );
       
-      // Store original transform to avoid conflicts
       const originalTransform = layer.getAttribute('data-original-transform') || '';
       
       if (zoomScale !== 1) {
@@ -208,7 +178,6 @@ function stepFrame(timestamp) {
   if (currentSlide.image && userBgWrap && userBg) {
     const imageData = currentSlide.image;
     
-    // Apply fade animation to image
     const opacity = computeOpacity(
       elapsed,
       duration,
@@ -217,7 +186,6 @@ function stepFrame(timestamp) {
     );
     userBgWrap.style.opacity = opacity.toString();
     
-    // Apply zoom animation to image
     const zoomScale = computeZoomScale(
       elapsed,
       duration,
@@ -225,40 +193,33 @@ function stepFrame(timestamp) {
       imageData.zoomOutMs || 0
     );
     
-    // Get current transform from setTransforms, remove any existing scale
     const currentTransform = userBg.style.transform || '';
     const base = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
 
     if (zoomScale !== 1) {
-      // Apply zoom on top of existing transform
       userBg.style.transform = `${base} scale(${zoomScale})`.trim();
     } else {
-      // Reset to just the original transform
       userBg.style.transform = base;
     }
   }
   
-  // Continue animation loop
   animationState.rafId = requestAnimationFrame(stepFrame);
 }
 
-// Start animation loop
 function startAnimationLoop() {
   if (animationState.isAnimating) {
-    return; // Already running
+    return;
   }
 
-  // Capture original transforms before animations modify them
   storeOriginalLayerTransforms();
 
   animationState.isAnimating = true;
   animationState.slideStartTime = performance.now();
   animationState.rafId = requestAnimationFrame(stepFrame);
   
-  console.log('🎬 Animation loop started');
+  console.log('Animation loop started');
 }
 
-// Stop animation loop
 function stopAnimationLoop() {
   animationState.isAnimating = false;
   
@@ -267,15 +228,12 @@ function stopAnimationLoop() {
     animationState.rafId = null;
   }
   
-  // Reset all animations to default state
   resetAnimations();
   
-  console.log('⏹️ Animation loop stopped');
+  console.log('Animation loop stopped');
 }
 
-// Reset all elements to their default state (no fade/zoom)
 function resetAnimations() {
-  // Reset text layers
   const layers = document.querySelectorAll('.layer');
   layers.forEach(layer => {
     layer.style.opacity = '1';
@@ -283,7 +241,6 @@ function resetAnimations() {
     layer.style.transform = originalTransform;
   });
   
-  // Reset background image
   const userBgWrap = document.getElementById('userBgWrap');
   const userBg = document.getElementById('userBg');
   
@@ -292,7 +249,6 @@ function resetAnimations() {
   }
   
   if (userBg) {
-    // Keep the image transforms from setTransforms, just remove animation scales
     const currentTransform = userBg.style.transform || '';
     userBg.style.transform = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
   }
@@ -329,27 +285,19 @@ function ensureSlide(idx) {
   }
 }
 
-/* --------------------------- Image Loading with Cancellation ----------------------------- */
+/* ----------------------------- Image Loading with Persistence ----------------------------- */
 
-/**
- * Cancellable image loader
- */
 class ImageLoader {
   constructor() {
     this.currentLoad = null;
   }
 
-  /**
-   * Load slide image defaulting to fit within the work area
-   */
   async loadSlideImage(slide) {
-    // Cancel any previous load
     this.cancelCurrentLoad();
     
     const { userBg, work } = getEls();
-    const chosenSrc = slide?.image?.src || slide?.image?.thumb || '';
     
-    if (!chosenSrc) {
+    if (!slide?.image?.src) {
       imgState.has = false;
       imgState.shearX = 0;
       imgState.shearY = 0;
@@ -357,6 +305,9 @@ class ImageLoader {
       setTransforms();
       return;
     }
+
+    const imageData = slide.image;
+    const chosenSrc = imageData.src || imageData.thumb || '';
 
     return new Promise((resolve) => {
       const loadOperation = {
@@ -375,63 +326,79 @@ class ImageLoader {
         }
 
         try {
-          imgState.natW = userBg.naturalWidth;
-          imgState.natH = userBg.naturalHeight;
+          // Restore image state from saved data
+          imgState.natW = imageData.natW || userBg.naturalWidth;
+          imgState.natH = imageData.natH || userBg.naturalHeight;
           imgState.has = true;
           
-          const workRect = work.getBoundingClientRect();
-          const centerX = workRect.width / 2;
-          const centerY = workRect.height / 2;
-          
-          // Use saved values or calculate fit-to-canvas defaults
-          if (slide.image && typeof slide.image.scale === 'number') {
-            imgState.scale = slide.image.scale;
-            imgState.angle = slide.image.angle || 0;
-            imgState.shearX = slide.image.shearX ?? 0;
-            imgState.shearY = slide.image.shearY ?? 0;
-            imgState.signX = slide.image.signX ?? 1;
-            imgState.signY = slide.image.signY ?? 1;
-            imgState.flip = !!slide.image.flip;
-            imgState.cx = slide.image.cx || centerX;
-            imgState.cy = slide.image.cy || centerY;
+          // Restore transform values or use defaults
+          if (typeof imageData.scale === 'number') {
+            imgState.scale = imageData.scale;
+            imgState.angle = imageData.angle || 0;
+            imgState.cx = imageData.cx || (work.getBoundingClientRect().width / 2);
+            imgState.cy = imageData.cy || (work.getBoundingClientRect().height / 2);
+            imgState.shearX = imageData.shearX || 0;
+            imgState.shearY = imageData.shearY || 0;
+            imgState.signX = imageData.signX || 1;
+            imgState.signY = imageData.signY || 1;
+            imgState.flip = imageData.flip || false;
           } else {
-            // Default to scale that keeps entire image visible
+            // Calculate fit-to-canvas defaults if no saved values
+            const workRect = work.getBoundingClientRect();
             const scaleToFitWidth = workRect.width / imgState.natW;
             const scaleToFitHeight = workRect.height / imgState.natH;
-
-            // Use the smaller scale and avoid upscaling beyond 100%
+            
             imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
             imgState.angle = 0;
+            imgState.cx = workRect.width / 2;
+            imgState.cy = workRect.height / 2;
             imgState.shearX = 0;
             imgState.shearY = 0;
             imgState.signX = 1;
             imgState.signY = 1;
             imgState.flip = false;
-            imgState.cx = centerX;
-            imgState.cy = centerY;
+          }
+          
+          // Restore backend info if available
+          if (imageData.backendImageId) {
+            imgState.backendImageId = imageData.backendImageId;
+            imgState.backendImageUrl = imageData.backendImageUrl;
+            imgState.backendThumbnailUrl = imageData.backendThumbnailUrl;
           }
           
           setTransforms();
-          console.log('✅ Slide image loaded with fit-to-canvas scale:', imgState.scale);
+          enforceImageBounds();
+          toggleUploadBtn();
           
+          console.log('Image loaded and state restored from slide data');
+
         } catch (error) {
-          console.warn('Image processing error:', error);
+          console.error('Error restoring image state:', error);
           imgState.has = false;
-          imgState.shearX = 0;
-          imgState.shearY = 0;
           setTransforms();
         }
-        
+
         resolve();
       };
 
       const onError = () => {
-        if (!loadOperation.cancelled) {
-          imgState.has = false;
-          imgState.shearX = 0;
-          imgState.shearY = 0;
-          setTransforms();
+        if (loadOperation.cancelled) {
+          resolve();
+          return;
         }
+        
+        console.error('Failed to load image:', chosenSrc);
+        
+        // If backend image fails, try to fallback to thumbnail
+        if (imageData.isLocal === false && imageData.backendThumbnailUrl && 
+            imageData.backendThumbnailUrl !== chosenSrc) {
+          console.log('Trying backup thumbnail URL');
+          userBg.src = imageData.backendThumbnailUrl;
+          return;
+        }
+        
+        imgState.has = false;
+        setTransforms();
         resolve();
       };
 
@@ -441,9 +408,6 @@ class ImageLoader {
     });
   }
 
-  /**
-   * Cancel current image load
-   */
   cancelCurrentLoad() {
     if (this.currentLoad) {
       this.currentLoad.cancelled = true;
@@ -451,9 +415,6 @@ class ImageLoader {
     }
   }
 
-  /**
-   * Cleanup
-   */
   destroy() {
     this.cancelCurrentLoad();
   }
@@ -462,7 +423,7 @@ class ImageLoader {
 // Create singleton image loader
 const imageLoader = new ImageLoader();
 
-/* --------------------------- Simplified Slide Loading ----------------------------- */
+/* ----------------------------- Slide Loading ----------------------------- */
 
 export async function loadSlideIntoDOM(slide) {
   const { work } = getEls();
@@ -509,14 +470,14 @@ export async function loadSlideIntoDOM(slide) {
     // Record original transforms for all layers after creation
     storeOriginalLayerTransforms();
 
-    console.log('✅ Slide loaded into DOM');
+    console.log('Slide loaded into DOM');
 
   } catch (error) {
     console.error('Failed to load slide into DOM:', error);
   }
 }
 
-/* --------------------------- Text Layer Creation ----------------------------- */
+/* ----------------------------- Text Layer Creation ----------------------------- */
 
 async function createTextLayerFromData(layerData) {
   try {
@@ -546,8 +507,8 @@ async function createTextLayerFromData(layerData) {
       textEl._zoomOutMs = layerData.zoomOutMs || 0;
       
       // Optimize element for smooth animations
-      textEl.style.backfaceVisibility = 'hidden'; // Reduce visual artifacts
-      textEl.style.perspective = '1000px'; // Enable 3D rendering
+      textEl.style.backfaceVisibility = 'hidden';
+      textEl.style.perspective = '1000px';
     }
 
     return textEl;
@@ -557,10 +518,9 @@ async function createTextLayerFromData(layerData) {
   }
 }
 
-/* --------------------------- Slide Switching ----------------------------- */
+/* ----------------------------- Slide Switching ----------------------------- */
 
 export async function switchToSlide(idx) {
-  // Start a new switch operation
   const switchOperation = switchManager.beginSwitch();
   if (!switchOperation) {
     console.log('Switch already in progress, ignoring request');
@@ -571,67 +531,58 @@ export async function switchToSlide(idx) {
     ensureSlide(idx);
     const targetIndex = getActiveIndex();
     
-    console.log(`🔄 Switching to slide ${targetIndex}`);
+    console.log(`Switching to slide ${targetIndex}`);
 
-    // Load the slide
     const slides = getSlides();
     await loadSlideIntoDOM(slides[targetIndex]);
     
-    // Update UI
     updateSlidesUI();
     
-    // Verify this switch operation is still current
     if (!switchManager.isCurrentSwitch(switchOperation)) {
       console.log('Switch operation superseded, aborting');
       return;
     }
 
-    console.log(`✅ Successfully switched to slide ${targetIndex}`);
+    console.log(`Successfully switched to slide ${targetIndex}`);
     
   } catch (error) {
     console.error('Failed to switch slide:', error);
   } finally {
-    // End the switch operation
     switchManager.endSwitch(switchOperation.id);
   }
 }
 
-// CRITICAL FIX: Direct slide switch that bypasses the switch manager for playback
 async function directSwitchToSlide(idx) {
   try {
     ensureSlide(idx);
     const targetIndex = getActiveIndex();
     
-    console.log(`🎬 Direct switching to slide ${targetIndex} (playback)`);
+    console.log(`Direct switching to slide ${targetIndex} (playback)`);
 
-    // Load the slide directly without switch manager blocking
     const slides = getSlides();
     await loadSlideIntoDOM(slides[targetIndex]);
     
-    // Update UI
     updateSlidesUI();
 
-    // Restart animation timing for new slide
     if (slidePlayback.isPlaying) {
       animationState.slideStartTime = performance.now();
     }
 
-    console.log(`✅ Direct switch to slide ${targetIndex} complete`);
+    console.log(`Direct switch to slide ${targetIndex} complete`);
     
   } catch (error) {
     console.error('Failed to direct switch slide:', error);
-    throw error; // Re-throw to stop playback
+    throw error;
   }
 }
 
-/* --------------------------- UI Updates ----------------------------- */
+/* ----------------------------- UI Updates ----------------------------- */
 
 export function updateSlidesUI() {
   const { slidesStrip, slideLabel, slideDur, slideDurVal } = getEls();
   const slides = getSlides();
   const activeIndex = getActiveIndex();
 
-  // Update slides strip
   if (slidesStrip) {
     slidesStrip.innerHTML = slides.map((slide, i) => 
       `<button class="slide-chip ${i === activeIndex ? 'active' : ''}" 
@@ -642,7 +593,6 @@ export function updateSlidesUI() {
       </button>`
     ).join('');
 
-    // Add click handlers
     [...slidesStrip.querySelectorAll('.slide-chip')].forEach(chip => {
       chip.addEventListener('click', () => {
         const slideIndex = parseInt(chip.dataset.slide, 10);
@@ -651,12 +601,10 @@ export function updateSlidesUI() {
     });
   }
 
-  // Update slide label
   if (slideLabel) {
     slideLabel.textContent = `Slide ${activeIndex + 1} of ${slides.length}`;
   }
 
-  // Update duration controls
   const currentSlideData = slides[activeIndex];
   if (slideDur && slideDurVal && currentSlideData) {
     const durationMs = currentSlideData.durationMs || DEFAULT_DUR;
@@ -665,7 +613,7 @@ export function updateSlidesUI() {
   }
 }
 
-/* --------------------------- Slide Data Management ----------------------------- */
+/* ----------------------------- Slide Data Management ----------------------------- */
 
 export function writeCurrentSlide() {
   try {
@@ -734,18 +682,17 @@ export function writeCurrentSlide() {
 
     slide.layers = layers;
 
-    // Update slides array
     slides[activeIndex] = slide;
-    setSlides([...slides]); // Create new array to trigger updates
+    setSlides([...slides]);
 
-    console.log('✅ Current slide data written');
+    console.log('Current slide data written');
     
   } catch (error) {
     console.error('Failed to write current slide:', error);
   }
 }
 
-/* --------------------------- Slide Actions ----------------------------- */
+/* ----------------------------- Slide Actions ----------------------------- */
 
 export function addSlide() {
   try {
@@ -766,7 +713,7 @@ export function addSlide() {
     setSlides(newSlides);
     switchToSlide(currentIndex + 1);
     
-    console.log('✅ New slide added');
+    console.log('New slide added');
     recordHistory();
   } catch (error) {
     console.error('Failed to add slide:', error);
@@ -775,7 +722,7 @@ export function addSlide() {
 
 export function duplicateSlide() {
   try {
-    writeCurrentSlide(); // Save current state first
+    writeCurrentSlide();
     
     const slides = getSlides();
     const currentIndex = getActiveIndex();
@@ -786,7 +733,6 @@ export function duplicateSlide() {
       return;
     }
     
-    // Deep clone the slide
     const duplicatedSlide = JSON.parse(JSON.stringify(currentSlide));
     
     const newSlides = [...slides];
@@ -795,7 +741,7 @@ export function duplicateSlide() {
     setSlides(newSlides);
     switchToSlide(currentIndex + 1);
     
-    console.log('✅ Slide duplicated');
+    console.log('Slide duplicated');
     recordHistory();
   } catch (error) {
     console.error('Failed to duplicate slide:', error);
@@ -815,18 +761,17 @@ export function deleteSlide() {
     const newSlides = slides.filter((_, i) => i !== currentIndex);
     setSlides(newSlides);
     
-    // Adjust active index if necessary
     const newActiveIndex = Math.min(currentIndex, newSlides.length - 1);
     switchToSlide(newActiveIndex);
     
-    console.log('✅ Slide deleted');
+    console.log('Slide deleted');
     recordHistory();
   } catch (error) {
     console.error('Failed to delete slide:', error);
   }
 }
 
-/* --------------------------- Slide Duration ----------------------------- */
+/* ----------------------------- Slide Duration ----------------------------- */
 
 export function handleSlideDuration(value) {
   try {
@@ -843,9 +788,9 @@ export function handleSlideDuration(value) {
         slideDurVal.textContent = (durationMs / 1000).toFixed(1) + 's';
       }
       
-      setSlides([...slides]); // Trigger update
+      setSlides([...slides]);
       
-      console.log(`✅ Slide duration set to ${durationMs}ms`);
+      console.log(`Slide duration set to ${durationMs}ms`);
       recordHistory();
     }
   } catch (error) {
@@ -854,11 +799,10 @@ export function handleSlideDuration(value) {
 }
 
 export function handleSlideDurationChange(value) {
-  // Alias for backward compatibility
   handleSlideDuration(value);
 }
 
-/* --------------------------- Slide Playback ----------------------------- */
+/* ----------------------------- Slide Playback ----------------------------- */
 
 let slidePlayback = {
   isPlaying: false,
@@ -886,7 +830,6 @@ export function playSlides() {
   slidePlayback.currentSlideIndex = getActiveIndex();
   slidePlayback.startTime = Date.now();
   
-  // Update play button
   const playBtn = document.getElementById('playSlidesBtn');
   if (playBtn) {
     playBtn.textContent = 'Stop';
@@ -894,12 +837,10 @@ export function playSlides() {
     playBtn.setAttribute('aria-pressed', 'true');
   }
   
-  // Start animation loop for fade/zoom effects
   startAnimationLoop();
   
-  // Start playback
   playNextSlide();
-  console.log('▶️ Started slide playback with animations');
+  console.log('Started slide playback with animations');
 }
 
 export function stopSlides() {
@@ -910,10 +851,8 @@ export function stopSlides() {
     slidePlayback.timeoutId = null;
   }
   
-  // Stop animation loop
   stopAnimationLoop();
   
-  // Update play button
   const playBtn = document.getElementById('playSlidesBtn');
   if (playBtn) {
     playBtn.textContent = 'Play';
@@ -921,52 +860,46 @@ export function stopSlides() {
     playBtn.setAttribute('aria-pressed', 'false');
   }
   
-  console.log('⏹️ Stopped slide playback');
+  console.log('Stopped slide playback');
 }
 
-// CRITICAL FIX: Make playNextSlide async and use direct switching for playback
 async function playNextSlide() {
   if (!slidePlayback.isPlaying) return;
   
   const slides = getSlides();
   if (slidePlayback.currentSlideIndex >= slides.length) {
-    // Loop back to start
     slidePlayback.currentSlideIndex = 0;
   }
   
   const slide = slides[slidePlayback.currentSlideIndex];
   
   try {
-    console.log(`🎬 Playing slide ${slidePlayback.currentSlideIndex + 1} of ${slides.length}`);
+    console.log(`Playing slide ${slidePlayback.currentSlideIndex + 1} of ${slides.length}`);
     
-    // CRITICAL: Use direct switch to bypass the switch manager blocking
     await directSwitchToSlide(slidePlayback.currentSlideIndex);
     
-    // Check if playback is still active after the switch
     if (!slidePlayback.isPlaying) {
       console.log('Playback stopped during slide switch');
       return;
     }
     
     const duration = slide?.durationMs || DEFAULT_DUR;
-    console.log(`⏰ Setting timer for ${duration}ms`);
+    console.log(`Setting timer for ${duration}ms`);
     
-    // Set timeout for next slide
     slidePlayback.timeoutId = setTimeout(async () => {
       if (slidePlayback.isPlaying) {
         slidePlayback.currentSlideIndex++;
-        await playNextSlide(); // Recursive call, now properly async
+        await playNextSlide();
       }
     }, duration);
     
   } catch (error) {
     console.error('Error during slide playback:', error);
-    // Stop playback on error to prevent getting stuck
     stopSlides();
   }
 }
 
-/* --------------------------- Slide Navigation ----------------------------- */
+/* ----------------------------- Slide Navigation ----------------------------- */
 
 export async function previousSlide() {
   const slides = getSlides();
@@ -982,9 +915,8 @@ export async function nextSlide() {
   await switchToSlide(newIndex);
 }
 
-/* --------------------------- Debug and Testing Functions ----------------------------- */
+/* ----------------------------- Debug Functions ----------------------------- */
 
-// Debug function to check playback state
 export function getPlaybackState() {
   return {
     isPlaying: slidePlayback.isPlaying,
@@ -998,9 +930,8 @@ export function getPlaybackState() {
   };
 }
 
-// Force stop playback and reset state
 export function forceStopPlayback() {
-  console.log('🛑 Force stopping playback');
+  console.log('Force stopping playback');
   slidePlayback.isPlaying = false;
   
   if (slidePlayback.timeoutId) {
@@ -1008,25 +939,21 @@ export function forceStopPlayback() {
     slidePlayback.timeoutId = null;
   }
   
-  // Stop animations
   stopAnimationLoop();
   
-  // Clear any pending switch operations
   switchManager.clearPendingSwitches();
   
-  // Update play button
   const playBtn = document.getElementById('playSlidesBtn');
   if (playBtn) {
     playBtn.textContent = 'Play';
     playBtn.classList.remove('active');
   }
   
-  console.log('✅ Playback force stopped');
+  console.log('Playback force stopped');
 }
 
-// Test function for debugging
 export function testPlayback() {
-  console.log('🧪 Testing playback system...');
+  console.log('Testing playback system...');
   console.log('Current state:', getPlaybackState());
   
   const slides = getSlides();
@@ -1040,7 +967,6 @@ export function testPlayback() {
   }
 }
 
-// Manual advance for testing
 export function advanceSlide() {
   if (slidePlayback.isPlaying) {
     slidePlayback.currentSlideIndex++;
@@ -1048,10 +974,9 @@ export function advanceSlide() {
   }
 }
 
-/* --------------------------- Reset Utilities ----------------------------- */
+/* ----------------------------- Reset Utilities ----------------------------- */
 
 export function resetOpacities() {
-  // Reset any opacity animations or transitions
   const userBg = document.querySelector('#userBg');
   if (userBg) {
     userBg.style.opacity = '';
@@ -1065,19 +990,39 @@ export function resetOpacities() {
   });
 }
 
-/* --------------------------- Cleanup ----------------------------- */
+/* ----------------------------- Image Persistence Validation ----------------------------- */
+
+export function validateImagePersistence() {
+  try {
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    const currentSlide = slides[activeIndex];
+    
+    console.log('=== IMAGE PERSISTENCE CHECK ===');
+    console.log('Current slide has image:', !!currentSlide?.image);
+    console.log('Image src:', currentSlide?.image?.src?.substring(0, 50) + '...');
+    console.log('Image data:', currentSlide?.image);
+    console.log('ImgState has:', imgState.has);
+    console.log('================================');
+  } catch (error) {
+    console.error('Failed to validate image persistence:', error);
+  }
+}
+
+/* ----------------------------- Cleanup ----------------------------- */
 
 export function destroySlideManager() {
   stopAnimationLoop();
   switchManager.destroy();
   imageLoader.destroy();
   stopSlides();
-  console.log('✅ Slide manager destroyed');
+  console.log('Slide manager destroyed');
 }
-
-/* --------------------------- Initialization ----------------------------- */
 
 // Initialize slides UI when the module loads
 document.addEventListener('DOMContentLoaded', () => {
   updateSlidesUI();
 });
+
+// Export for debugging
+window.validateImagePersistence = validateImagePersistence;

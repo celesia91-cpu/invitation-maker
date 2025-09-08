@@ -1,8 +1,8 @@
-// image-manager.js - COMPLETE FIXED VERSION - No missing imports
+// image-manager.js - COMPLETE FIXED VERSION WITH PERSISTENCE
 
 import { apiClient } from './api-client.js';
 import { clamp } from './utils.js';
-import { getSlides, getActiveIndex, saveProjectDebounced, recordHistory } from './state-manager.js';
+import { getSlides, getActiveIndex, setSlides, saveProjectDebounced, recordHistory } from './state-manager.js';
 
 // Image state management
 export const imgState = {
@@ -51,7 +51,7 @@ function saveAndRecord() {
   recordHistory();
 }
 
-// FIXED: Get slide image helper function (no import needed)
+// Get slide image helper function
 function getSlideImage() {
   const slides = getSlides();
   const activeIndex = getActiveIndex();
@@ -181,7 +181,7 @@ export function enforceImageBounds() {
   imgState.cy = clamp(imgState.cy, h / 2, r.height - h / 2);
 }
 
-// FIXED: Set image transforms and position with proper scaling
+// Set image transforms and position with proper scaling
 export function setTransforms() {
   const body = document.body;
   const userBgWrap = document.querySelector('#userBgWrap');
@@ -237,7 +237,40 @@ export function setTransforms() {
   syncImageControls();
 }
 
-// Handle image upload defaulting to fit within work area
+// CRITICAL: Save image data to slide for persistence
+function saveImageToSlide(src, imageData) {
+  try {
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    
+    if (slides && slides[activeIndex]) {
+      // Create/update image object in slide
+      slides[activeIndex].image = {
+        src: src,
+        thumb: imageData.backendThumbnailUrl || src,
+        ...imageData
+      };
+      
+      // Save updated slides
+      setSlides([...slides]);
+      
+      // Write to storage asynchronously
+      setTimeout(() => {
+        import('./slide-manager.js').then(({ writeCurrentSlide }) => {
+          writeCurrentSlide();
+        }).catch(error => {
+          console.warn('Failed to write slide after image save:', error);
+        });
+      }, 0);
+      
+      console.log('Image data saved to slide:', activeIndex);
+    }
+  } catch (error) {
+    console.error('Failed to save image to slide:', error);
+  }
+}
+
+// Handle image upload with persistence
 export async function handleImageUpload(file) {
   // Validate file size first
   const maxSize = 10 * 1024 * 1024; // 10MB limit
@@ -273,8 +306,6 @@ export async function handleImageUpload(file) {
           // Use the smaller scale and avoid upscaling beyond 100%
           imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
           imgState.angle = 0;
-          // imgState.shearX = 0;
-          // imgState.shearY = 0;
           imgState.signX = 1;
           imgState.signY = 1;
           imgState.flip = false;
@@ -296,12 +327,26 @@ export async function handleImageUpload(file) {
           imgState.backendImageUrl = response.url;
           imgState.backendThumbnailUrl = response.thumbnailUrl;
           
-          // Save project with new image
-          import('./slide-manager.js').then(({ writeCurrentSlide }) => {
-            writeCurrentSlide();
+          // CRITICAL: Save to project with backend info
+          saveImageToSlide(response.url, {
+            scale: imgState.scale,
+            angle: imgState.angle,
+            cx: imgState.cx,
+            cy: imgState.cy,
+            shearX: imgState.shearX,
+            shearY: imgState.shearY,
+            signX: imgState.signX,
+            signY: imgState.signY,
+            flip: imgState.flip,
+            natW: imgState.natW,
+            natH: imgState.natH,
+            backendImageId: response.imageId,
+            backendImageUrl: response.url,
+            backendThumbnailUrl: response.thumbnailUrl,
+            isLocal: false
           });
           
-          console.log('✅ Image uploaded to cloud with fit-to-canvas scale');
+          console.log('Backend image uploaded and saved to project');
           
         } catch (error) {
           console.error('Error processing uploaded image:', error);
@@ -326,7 +371,7 @@ export async function handleImageUpload(file) {
   fallbackToLocalUpload(file);
 }
 
-// Local upload fallback with fit-to-canvas scaling
+// Local upload fallback with persistence
 function fallbackToLocalUpload(file) {
   const userBgEl = document.querySelector('#userBg');
   const work = document.querySelector('#work');
@@ -348,7 +393,7 @@ function fallbackToLocalUpload(file) {
 
       const { shearX, shearY, signX, signY, flip } = imgState;
       imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
-      imgState.angle ??= 0;
+      imgState.angle = 0;
       imgState.cx = r.width / 2;
       imgState.cy = r.height / 2;
       imgState.has = true;
@@ -370,12 +415,23 @@ function fallbackToLocalUpload(file) {
       delete imgState.backendImageUrl;
       delete imgState.backendThumbnailUrl;
       
-      // Save project
-      import('./slide-manager.js').then(({ writeCurrentSlide }) => {
-        writeCurrentSlide();
+      // CRITICAL: Save local image data to project
+      saveImageToSlide(userBgEl.src, {
+        scale: imgState.scale,
+        angle: imgState.angle,
+        cx: imgState.cx,
+        cy: imgState.cy,
+        shearX: imgState.shearX,
+        shearY: imgState.shearY,
+        signX: imgState.signX,
+        signY: imgState.signY,
+        flip: imgState.flip,
+        natW: imgState.natW,
+        natH: imgState.natH,
+        isLocal: true // Flag to indicate this is a local data URL
       });
       
-        console.log('✅ Local image loaded with fit-to-canvas scale');
+      console.log('Local image loaded and saved to project');
       
     } catch (error) {
       console.error('Error processing local image:', error);
@@ -478,7 +534,7 @@ export function handleImageFadeIn() {
   if (!img) return;
   img.fadeInMs = (img.fadeInMs || 0) > 0 ? 0 : 800;
   updateImageFadeUI();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
 }
 
@@ -487,7 +543,7 @@ export function handleImageFadeOut() {
   if (!img) return;
   img.fadeOutMs = (img.fadeOutMs || 0) > 0 ? 0 : 800;
   updateImageFadeUI();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
 }
 
@@ -497,6 +553,7 @@ export function handleImageFadeInRange(value) {
   img.fadeInMs = parseInt(value, 10) || 0;
   const imgFadeInVal = document.getElementById('imgFadeInVal');
   if (imgFadeInVal) imgFadeInVal.textContent = fmtSec(img.fadeInMs);
+  saveImageSettings();
 }
 
 export function handleImageFadeOutRange(value) {
@@ -505,6 +562,7 @@ export function handleImageFadeOutRange(value) {
   img.fadeOutMs = parseInt(value, 10) || 0;
   const imgFadeOutVal = document.getElementById('imgFadeOutVal');
   if (imgFadeOutVal) imgFadeOutVal.textContent = fmtSec(img.fadeOutMs);
+  saveImageSettings();
 }
 
 // Image zoom handlers
@@ -513,7 +571,7 @@ export function handleImageZoomIn() {
   if (!img) return;
   img.zoomInMs = (img.zoomInMs || 0) > 0 ? 0 : 800;
   updateImageZoomUI();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
 }
 
@@ -522,7 +580,7 @@ export function handleImageZoomOut() {
   if (!img) return;
   img.zoomOutMs = (img.zoomOutMs || 0) > 0 ? 0 : 800;
   updateImageZoomUI();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
 }
 
@@ -532,6 +590,7 @@ export function handleImageZoomInRange(value) {
   img.zoomInMs = parseInt(value, 10) || 0;
   const imgZoomInVal = document.getElementById('imgZoomInVal');
   if (imgZoomInVal) imgZoomInVal.textContent = fmtSec(img.zoomInMs);
+  saveImageSettings();
 }
 
 export function handleImageZoomOutRange(value) {
@@ -540,6 +599,7 @@ export function handleImageZoomOutRange(value) {
   img.zoomOutMs = parseInt(value, 10) || 0;
   const imgZoomOutVal = document.getElementById('imgZoomOutVal');
   if (imgZoomOutVal) imgZoomOutVal.textContent = fmtSec(img.zoomOutMs);
+  saveImageSettings();
 }
 
 // Image scaling and rotation handlers
@@ -548,7 +608,7 @@ export function handleImageScale(value) {
   imgState.scale = clamp(parseInt(value, 10) / 100, 0.05, 10);
   enforceImageBounds();
   setTransforms();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
 }
 
@@ -559,7 +619,7 @@ export function handleImageRotate(value) {
   imgState.angle = deg * Math.PI / 180; // store in radians
   enforceImageBounds();
   setTransforms();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
 }
 
@@ -568,8 +628,25 @@ export function handleImageFlip() {
   if (!imgState.has) return;
   imgState.flip = !imgState.flip;
   setTransforms();
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
+  saveImageSettings();
   saveAndRecord();
+}
+
+// Save current image settings to slide
+function saveImageSettings() {
+  if (!imgState.has) return;
+  
+  try {
+    setTimeout(() => {
+      import('./slide-manager.js').then(({ writeCurrentSlide }) => {
+        writeCurrentSlide();
+      }).catch(error => {
+        console.warn('Failed to write slide after image settings change:', error);
+      });
+    }, 0);
+  } catch (error) {
+    console.warn('Failed to save image settings:', error);
+  }
 }
 
 // Preload cache for performance
@@ -596,3 +673,80 @@ export function preloadSlideImageAt(idx) {
     im.src = src;
   });
 }
+
+// Filter handling for individual sliders
+export function handleBlur(value) {
+  imgFilters.blur = clamp(parseInt(value, 10), 0, 20);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleBrightness(value) {
+  imgFilters.brightness = clamp(parseInt(value, 10), 0, 200);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleContrast(value) {
+  imgFilters.contrast = clamp(parseInt(value, 10), 0, 200);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleGrayscale(value) {
+  imgFilters.grayscale = clamp(parseInt(value, 10), 0, 100);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleHueRotate(value) {
+  imgFilters.hueRotate = clamp(parseInt(value, 10), 0, 360);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleInvert(value) {
+  imgFilters.invert = clamp(parseInt(value, 10), 0, 100);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleSaturate(value) {
+  imgFilters.saturate = clamp(parseInt(value, 10), 0, 200);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleSepia(value) {
+  imgFilters.sepia = clamp(parseInt(value, 10), 0, 100);
+  setTransforms();
+  saveAndRecord();
+}
+
+export function handleOpacity(value) {
+  imgFilters.opacity = clamp(parseInt(value, 10), 0, 100);
+  setTransforms();
+  saveAndRecord();
+}
+
+// Validation function for debugging image persistence
+export function validateImagePersistence() {
+  try {
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    const currentSlide = slides[activeIndex];
+    
+    console.log('=== IMAGE PERSISTENCE CHECK ===');
+    console.log('Current slide has image:', !!currentSlide?.image);
+    console.log('Image src:', currentSlide?.image?.src?.substring(0, 50) + '...');
+    console.log('Image data:', currentSlide?.image);
+    console.log('ImgState has:', imgState.has);
+    console.log('ImgState src:', document.querySelector('#userBg')?.src?.substring(0, 50) + '...');
+    console.log('================================');
+  } catch (error) {
+    console.error('Failed to validate image persistence:', error);
+  }
+}
+
+// Export for debugging
+window.validateImagePersistence = validateImagePersistence;
