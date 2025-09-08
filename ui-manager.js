@@ -88,6 +88,7 @@ export function enterPreview() {
   document.body.classList.add('preview');
   const previewBtn = document.getElementById('previewBtn');
   previewBtn?.setAttribute('aria-pressed', 'true');
+  previewBtn?.classList.add('active');
   previewMode = true;
 
   // Ensure RSVP bar is visible in preview mode
@@ -98,6 +99,7 @@ export function exitPreview() {
   document.body.classList.remove('preview');
   const previewBtn = document.getElementById('previewBtn');
   previewBtn?.setAttribute('aria-pressed', 'false');
+  previewBtn?.classList.remove('active');
   previewMode = false;
 }
 
