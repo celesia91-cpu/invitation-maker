@@ -17,9 +17,7 @@ export class DragHandlersManager {
     // Context object for operations
     this.ctx = null;
     
-    // Drag modes
-    this.dragMode = null; // 'move' | 'scale' | 'rotate'
-    this.start = {};
+    // Drag state for current operation
     this.dragText = null;
 
     // Bind methods to preserve context
@@ -29,11 +27,6 @@ export class DragHandlersManager {
     this.handlePointerCancel = this.handlePointerCancel.bind(this);
     this.handleWorkClick = this.handleWorkClick.bind(this);
     this.handleEscapeKey = this.handleEscapeKey.bind(this);
-
-    // Background box handlers
-    this._onBgBoxDown = this._onBgBoxDown.bind(this);
-    this._onBgBoxMove = this._onBgBoxMove.bind(this);
-    this._onBgBoxUp = this._onBgBoxUp.bind(this);
 
     // Text handlers
     this._onTextDown = this._onTextDown.bind(this);
@@ -134,7 +127,7 @@ export class DragHandlersManager {
 
   /**
    * Setup background image handlers with proper validation
-   */
+  */
   setupBackgroundHandlers() {
     const bgBox = this.ctx.bgBox;
     if (!bgBox) {
@@ -142,21 +135,9 @@ export class DragHandlersManager {
       return;
     }
 
-    // Remove existing listeners
-    bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
-
-    // Add pointer handler
-    bgBox.addEventListener('pointerdown', this._onBgBoxDown);
-
-    bgBox.addEventListener('pointermove', this._onBgBoxMove);
-    
-    // Add cleanup handlers
-    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => {
-      bgBox.removeEventListener(ev, this._onBgBoxUp);
-      bgBox.addEventListener(ev, this._onBgBoxUp, { passive: true });
-    });
-    
-    console.log('✅ Background handlers setup complete');
+    // Background dragging is handled through work area listeners.
+    // This function remains for API compatibility.
+    console.log('✅ Background handlers delegated to work area');
   }
 
   /**
@@ -709,11 +690,7 @@ export class DragHandlersManager {
     }
 
     if (bgBox) {
-      bgBox.removeEventListener('pointerdown', this._onBgBoxDown);
-      bgBox.removeEventListener('pointermove', this._onBgBoxMove);
-      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => {
-        bgBox.removeEventListener(ev, this._onBgBoxUp);
-      });
+      // No background-specific listeners in the unified system.
     }
   }
 
@@ -815,117 +792,12 @@ export class DragHandlersManager {
     console.log('📝 Started text drag operation');
   }
 
-  /**
-   * Background box pointer down
-   */
-  _onBgBoxDown(e) {
-    const bgBox = this.ctx.bgBox;
-    const imgState = this.ctx.imgState;
-    const getLocked = this.ctx.getLocked;
-    
-    if (!imgState?.has || (getLocked && getLocked())) return;
-    
-    e.preventDefault();
-    this.capturePointer(e);
+    // Legacy background box handlers removed - background dragging is handled by
+    // startImageDrag/handleImagePointerMove and startHandleTransform.
 
-    const p = this._getPoint(e);
-    const handle = e.target.dataset.handle;
-
-    if (handle === 'rotate') {
-      this.dragMode = 'rotate';
-      this.start = {
-        angle0: imgState.angle,
-        a0: Math.atan2(p.y - imgState.cy, p.x - imgState.cx)
-      };
-    } else if (handle) {
-      if (['nw', 'ne', 'se', 'sw'].includes(handle)) {
-        this.dragMode = 'scale';
-        this.start = {
-          scale0: imgState.scale,
-          cx: imgState.cx,
-          cy: imgState.cy,
-          dist0: Math.sqrt(Math.pow(p.x - imgState.cx, 2) + Math.pow(p.y - imgState.cy, 2))
-        };
-      }
-    } else {
-      this.dragMode = 'move';
-      this.start = {
-        cx0: imgState.cx,
-        cy0: imgState.cy,
-        x0: p.x,
-        y0: p.y
-      };
-    }
-    
-    console.log(`🎯 Background drag mode: ${this.dragMode}`);
-  }
-
-  /**
-   * FIXED: Background box pointer up - now properly releases pointer capture
-   */
-  _onBgBoxUp(e) {
-    if (this.dragMode) {
-      console.log(`✅ Ended background ${this.dragMode} operation`);
-      this.dragMode = null;
-      this.start = {};
-      
-      // CRITICAL FIX: Release pointer capture
-      if (this.capturedPointerId !== null) {
-        const work = this.ctx.work;
-        if (work && work.releasePointerCapture) {
-          try {
-            work.releasePointerCapture(this.capturedPointerId);
-          } catch (error) {
-            console.warn('Could not release pointer capture in bgBox:', error);
-          }
-        }
-        this.capturedPointerId = null;
-      }
-    }
-  }
-
-  _onBgBoxMove(e) {
-    const imgState = this.ctx.imgState;
-    const { setTransforms, enforceImageBounds } = this.ctx;
-    
-    if (!this.dragMode || !imgState) return;
-    
-    const p = this._getPoint(e);
-    
-    if (this.dragMode === 'move') {
-      const dx = p.x - this.start.x0;
-      const dy = p.y - this.start.y0;
-      imgState.cx = this.start.cx0 + dx;
-      imgState.cy = this.start.cy0 + dy;
-    } else if (this.dragMode === 'scale') {
-      const dist = Math.sqrt(Math.pow(p.x - this.start.cx, 2) + Math.pow(p.y - this.start.cy, 2));
-      if (this.start.dist0 > 0) {
-        imgState.scale = this.start.scale0 * (dist / this.start.dist0);
-      }
-    } else if (this.dragMode === 'rotate') {
-      const angle = Math.atan2(p.y - imgState.cy, p.x - imgState.cx);
-      imgState.angle = this.start.angle0 + (angle - this.start.a0);
-    }
-    
-    if (enforceImageBounds) enforceImageBounds();
-    if (setTransforms) setTransforms();
-  }
-
-  /**
-   * Get point coordinates relative to work area
-   */
-  _getPoint(e) {
-    const work = this.ctx.work;
-    const rect = work.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-  }
-
-  /**
-   * Work area pointer move
-   */
+    /**
+     * Work area pointer move
+     */
   _onWorkMove(e) {
     if (!this.dragText) return;
     
