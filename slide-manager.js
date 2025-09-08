@@ -6,6 +6,8 @@ import { clamp } from './utils.js';
 
 // Constants
 const DEFAULT_DUR = 3000;
+const ZOOM_MIN = 0.8;
+const ZOOM_MAX = 1.2;
 
 // Get slide image helper function
 function getSlideImage() {
@@ -87,6 +89,11 @@ function easeInOut(t) {
   return -(Math.cos(Math.PI * clamp(t, 0, 1)) - 1) / 2;
 }
 
+function easeZoom(progress, start, end) {
+  const eased = easeInOut(clamp(progress, 0, 1));
+  return start + (end - start) * eased;
+}
+
 function computeOpacity(elapsed, duration, fadeInMs, fadeOutMs) {
   const fadeIn = fadeInMs || 0;
   const fadeOut = fadeOutMs || 0;
@@ -109,20 +116,20 @@ function computeOpacity(elapsed, duration, fadeInMs, fadeOutMs) {
 function computeZoomScale(elapsed, duration, zoomInMs, zoomOutMs) {
   const zoomIn = zoomInMs || 0;
   const zoomOut = zoomOutMs || 0;
-  
+
   let scale = 1;
-  
+
   if (zoomIn > 0 && elapsed < zoomIn) {
     const progress = elapsed / zoomIn;
-    scale = 0.3 + (0.7 * progress);
+    scale = easeZoom(progress, ZOOM_MIN, 1);
   }
-  
+
   if (zoomOut > 0 && elapsed > (duration - zoomOut)) {
-    const zoomOutProgress = (elapsed - (duration - zoomOut)) / zoomOut;
-    scale = 1 + (0.5 * zoomOutProgress);
+    const progress = (elapsed - (duration - zoomOut)) / zoomOut;
+    scale = easeZoom(progress, 1, ZOOM_MAX);
   }
-  
-  return Math.max(0.1, scale);
+
+  return clamp(scale, ZOOM_MIN, ZOOM_MAX);
 }
 
 function stepFrame(timestamp) {
@@ -159,17 +166,17 @@ function stepFrame(timestamp) {
       );
       layer.style.opacity = opacity.toString();
       
-      const zoomScale = computeZoomScale(
+      const scale = computeZoomScale(
         elapsed,
         duration,
         layerData.zoomInMs || 0,
         layerData.zoomOutMs || 0
       );
-      
+
       const originalTransform = layer.getAttribute('data-original-transform') || '';
-      
-      if (zoomScale !== 1) {
-        layer.style.transform = `${originalTransform} scale(${zoomScale})`.trim();
+
+      if (scale !== 1) {
+        layer.style.transform = `${originalTransform} scale(${scale})`.trim();
         layer.style.transformOrigin = 'center center';
       } else {
         layer.style.transform = originalTransform;
@@ -191,18 +198,18 @@ function stepFrame(timestamp) {
     );
     userBgWrap.style.opacity = opacity.toString();
     
-    const zoomScale = computeZoomScale(
+    const scale = computeZoomScale(
       elapsed,
       duration,
       imageData.zoomInMs || 0,
       imageData.zoomOutMs || 0
     );
-    
+
     const currentTransform = userBg.style.transform || '';
     const base = currentTransform.replace(/scale\([^)]*\)/g, '').trim();
 
-    if (zoomScale !== 1) {
-      userBg.style.transform = `${base} scale(${zoomScale})`.trim();
+    if (scale !== 1) {
+      userBg.style.transform = `${base} scale(${scale})`.trim();
     } else {
       userBg.style.transform = base;
     }
