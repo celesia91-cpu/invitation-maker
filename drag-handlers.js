@@ -1,9 +1,10 @@
-// drag-handlers.js - COMPLETE FIXED VERSION - Allows text editing while preserving drag functionality
+// drag-handlers.js - COMPLETE FIXED VERSION - Fixes the pointer capture release issue
 
 /**
  * Enhanced Drag Handlers Manager
  * Handles image transforms, text positioning/resizing, snap guides, touch support
  * FIXED: Allows double-click text editing without drag interference
+ * FIXED: Properly releases pointer capture to prevent stuck dragging
  */
 export class DragHandlersManager {
   constructor() {
@@ -628,19 +629,19 @@ export class DragHandlersManager {
       // Clear drag state
       this.dragState = null;
 
-      // Release pointer capture
+      // FIXED: Release pointer capture properly
       if (this.capturedPointerId !== null) {
-  const work = ctx.work;
-  if (work && work.releasePointerCapture) {
-    try {
-      work.releasePointerCapture(this.capturedPointerId);
-    } catch (error) {
-      // Ignore errors - pointer might already be released
-      console.warn('Could not release pointer capture:', error);
-    }
-  }
-  this.capturedPointerId = null;
-}
+        const work = ctx.work;
+        if (work && work.releasePointerCapture) {
+          try {
+            work.releasePointerCapture(this.capturedPointerId);
+          } catch (error) {
+            // Ignore errors - pointer might already be released
+            console.warn('Could not release pointer capture:', error);
+          }
+        }
+        this.capturedPointerId = null;
+      }
 
       console.log(`✅ Ended ${dragType} drag operation`);
       
@@ -739,7 +740,7 @@ export class DragHandlersManager {
   }
 
   /**
-   * Utility: Force end drag operation
+   * FIXED: Force end drag operation with proper pointer capture release
    */
   forceEndDrag() {
     try {
@@ -757,11 +758,23 @@ export class DragHandlersManager {
         this.ctx.endDragText();
       }
       
+      // CRITICAL FIX: Release pointer capture before clearing the ID
+      if (this.capturedPointerId !== null) {
+        const work = this.ctx.work;
+        if (work && work.releasePointerCapture) {
+          try {
+            work.releasePointerCapture(this.capturedPointerId);
+          } catch (error) {
+            console.warn('Could not force release pointer capture:', error);
+          }
+        }
+      }
+      
       this.dragState = null;
       this.potentialDrag = null;
       this.capturedPointerId = null;
       
-      console.log('🛑 Forced end drag');
+      console.log('🛑 Forced end drag - with pointer capture release');
     } catch (error) {
       console.error('Failed to force end drag:', error);
     }
@@ -848,42 +861,55 @@ export class DragHandlersManager {
   }
 
   /**
-   * Background box pointer up
+   * FIXED: Background box pointer up - now properly releases pointer capture
    */
   _onBgBoxUp(e) {
     if (this.dragMode) {
       console.log(`✅ Ended background ${this.dragMode} operation`);
       this.dragMode = null;
       this.start = {};
+      
+      // CRITICAL FIX: Release pointer capture
+      if (this.capturedPointerId !== null) {
+        const work = this.ctx.work;
+        if (work && work.releasePointerCapture) {
+          try {
+            work.releasePointerCapture(this.capturedPointerId);
+          } catch (error) {
+            console.warn('Could not release pointer capture in bgBox:', error);
+          }
+        }
+        this.capturedPointerId = null;
+      }
     }
   }
 
   _onBgBoxMove(e) {
-  const imgState = this.ctx.imgState;
-  const { setTransforms, enforceImageBounds } = this.ctx;
-  
-  if (!this.dragMode || !imgState) return;
-  
-  const p = this._getPoint(e);
-  
-  if (this.dragMode === 'move') {
-    const dx = p.x - this.start.x0;
-    const dy = p.y - this.start.y0;
-    imgState.cx = this.start.cx0 + dx;
-    imgState.cy = this.start.cy0 + dy;
-  } else if (this.dragMode === 'scale') {
-    const dist = Math.sqrt(Math.pow(p.x - this.start.cx, 2) + Math.pow(p.y - this.start.cy, 2));
-    if (this.start.dist0 > 0) {
-      imgState.scale = this.start.scale0 * (dist / this.start.dist0);
+    const imgState = this.ctx.imgState;
+    const { setTransforms, enforceImageBounds } = this.ctx;
+    
+    if (!this.dragMode || !imgState) return;
+    
+    const p = this._getPoint(e);
+    
+    if (this.dragMode === 'move') {
+      const dx = p.x - this.start.x0;
+      const dy = p.y - this.start.y0;
+      imgState.cx = this.start.cx0 + dx;
+      imgState.cy = this.start.cy0 + dy;
+    } else if (this.dragMode === 'scale') {
+      const dist = Math.sqrt(Math.pow(p.x - this.start.cx, 2) + Math.pow(p.y - this.start.cy, 2));
+      if (this.start.dist0 > 0) {
+        imgState.scale = this.start.scale0 * (dist / this.start.dist0);
+      }
+    } else if (this.dragMode === 'rotate') {
+      const angle = Math.atan2(p.y - imgState.cy, p.x - imgState.cx);
+      imgState.angle = this.start.angle0 + (angle - this.start.a0);
     }
-  } else if (this.dragMode === 'rotate') {
-    const angle = Math.atan2(p.y - imgState.cy, p.x - imgState.cx);
-    imgState.angle = this.start.angle0 + (angle - this.start.a0);
+    
+    if (enforceImageBounds) enforceImageBounds();
+    if (setTransforms) setTransforms();
   }
-  
-  if (enforceImageBounds) enforceImageBounds();
-  if (setTransforms) setTransforms();
-}
 
   /**
    * Get point coordinates relative to work area
