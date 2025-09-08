@@ -83,22 +83,27 @@ function storeOriginalLayerTransforms() {
 
 /* ----------------------------- Animation Functions ---------------------------------- */
 
+function easeInOut(t) {
+  return -(Math.cos(Math.PI * clamp(t, 0, 1)) - 1) / 2;
+}
+
 function computeOpacity(elapsed, duration, fadeInMs, fadeOutMs) {
   const fadeIn = fadeInMs || 0;
   const fadeOut = fadeOutMs || 0;
-  
+
   let opacity = 1;
-  
+
   if (fadeIn > 0 && elapsed < fadeIn) {
-    opacity = Math.min(1, elapsed / fadeIn);
+    const progress = elapsed / fadeIn;
+    opacity = clamp(easeInOut(progress), 0, 1);
   }
-  
+
   if (fadeOut > 0 && elapsed > (duration - fadeOut)) {
     const fadeOutProgress = (elapsed - (duration - fadeOut)) / fadeOut;
-    opacity = Math.max(0, 1 - fadeOutProgress);
+    opacity = clamp(1 - easeInOut(fadeOutProgress), 0, 1);
   }
-  
-  return Math.max(0, Math.min(1, opacity));
+
+  return clamp(opacity, 0, 1);
 }
 
 function computeZoomScale(elapsed, duration, zoomInMs, zoomOutMs) {
