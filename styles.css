@@ -334,6 +334,15 @@ body {
 }
 
 @media (max-width: 599px) {
+  :root {
+    --topbar-h: 56px;
+  }
+
+  .topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
   .brand {
     font-size: 13px;
     gap: 6px;
@@ -342,13 +351,30 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .brand .dot {
     width: 8px;
     height: 8px;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
   }
-  
+
+  .topbar .brand {
+    flex: 1 1 100%;
+    justify-content: center;
+    font-size: 15px;
+  }
+
+  .topbar .grow {
+    display: none;
+  }
+
+  .topbar .iconbtn {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
   #topbarToggle {
     display: flex;
     align-items: center;
@@ -357,15 +383,15 @@ body {
     left: 50%;
     transform: translateX(-50%);
     top: calc(var(--topbar-h) - 1px);
-    height: 28px;
-    padding: 0 10px;
+    height: 32px;
+    padding: 0 12px;
     border-radius: 999px;
     z-index: 96;
     border: 1px solid #26334f;
     background: #0b1630;
     color: var(--text-primary);
     font-weight: 800;
-    font-size: 12px;
+    font-size: 13px;
     box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
     transition: all var(--transition-fast);
   }
