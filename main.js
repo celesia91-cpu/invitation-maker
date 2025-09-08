@@ -277,8 +277,10 @@ class InvitationMakerApp {
       
     } catch (error) {
       console.error('❌ Failed to initialize drag handlers:', error);
-      // Setup basic fallback drag system
-      this.setupBasicDragFallback();
+      // Setup basic fallback drag system only if no drag handlers are active
+      if (!this.managers.dragHandlers || !this.managers.dragHandlers.isInitialized) {
+        this.setupBasicDragFallback();
+      }
     }
   }
 
@@ -491,10 +493,12 @@ class InvitationMakerApp {
   }
 
   /**
-   * Basic drag fallback system with edit mode awareness
+   * Basic drag fallback system with edit mode awareness.
+   * @deprecated Retained for legacy support; not used when DragHandlersManager
+   *             initializes successfully.
    */
   setupBasicDragFallback() {
-    console.log('🔄 Setting up basic drag fallback...');
+    console.log('🔄 Setting up basic drag fallback (deprecated)...');
     
     const work = this.elements.work;
     if (!work) {
@@ -625,11 +629,13 @@ class InvitationMakerApp {
       }
     };
     
-    // Add event listeners
-    //work.addEventListener('pointerdown', handlePointerDown);
-    //work.addEventListener('pointermove', handlePointerMove);
-    //work.addEventListener('pointerup', handlePointerUp);
-    //work.addEventListener('pointercancel', handlePointerUp);
+    // NOTE: This deprecated fallback intentionally leaves its event listeners
+    // commented out to avoid accidental activation. Remove this function if
+    // legacy support is no longer required.
+    // work.addEventListener('pointerdown', handlePointerDown);
+    // work.addEventListener('pointermove', handlePointerMove);
+    // work.addEventListener('pointerup', handlePointerUp);
+    // work.addEventListener('pointercancel', handlePointerUp);
     
     console.log('✅ Basic drag fallback with edit mode support initialized');
   }
