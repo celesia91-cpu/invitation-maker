@@ -140,11 +140,6 @@ getUser() {
   }
 }
 
-// NEW: Check if user is authenticated (has valid token)
-isAuthenticated() {
-  return !!this.token;
-}
-
 // ENHANCED: Session management methods
 isSessionValid() {
   try {
@@ -174,11 +169,6 @@ refreshSession() {
     console.warn('Failed to refresh session:', error);
   }
 }
-
-  // NEW: Get user data from session
-  getUser() {
-    return this._sessionData.user;
-  }
 
   // Enhanced request method with session refresh
   async request(endpoint, options = {}) {
