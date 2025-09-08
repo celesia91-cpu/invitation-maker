@@ -156,8 +156,9 @@ class InvitationMakerApp {
     // Load or create project
     const restored = await loadProject();
     updateSlidesUI();
-    
-    if (!restored) {
+    if (restored) {
+      await loadSlideIntoDOM(restored.slides[restored.activeIndex ?? 0]);
+    } else {
       await this.createDefaultProject();
     }
     
