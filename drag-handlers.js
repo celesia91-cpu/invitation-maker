@@ -630,12 +630,17 @@ export class DragHandlersManager {
 
       // Release pointer capture
       if (this.capturedPointerId !== null) {
-        const work = ctx.work;
-        if (work && work.hasPointerCapture(this.capturedPointerId)) {
-          work.releasePointerCapture(this.capturedPointerId);
-        }
-        this.capturedPointerId = null;
-      }
+  const work = ctx.work;
+  if (work && work.releasePointerCapture) {
+    try {
+      work.releasePointerCapture(this.capturedPointerId);
+    } catch (error) {
+      // Ignore errors - pointer might already be released
+      console.warn('Could not release pointer capture:', error);
+    }
+  }
+  this.capturedPointerId = null;
+}
 
       console.log(`✅ Ended ${dragType} drag operation`);
       
