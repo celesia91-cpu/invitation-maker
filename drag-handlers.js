@@ -146,9 +146,11 @@ export class DragHandlersManager {
 
     // Add pointer handler
     bgBox.addEventListener('pointerdown', this._onBgBoxDown);
+
+    bgBox.addEventListener('pointermove', this._onBgBoxMove);
     
     // Add cleanup handlers
-    ['pointerup', 'pointermove', 'pointercancel', 'lostpointercapture'].forEach(ev => {
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => {
       bgBox.removeEventListener(ev, this._onBgBoxUp);
       bgBox.addEventListener(ev, this._onBgBoxUp, { passive: true });
     });
@@ -778,6 +780,33 @@ export class DragHandlersManager {
       this.start = {};
     }
   }
+
+  _onBgBoxMove(e) {
+  const imgState = this.ctx.imgState;
+  const { setTransforms, enforceImageBounds } = this.ctx;
+  
+  if (!this.dragMode || !imgState) return;
+  
+  const p = this._getPoint(e);
+  
+  if (this.dragMode === 'move') {
+    const dx = p.x - this.start.x0;
+    const dy = p.y - this.start.y0;
+    imgState.cx = this.start.cx0 + dx;
+    imgState.cy = this.start.cy0 + dy;
+  } else if (this.dragMode === 'scale') {
+    const dist = Math.sqrt(Math.pow(p.x - this.start.cx, 2) + Math.pow(p.y - this.start.cy, 2));
+    if (this.start.dist0 > 0) {
+      imgState.scale = this.start.scale0 * (dist / this.start.dist0);
+    }
+  } else if (this.dragMode === 'rotate') {
+    const angle = Math.atan2(p.y - imgState.cy, p.x - imgState.cx);
+    imgState.angle = this.start.angle0 + (angle - this.start.a0);
+  }
+  
+  if (enforceImageBounds) enforceImageBounds();
+  if (setTransforms) setTransforms();
+}
 
   /**
    * Get point coordinates relative to work area
