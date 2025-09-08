@@ -39,7 +39,7 @@ global.document = {
 global.window = { addEventListener() {} };
 
 const manager = new DragHandlersManager();
-manager.initialize();
+manager.initialize({ work: elements.work, bgBox: elements.bgBox });
 
 // Ensure listeners are added
 assert.strictEqual(elements.work.listenerCount('pointerdown'), 1);
@@ -208,4 +208,39 @@ elNoHandler.dataset.editing = 'true';
 manager5.attachText(elNoHandler);
 assert.strictEqual(elNoHandler.listenerCount('pointerdown'), 0);
 console.log('attachText skips pointer handlers when editing');
+
+// ----- Text snapping with guides -----
+
+const workEl = new MockElement();
+workEl.getBoundingClientRect = () => ({ width: 200, height: 200 });
+
+// Snaps when near center and shows guides
+const snapManager = new DragHandlersManager();
+let shown = [];
+let hidden = 0;
+snapManager.ctx = {
+  work: workEl,
+  showGuides: (o) => shown.push(o),
+  hideGuides: () => hidden++,
+  enableSnapping: true,
+  enableGuides: true,
+  snapThreshold: 8
+};
+const textEl = { style: {}, offsetWidth: 20, offsetHeight: 20 };
+snapManager.dragState = { element: textEl, startLeft: 40, startTop: 40 };
+await snapManager.handleTextPointerMove({}, 52, 52);
+assert.strictEqual(textEl.style.left, '90px');
+assert.strictEqual(textEl.style.top, '90px');
+assert.deepStrictEqual(shown[0], { v: true, h: true });
+assert.strictEqual(hidden, 0);
+
+// Away from center hides guides and doesn't snap
+shown = [];
+hidden = 0;
+snapManager.dragState = { element: textEl, startLeft: 0, startTop: 0 };
+await snapManager.handleTextPointerMove({}, 10, 10);
+assert.strictEqual(textEl.style.left, '10px');
+assert.strictEqual(textEl.style.top, '10px');
+assert.strictEqual(shown.length, 0);
+assert.strictEqual(hidden, 1);
 
