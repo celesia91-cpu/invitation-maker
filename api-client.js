@@ -30,12 +30,8 @@ class APIClient {
 
     this.baseURL = baseURL;
 
-    // FIXED: In-memory session storage for tokens
-    this._sessionData = {
-      token: null,
-      user: null,
-      lastActivity: null
-    };
+    // FIXED: session storage for tokens
+    this._storageKey = 'app_auth_session';
 
     // Initialize token after session data is ready
     this.token = this.loadToken();
@@ -58,81 +54,126 @@ class APIClient {
     }
   }
 
-  // FIXED: In-memory token management instead of localStorage
-  loadToken() {
-    try {
-      // Try to restore from session data first
-      if (this._sessionData && this._sessionData.token) {
-        // Check if session is still valid (24 hour limit)
-        const lastActivity = this._sessionData.lastActivity;
-        if (lastActivity && (Date.now() - lastActivity) < 24 * 60 * 60 * 1000) {
-          this._log('Token restored from session');
-          return this._sessionData.token;
-        }
-      }
+  // FIXED: Load token from sessionStorage (persists across refreshes)
+loadToken() {
+  try {
+    const sessionData = sessionStorage.getItem(this._storageKey);
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
       
-      // If no valid session, return null
-      return null;
-    } catch (error) {
-      console.warn('Failed to load token from session:', error);
-      return null;
-    }
-  }
-
-  // FIXED: Save token to in-memory session
-  saveToken(token) {
-    try {
-      if (token && typeof token === 'string') {
-        this._sessionData.token = token;
-        this._sessionData.lastActivity = Date.now();
-        this.token = token;
-        this._log('Token saved to session successfully');
-      } else {
-        this.clearToken();
+      // Check if session is still valid (24 hour limit)
+      if (parsed.lastActivity && (Date.now() - parsed.lastActivity) < 24 * 60 * 60 * 1000) {
+        this._log('Token restored from sessionStorage');
+        return parsed.token;
       }
-    } catch (error) {
-      console.warn('Failed to save token to session:', error);
-      // Still set token even if session fails
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Failed to load token from sessionStorage:', error);
+    return null;
+  }
+}
+
+// FIXED: Save token to sessionStorage (persists across refreshes) 
+saveToken(token) {
+  try {
+    if (token && typeof token === 'string') {
+      const sessionData = {
+        token: token,
+        lastActivity: Date.now()
+      };
+      
+      sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
       this.token = token;
+      this._log('Token saved to sessionStorage successfully');
+    } else {
+      this.clearToken();
     }
+  } catch (error) {
+    console.warn('Failed to save token to sessionStorage:', error);
+    // Still set token even if storage fails
+    this.token = token;
   }
+}
 
-  // FIXED: Clear token from in-memory session
-  clearToken() {
-    try {
-      this._sessionData.token = null;
-      this._sessionData.user = null;
-      this._sessionData.lastActivity = null;
-      this._log('Token cleared from session');
-    } catch (error) {
-      console.warn('Failed to clear token from session:', error);
+// FIXED: Clear token from sessionStorage
+clearToken() {
+  try {
+    sessionStorage.removeItem(this._storageKey);
+    this._log('Token cleared from sessionStorage');
+  } catch (error) {
+    console.warn('Failed to clear token from sessionStorage:', error);
+  }
+  this.token = null;
+}
+
+// NEW: Save user data to sessionStorage
+saveUser(user) {
+  try {
+    if (user && typeof user === 'object') {
+      const existingData = sessionStorage.getItem(this._storageKey);
+      const sessionData = existingData ? JSON.parse(existingData) : {};
+      
+      sessionData.user = user;
+      sessionData.lastActivity = Date.now();
+      
+      sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
     }
-    this.token = null;
+  } catch (error) {
+    console.warn('Failed to save user to sessionStorage:', error);
   }
+}
 
-  // NEW: Session management methods
-  isSessionValid() {
-    if (!this._sessionData.token) return false;
-    if (!this._sessionData.lastActivity) return false;
+// NEW: Get user data from sessionStorage
+getUser() {
+  try {
+    const sessionData = sessionStorage.getItem(this._storageKey);
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      return parsed.user || null;
+    }
+    return null;
+  } catch (error) {
+    console.warn('Failed to get user from sessionStorage:', error);
+    return null;
+  }
+}
+
+// NEW: Check if user is authenticated (has valid token)
+isAuthenticated() {
+  return !!this.token;
+}
+
+// ENHANCED: Session management methods
+isSessionValid() {
+  try {
+    const sessionData = sessionStorage.getItem(this._storageKey);
+    if (!sessionData) return false;
+    
+    const parsed = JSON.parse(sessionData);
+    if (!parsed.token || !parsed.lastActivity) return false;
     
     // Session expires after 24 hours of inactivity
-    const sessionAge = Date.now() - this._sessionData.lastActivity;
+    const sessionAge = Date.now() - parsed.lastActivity;
     return sessionAge < 24 * 60 * 60 * 1000;
+  } catch (error) {
+    return false;
   }
+}
 
-  refreshSession() {
-    if (this._sessionData.token) {
-      this._sessionData.lastActivity = Date.now();
+refreshSession() {
+  try {
+    const sessionData = sessionStorage.getItem(this._storageKey);
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      parsed.lastActivity = Date.now();
+      sessionStorage.setItem(this._storageKey, JSON.stringify(parsed));
     }
+  } catch (error) {
+    console.warn('Failed to refresh session:', error);
   }
-
-  // NEW: Save user data to session
-  saveUser(user) {
-    if (user && typeof user === 'object') {
-      this._sessionData.user = user;
-      this._sessionData.lastActivity = Date.now();
-    }
-  }
+}
 
   // NEW: Get user data from session
   getUser() {
@@ -274,26 +315,47 @@ class APIClient {
   }
 
   async login(credentials) {
-    this.isRetrying = true;
-    try {
-      const response = await this.post('/auth/login', credentials);
-      if (response.token) {
-        this.saveToken(response.token);
-      }
+  try {
+    const response = await this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    });
+
+    if (response.access_token || response.token) {
+      const token = response.access_token || response.token;
+      this.saveToken(token);
+      
+      // IMPORTANT: Also save user data
       if (response.user) {
         this.saveUser(response.user);
       }
+      
       return response;
-    } finally {
-      this.isRetrying = false;
+    } else {
+      throw new Error('No token received from server');
     }
+  } catch (error) {
+    console.error('Login failed:', error);
+    throw error;
   }
+}
 
   async logout() {
+  try {
+    // Call logout endpoint if authenticated
+    if (this.isAuthenticated()) {
+      try {
+        await this.request('/auth/logout', { method: 'POST' });
+      } catch (error) {
+        console.warn('Logout endpoint failed:', error);
+        // Continue with local logout even if server call fails
+      }
+    }
+  } finally {
+    // Always clear local session
     this.clearToken();
-    // Could call a logout endpoint if implemented
-    return Promise.resolve();
   }
+}
 
   async getCurrentUser() {
     // Try session first, then API
