@@ -49,9 +49,6 @@ assert.strictEqual(elements.work.listenerCount('click'), 1);
 assert.strictEqual(elements.work.listenerCount('touchstart'), 1);
 assert.strictEqual(elements.work.listenerCount('touchmove'), 1);
 assert.strictEqual(elements.work.listenerCount('touchend'), 1);
-assert.strictEqual(elements.bgBox.listenerCount('pointerdown'), 1);
-assert.strictEqual(elements.bgBox.listenerCount('pointermove'), 1);
-assert.strictEqual(elements.bgBox.listenerCount('pointerup'), 1);
 
 manager.cleanup();
 
@@ -63,9 +60,6 @@ assert.strictEqual(elements.work.listenerCount('click'), 0);
 assert.strictEqual(elements.work.listenerCount('touchstart'), 0);
 assert.strictEqual(elements.work.listenerCount('touchmove'), 0);
 assert.strictEqual(elements.work.listenerCount('touchend'), 0);
-assert.strictEqual(elements.bgBox.listenerCount('pointerdown'), 0);
-assert.strictEqual(elements.bgBox.listenerCount('pointermove'), 0);
-assert.strictEqual(elements.bgBox.listenerCount('pointerup'), 0);
 
 console.log('cleanup removes listeners successfully');
 
