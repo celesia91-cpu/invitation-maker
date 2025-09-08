@@ -616,8 +616,12 @@ class InvitationMakerApp {
       
       dragState = null;
       
-      if (work.hasPointerCapture(e.pointerId)) {
-        work.releasePointerCapture(e.pointerId);
+      if (work && work.releasePointerCapture) {
+        try {
+          work.releasePointerCapture(e.pointerId);
+        } catch (error) {
+          console.warn('Could not release pointer capture:', error);
+        }
       }
     };
     
