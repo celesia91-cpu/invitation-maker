@@ -326,7 +326,7 @@ export async function handleImageUpload(file) {
           imgState.backendImageId = response.imageId;
           imgState.backendImageUrl = response.url;
           imgState.backendThumbnailUrl = response.thumbnailUrl;
-          
+
           // CRITICAL: Save to project with backend info
           saveImageToSlide(response.url, {
             scale: imgState.scale,
@@ -345,6 +345,7 @@ export async function handleImageUpload(file) {
             backendThumbnailUrl: response.thumbnailUrl,
             isLocal: false
           });
+          saveAndRecord();
           
           console.log('Backend image uploaded and saved to project');
           
@@ -430,6 +431,7 @@ function fallbackToLocalUpload(file) {
         natH: imgState.natH,
         isLocal: true // Flag to indicate this is a local data URL
       });
+      saveAndRecord();
       
       console.log('Local image loaded and saved to project');
       
