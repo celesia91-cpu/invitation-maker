@@ -1,4 +1,4 @@
-// image-manager.js - COMPLETE FIXED VERSION WITH PERSISTENCE
+// image-manager.js - COMPLETE ENHANCED VERSION WITH PERCENTAGE-BASED POSITIONING
 
 import { apiClient } from './api-client.js';
 import { clamp } from './utils.js';
@@ -62,6 +62,50 @@ function getSlideImage() {
 // Format seconds helper
 function fmtSec(ms) {
   return (ms / 1000).toFixed(1) + 's';
+}
+
+// ENHANCED: Convert absolute coordinates to percentages for sharing
+export function getImagePositionAsPercentage() {
+  if (!imgState.has) return null;
+  
+  const work = document.querySelector('#work');
+  if (!work) return null;
+  
+  const rect = work.getBoundingClientRect();
+  
+  return {
+    cxPercent: (imgState.cx / rect.width) * 100,
+    cyPercent: (imgState.cy / rect.height) * 100,
+    scale: imgState.scale,
+    angle: imgState.angle,
+    shearX: imgState.shearX,
+    shearY: imgState.shearY,
+    signX: imgState.signX,
+    signY: imgState.signY,
+    flip: imgState.flip
+  };
+}
+
+// ENHANCED: Apply percentage-based coordinates when loading
+export function setImagePositionFromPercentage(percentageData) {
+  if (!percentageData) return;
+  
+  const work = document.querySelector('#work');
+  if (!work) return;
+  
+  const rect = work.getBoundingClientRect();
+  
+  imgState.cx = (percentageData.cxPercent / 100) * rect.width;
+  imgState.cy = (percentageData.cyPercent / 100) * rect.height;
+  imgState.scale = percentageData.scale || 1;
+  imgState.angle = percentageData.angle || 0;
+  imgState.shearX = percentageData.shearX || 0;
+  imgState.shearY = percentageData.shearY || 0;
+  imgState.signX = percentageData.signX || 1;
+  imgState.signY = percentageData.signY || 1;
+  imgState.flip = percentageData.flip || false;
+  
+  setTransforms();
 }
 
 // Toggle upload button visibility
@@ -181,12 +225,13 @@ export function enforceImageBounds() {
   imgState.cy = clamp(imgState.cy, h / 2, r.height - h / 2);
 }
 
-// Set image transforms and position with proper scaling
+// ENHANCED: Set image transforms with viewer mode support
 export function setTransforms() {
   const body = document.body;
   const userBgWrap = document.querySelector('#userBgWrap');
   const bgBox = document.querySelector('#bgBox');
-  const inPreview = body.classList.contains('preview') || body.classList.contains('viewer');
+  const inViewer = body.classList.contains('viewer');
+  const inPreview = body.classList.contains('preview') || inViewer;
 
   if (!imgState.has) {
     if (bgBox) bgBox.classList.add('hidden');
@@ -199,12 +244,16 @@ export function setTransforms() {
     return;
   }
   
-  enforceImageBounds();
+  // Don't enforce bounds in viewer mode to maintain positioning
+  if (!inViewer) {
+    enforceImageBounds();
+  }
   
   const w = imgState.natW * imgState.scale;
   const h = imgState.natH * imgState.scale;
   const sx = (imgState.flip ? -1 : 1) * (imgState.signX ?? 1);
   const sy = imgState.signY ?? 1;
+  
   const base = [
     'translate(-50%,-50%)',
     `rotate(${imgState.angle}rad)`,
@@ -218,19 +267,22 @@ export function setTransforms() {
     userBgWrap.style.left = imgState.cx + 'px';
     userBgWrap.style.top = imgState.cy + 'px';
     userBgWrap.style.transform = base;
+    
+    // Ensure proper z-index in viewer mode
+    if (inViewer) {
+      userBgWrap.style.zIndex = '15'; // Below fx video (z-index 18)
+    }
   }
 
-  if (bgBox) {
-    if (inPreview) {
-      bgBox.classList.add('hidden');
-    } else {
-      bgBox.classList.remove('hidden');
-      bgBox.style.width = w + 'px';
-      bgBox.style.height = h + 'px';
-      bgBox.style.left = imgState.cx + 'px';
-      bgBox.style.top = imgState.cy + 'px';
-      bgBox.style.transform = base;
-    }
+  if (bgBox && !inPreview) {
+    bgBox.classList.remove('hidden');
+    bgBox.style.width = w + 'px';
+    bgBox.style.height = h + 'px';
+    bgBox.style.left = imgState.cx + 'px';
+    bgBox.style.top = imgState.cy + 'px';
+    bgBox.style.transform = base;
+  } else if (bgBox) {
+    bgBox.classList.add('hidden');
   }
 
   applyFilters();
@@ -244,10 +296,19 @@ function saveImageToSlide(src, imageData) {
     const activeIndex = getActiveIndex();
     
     if (slides && slides[activeIndex]) {
+      // Get percentage position for sharing compatibility
+      const percentagePos = getImagePositionAsPercentage();
+      
       // Create/update image object in slide
       slides[activeIndex].image = {
         src: src,
         thumb: imageData.backendThumbnailUrl || src,
+        // Store both absolute and percentage coordinates for compatibility
+        cx: imgState.cx,
+        cy: imgState.cy,
+        // Store percentage coordinates for consistent cross-device sharing
+        cxPercent: percentagePos?.cxPercent,
+        cyPercent: percentagePos?.cyPercent,
         ...imageData
       };
       
@@ -263,7 +324,7 @@ function saveImageToSlide(src, imageData) {
         });
       }, 0);
       
-      console.log('Image data saved to slide:', activeIndex);
+      console.log('Image data saved to slide with percentage positioning:', activeIndex);
     }
   } catch (error) {
     console.error('Failed to save image to slide:', error);
@@ -731,6 +792,121 @@ export function handleOpacity(value) {
   saveAndRecord();
 }
 
+// ENHANCED: Debug and fix functions for positioning
+export function debugImagePositioning() {
+  const work = document.querySelector('#work');
+  const userBgWrap = document.querySelector('#userBgWrap');
+  const fxVideo = document.querySelector('#fxVideo');
+  
+  if (!work || !userBgWrap || !fxVideo) {
+    console.log('❌ Missing elements for debugging');
+    return;
+  }
+  
+  const workRect = work.getBoundingClientRect();
+  const videoRect = fxVideo.getBoundingClientRect();
+  const imageRect = userBgWrap.getBoundingClientRect();
+  const percentagePos = getImagePositionAsPercentage();
+  
+  console.log('🔍 Image Positioning Debug:', {
+    workArea: {
+      width: workRect.width,
+      height: workRect.height,
+      aspectRatio: workRect.width / workRect.height
+    },
+    fxVideo: {
+      width: videoRect.width,
+      height: videoRect.height,
+      position: 'covers entire work area'
+    },
+    userImage: {
+      width: imageRect.width,
+      height: imageRect.height,
+      centerX: imageRect.left + imageRect.width / 2 - workRect.left,
+      centerY: imageRect.top + imageRect.height / 2 - workRect.top,
+      transform: userBgWrap.style.transform
+    },
+    imgState: {
+      cx: imgState.cx,
+      cy: imgState.cy,
+      scale: imgState.scale,
+      has: imgState.has
+    },
+    percentagePosition: percentagePos
+  });
+  
+  // Create visual debug overlay
+  const overlay = document.querySelector('.debug-positioning') || document.createElement('div');
+  overlay.className = 'debug-positioning';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    z-index: 9999;
+    pointer-events: none;
+  `;
+  overlay.innerHTML = `
+    <strong>Image Position Debug</strong><br>
+    Work: ${Math.round(workRect.width)}×${Math.round(workRect.height)}<br>
+    Video: ${Math.round(videoRect.width)}×${Math.round(videoRect.height)}<br>
+    Image: ${Math.round(imageRect.width)}×${Math.round(imageRect.height)}<br>
+    Center: ${Math.round(imgState.cx)}, ${Math.round(imgState.cy)}<br>
+    Percent: ${Math.round(percentagePos?.cxPercent || 0)}%, ${Math.round(percentagePos?.cyPercent || 0)}%<br>
+    Scale: ${Math.round(imgState.scale * 100)}%<br>
+    Mode: ${document.body.classList.contains('viewer') ? 'Viewer' : 'Editor'}
+  `;
+  
+  if (!overlay.parentElement) {
+    document.body.appendChild(overlay);
+  }
+  
+  // Auto-remove after 10 seconds
+  setTimeout(() => overlay.remove(), 10000);
+}
+
+// ENHANCED: Quick fix to center image to match fx video
+export async function centerImageToVideo() {
+  if (!imgState.has) {
+    console.log('❌ No image to center');
+    return;
+  }
+  
+  const work = document.querySelector('#work');
+  if (!work) {
+    console.log('❌ Work area not found');
+    return;
+  }
+  
+  const rect = work.getBoundingClientRect();
+  
+  // Center the image in the work area (matching fx video positioning)
+  imgState.cx = rect.width / 2;
+  imgState.cy = rect.height / 2;
+  
+  // Optionally adjust scale to better match video coverage
+  const imageAspect = imgState.natW / imgState.natH;
+  const workAspect = rect.width / rect.height;
+  
+  if (imageAspect !== workAspect) {
+    // Scale to cover (similar to object-fit: cover)
+    const scaleToFit = Math.max(
+      rect.width / imgState.natW,
+      rect.height / imgState.natH
+    );
+    imgState.scale = scaleToFit;
+  }
+  
+  setTransforms();
+  saveImageSettings();
+  console.log('✅ Image centered and scaled to match fx video');
+}
+
 // Validation function for debugging image persistence
 export function validateImagePersistence() {
   try {
@@ -744,11 +920,18 @@ export function validateImagePersistence() {
     console.log('Image data:', currentSlide?.image);
     console.log('ImgState has:', imgState.has);
     console.log('ImgState src:', document.querySelector('#userBg')?.src?.substring(0, 50) + '...');
+    console.log('Percentage position available:', !!currentSlide?.image?.cxPercent);
     console.log('================================');
   } catch (error) {
     console.error('Failed to validate image persistence:', error);
   }
 }
 
-// Export for debugging
-window.validateImagePersistence = validateImagePersistence;
+// Make functions available globally for console debugging
+if (typeof window !== 'undefined') {
+  window.validateImagePersistence = validateImagePersistence;
+  window.debugImagePositioning = debugImagePositioning;
+  window.centerImageToVideo = centerImageToVideo;
+  window.getImagePositionAsPercentage = getImagePositionAsPercentage;
+  window.setImagePositionFromPercentage = setImagePositionFromPercentage;
+}

@@ -1,4 +1,4 @@
-// share-manager.js - Fixed sharing functionality
+// share-manager.js - COMPLETE ENHANCED VERSION WITH PERCENTAGE-BASED POSITIONING
 
 import { encodeState, decodeState } from './utils.js';
 import {
@@ -24,10 +24,10 @@ function getViewerOrigin() {
   }
 }
 
-// Prepare project data for sharing (trim huge inline images, keep remote URLs)
-// Optionally accepts a project object to operate on for easier testing
+// ENHANCED: Prepare project data for sharing with percentage-based positioning
 export function safeProjectForShare(project) {
   const p = project ? JSON.parse(JSON.stringify(project)) : buildProject();
+  
   p.slides = (p.slides || []).map((s) => {
     let img = null;
     if (s.image) {
@@ -36,6 +36,8 @@ export function safeProjectForShare(project) {
         thumb,
         cx,
         cy,
+        cxPercent,
+        cyPercent,
         scale,
         angle,
         shearX,
@@ -50,26 +52,51 @@ export function safeProjectForShare(project) {
       } = s.image;
 
       const isDataUrl = /^data:/i.test(src || '');
-      img = {
-        src: isDataUrl ? null : (src || null),
-        thumb: thumb ?? null,
-        cx: cx ?? 0,
-        cy: cy ?? 0,
-        scale: scale ?? 1,
-        angle: angle ?? 0,
-        shearX: shearX ?? 0,
-        shearY: shearY ?? 0,
-        signX: signX ?? 1,
-        signY: signY ?? 1,
-        flip: !!flip,
-        fadeInMs,
-        fadeOutMs,
-        zoomInMs,
-        zoomOutMs
-      };
+      
+      // Prioritize percentage-based positioning for cross-device compatibility
+      if (cxPercent !== undefined && cyPercent !== undefined) {
+        img = {
+          src: isDataUrl ? null : (src || null),
+          thumb: thumb ?? null,
+          // Use percentage coordinates for consistent cross-device positioning
+          cxPercent: Math.round(cxPercent * 100) / 100, // Round to 2 decimal places
+          cyPercent: Math.round(cyPercent * 100) / 100,
+          scale: Math.round((scale ?? 1) * 1000) / 1000, // Round to 3 decimal places
+          angle: Math.round((angle ?? 0) * 100) / 100,
+          shearX: Math.round((shearX ?? 0) * 1000) / 1000,
+          shearY: Math.round((shearY ?? 0) * 1000) / 1000,
+          signX: signX === -1 ? -1 : undefined,
+          signY: signY === -1 ? -1 : undefined,
+          flip: flip ? true : undefined,
+          fadeInMs,
+          fadeOutMs,
+          zoomInMs,
+          zoomOutMs
+        };
+      } else {
+        // Fallback to absolute coordinates (legacy support)
+        img = {
+          src: isDataUrl ? null : (src || null),
+          thumb: thumb ?? null,
+          cx: cx ?? 0,
+          cy: cy ?? 0,
+          scale: scale ?? 1,
+          angle: angle ?? 0,
+          shearX: shearX ?? 0,
+          shearY: shearY ?? 0,
+          signX: signX ?? 1,
+          signY: signY ?? 1,
+          flip: !!flip,
+          fadeInMs,
+          fadeOutMs,
+          zoomInMs,
+          zoomOutMs
+        };
+      }
     }
     return { ...s, image: img };
   });
+  
   return p;
 }
 
@@ -118,7 +145,7 @@ export async function shareCurrent() {
       url
     };
 
-    console.log('Sharing URL:', url);
+    console.log('Sharing URL with enhanced positioning:', url);
 
     // Try native sharing first
     if (navigator.share && typeof navigator.share === 'function') {
@@ -177,7 +204,184 @@ function manualCopy(url) {
   console.log('Copy the link manually');
 }
 
-// Apply viewer mode from URL parameters
+// ENHANCED: Load slide image with percentage positioning support
+async function loadSlideImage(slide) {
+  if (!slide.image || !slide.image.src) return;
+  
+  const userBgEl = document.querySelector('#userBg');
+  if (!userBgEl) return;
+
+  return new Promise((resolve) => {
+    userBgEl.onload = async () => {
+      try {
+        const { imgState, setImagePositionFromPercentage, setTransforms } = await import('./image-manager.js');
+        
+        imgState.has = true;
+        imgState.natW = userBgEl.naturalWidth;
+        imgState.natH = userBgEl.naturalHeight;
+        
+        const work = document.querySelector('#work');
+        if (!work) {
+          resolve();
+          return;
+        }
+
+        // Check if we have percentage-based coordinates (new format)
+        if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
+          console.log('📍 Loading with percentage-based positioning');
+          
+          // Use percentage-based positioning for consistent cross-device display
+          setImagePositionFromPercentage({
+            cxPercent: slide.image.cxPercent,
+            cyPercent: slide.image.cyPercent,
+            scale: slide.image.scale || 1,
+            angle: slide.image.angle || 0,
+            shearX: slide.image.shearX || 0,
+            shearY: slide.image.shearY || 0,
+            signX: slide.image.signX || 1,
+            signY: slide.image.signY || 1,
+            flip: slide.image.flip || false
+          });
+          
+        } else {
+          console.log('📍 Loading with legacy absolute positioning');
+          
+          // Fallback to absolute positioning (legacy format)
+          const rect = work.getBoundingClientRect();
+          
+          // Try to detect if coordinates are from a different sized work area
+          const isLegacyCoords = (slide.image.cx > rect.width * 2) || (slide.image.cy > rect.height * 2);
+          
+          if (isLegacyCoords) {
+            // Assume legacy coordinates were from a standard work area size
+            // Common editor sizes: 1280x720 or similar 16:9 ratios
+            const assumedLegacyWidth = 1280;
+            const assumedLegacyHeight = 720;
+            
+            const scaleX = rect.width / assumedLegacyWidth;
+            const scaleY = rect.height / assumedLegacyHeight;
+            
+            imgState.cx = (slide.image.cx || assumedLegacyWidth / 2) * scaleX;
+            imgState.cy = (slide.image.cy || assumedLegacyHeight / 2) * scaleY;
+            
+            console.log('🔧 Scaled legacy coordinates:', { 
+              original: { cx: slide.image.cx, cy: slide.image.cy },
+              scaled: { cx: imgState.cx, cy: imgState.cy },
+              factors: { scaleX, scaleY }
+            });
+          } else {
+            // Use coordinates as-is (should work for similar sized work areas)
+            imgState.cx = slide.image.cx || rect.width / 2;
+            imgState.cy = slide.image.cy || rect.height / 2;
+          }
+          
+          // Apply other transform properties
+          imgState.scale = slide.image.scale || 1;
+          imgState.angle = slide.image.angle || 0;
+          imgState.shearX = slide.image.shearX || 0;
+          imgState.shearY = slide.image.shearY || 0;
+          imgState.signX = slide.image.signX || 1;
+          imgState.signY = slide.image.signY || 1;
+          imgState.flip = slide.image.flip || false;
+          
+          setTransforms();
+        }
+        
+        // Apply image effects if present
+        if (slide.image.fadeInMs) imgState.fadeInMs = slide.image.fadeInMs;
+        if (slide.image.fadeOutMs) imgState.fadeOutMs = slide.image.fadeOutMs;
+        if (slide.image.zoomInMs) imgState.zoomInMs = slide.image.zoomInMs;
+        if (slide.image.zoomOutMs) imgState.zoomOutMs = slide.image.zoomOutMs;
+        
+        console.log('✅ Image loaded and positioned for viewer');
+        resolve();
+        
+      } catch (error) {
+        console.error('Error setting up loaded image:', error);
+        resolve();
+      }
+    };
+    
+    userBgEl.onerror = () => {
+      console.error('Failed to load shared image:', slide.image.src);
+      resolve();
+    };
+    
+    // Trigger load
+    userBgEl.src = slide.image.src;
+  });
+}
+
+// ENHANCED: Load text layers for shared project with responsive scaling
+async function loadTextLayers(layers) {
+  const work = document.querySelector('#work');
+  if (!work || !layers.length) return;
+  
+  // Clear existing layers
+  const existingLayers = work.querySelectorAll('.layer');
+  existingLayers.forEach(layer => layer.remove());
+  
+  const workRect = work.getBoundingClientRect();
+  
+  // Add new layers with responsive scaling
+  for (const layerData of layers) {
+    const element = document.createElement('div');
+    element.className = 'layer text-layer';
+    element.contentEditable = 'false';
+    element.textContent = layerData.text || 'Text';
+    
+    // Apply positioning and styles with viewport scaling
+    const scaleFactorX = workRect.width / (layerData.workWidth || 1280);
+    const scaleFactorY = workRect.height / (layerData.workHeight || 720);
+    const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
+    
+    element.style.left = (layerData.left * scaleFactorX) + 'px';
+    element.style.top = (layerData.top * scaleFactorY) + 'px';
+    element.style.fontSize = (layerData.fontSize * scaleFactor) + 'px';
+    element.style.fontFamily = layerData.fontFamily || 'system-ui';
+    element.style.fontWeight = layerData.fontWeight || 'normal';
+    element.style.color = layerData.color || '#ffffff';
+    element.style.textAlign = layerData.textAlign || 'left';
+    
+    if (layerData.transform) {
+      element.style.transform = layerData.transform;
+    }
+    
+    work.appendChild(element);
+  }
+  
+  console.log('✅ Text layers loaded and scaled for viewer');
+}
+
+// ENHANCED: Apply shared project data with improved positioning
+export async function applySharedProject(projectData) {
+  if (!projectData || !projectData.slides) {
+    console.warn('Invalid project data for sharing');
+    return;
+  }
+
+  try {
+    console.log('📋 Applying shared project data...');
+    
+    // Process each slide
+    for (const slide of projectData.slides) {
+      if (slide.image) {
+        await loadSlideImage(slide);
+      }
+      
+      // Apply text layers
+      if (slide.layers) {
+        await loadTextLayers(slide.layers);
+      }
+    }
+    
+    console.log('✅ Successfully applied shared project with enhanced positioning');
+  } catch (error) {
+    console.error('Failed to apply shared project:', error);
+  }
+}
+
+// ENHANCED: Apply viewer mode from URL parameters with better error handling
 export function applyViewerFromUrl() {
   const params = new URLSearchParams(location.search);
   const isViewer = params.has('view') || params.get('mode') === 'view';
@@ -194,6 +398,9 @@ export function applyViewerFromUrl() {
     const body = document.body;
     body.classList.add('viewer');
 
+    // Apply viewer-specific CSS for consistent positioning
+    setupViewerLayout();
+
     // Disable editor-centric shortcuts in viewer
     window.addEventListener('keydown', (e) => {
       const k = e.key?.toLowerCase();
@@ -202,10 +409,17 @@ export function applyViewerFromUrl() {
       }
     });
 
-    // Hide editor affordances
-    import('./ui-manager.js').then(({ syncTopbarHeight, enterPreview }) => {
-      try { syncTopbarHeight(); } catch {}
-      try { enterPreview(); } catch {}
+    // Hide editor affordances and setup viewer UI
+    import('./ui-manager.js').then(({ syncTopbarHeight, enterPreview, setupViewerMode }) => {
+      try { 
+        syncTopbarHeight(); 
+      } catch {}
+      try { 
+        enterPreview(); 
+      } catch {}
+      try {
+        if (setupViewerMode) setupViewerMode();
+      } catch {}
     });
 
     // Ensure any present layers are not editable
@@ -222,11 +436,16 @@ export function applyViewerFromUrl() {
       historyState.lock = true;
       applyProject(data);
 
-      // Ensure slides render after applying project
+      // ENHANCED: Apply shared project with improved positioning
       if (data.slides && data.slides.length > 0) {
         import('./slide-manager.js').then(async ({ loadSlideIntoDOM, updateSlidesUI, startPlay }) => {
           try {
             const activeIndex = Math.max(0, Math.min(data.activeIndex || 0, data.slides.length - 1));
+            
+            // Apply the shared project data with enhanced positioning
+            await applySharedProject(data);
+            
+            // Load the active slide
             await loadSlideIntoDOM(data.slides[activeIndex]);
             updateSlidesUI();
 
@@ -246,8 +465,78 @@ export function applyViewerFromUrl() {
     } catch (error) {
       console.warn('Failed to decode shared state:', error);
       console.error('Invalid share link');
+      
+      // Show user-friendly error in viewer mode
+      if (isViewer) {
+        showViewerError('Invalid share link. Please check the URL and try again.');
+      }
     }
   }
+}
+
+// ENHANCED: Setup viewer layout for consistent positioning
+function setupViewerLayout() {
+  const body = document.body;
+  const wrap = document.querySelector('.wrap');
+  const stage = document.querySelector('.stage');
+  
+  // Apply viewer-specific layout styles
+  if (stage) {
+    stage.style.minHeight = '100vh';
+    stage.style.padding = '0';
+    stage.style.display = 'flex';
+    stage.style.alignItems = 'center';
+    stage.style.justifyContent = 'center';
+  }
+  
+  if (wrap) {
+    // Maintain aspect ratio for consistent coordinate system
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+      // Mobile: use full screen
+      wrap.style.width = '100vw';
+      wrap.style.height = '100vh';
+      wrap.style.borderRadius = '0';
+      wrap.style.aspectRatio = 'auto';
+    } else {
+      // Desktop: maintain 16:9 aspect ratio for consistent positioning
+      wrap.style.width = 'min(100vw, calc(100vh * 16/9))';
+      wrap.style.height = 'min(100vh, calc(100vw * 9/16))';
+      wrap.style.aspectRatio = '16 / 9';
+      wrap.style.position = 'static';
+      wrap.style.transform = 'none';
+    }
+  }
+  
+  console.log('📱 Viewer layout configured');
+}
+
+// Show viewer error message
+function showViewerError(message) {
+  const errorDiv = document.createElement('div');
+  errorDiv.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    z-index: 9999;
+    font-family: system-ui, sans-serif;
+    max-width: 400px;
+  `;
+  errorDiv.innerHTML = `
+    <h3 style="margin: 0 0 10px; font-size: 18px;">Error Loading Invitation</h3>
+    <p style="margin: 0; font-size: 14px; line-height: 1.4;">${message}</p>
+  `;
+  document.body.appendChild(errorDiv);
+  
+  // Auto-remove after 8 seconds
+  setTimeout(() => errorDiv.remove(), 8000);
 }
 
 // Setup share button handler
@@ -269,4 +558,29 @@ export function buildProjectForShare() {
     console.error('Error building project for share:', error);
     return buildProject(); // fallback
   }
+}
+
+// ENHANCED: Debug functions for sharing
+export function debugSharedProject() {
+  try {
+    const project = safeProjectForShare();
+    console.log('🔍 Shared Project Debug:', {
+      slides: project.slides?.length || 0,
+      activeIndex: project.activeIndex,
+      hasPercentageCoords: project.slides?.some(s => 
+        s.image?.cxPercent !== undefined
+      ),
+      firstSlideImage: project.slides?.[0]?.image,
+      encodedLength: encodeState(project).length
+    });
+  } catch (error) {
+    console.error('Failed to debug shared project:', error);
+  }
+}
+
+// Make debug functions available globally
+if (typeof window !== 'undefined') {
+  window.debugSharedProject = debugSharedProject;
+  window.safeProjectForShare = safeProjectForShare;
+  window.applySharedProject = applySharedProject;
 }

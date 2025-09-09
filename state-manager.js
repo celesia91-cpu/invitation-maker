@@ -1,4 +1,4 @@
-// state-manager.js - Fixed version with proper exports
+// state-manager.js - COMPLETE ENHANCED VERSION WITH PERCENTAGE-BASED POSITIONING SUPPORT
 
 // Import dependencies
 let apiClient;
@@ -28,8 +28,8 @@ function debounce(func, wait) {
 }
 
 /**
- * Application State Manager
- * Manages all application state, history, and persistence
+ * ENHANCED Application State Manager
+ * Manages all application state, history, and persistence with percentage-based positioning support
  */
 class ApplicationStateManager {
   constructor() {
@@ -44,6 +44,8 @@ class ApplicationStateManager {
       slideStartTs: 0,
       rsvpChoice: 'none',
       mapQuery: '',
+      viewerMode: false,
+      workDimensions: { width: 1280, height: 720 }, // Track work area size for scaling
       defaults: {
         fontFamily: 'system-ui',
         fontSize: 28,
@@ -69,6 +71,7 @@ class ApplicationStateManager {
   get isViewer() { return this.state.isViewer; }
   set isViewer(value) { 
     this.state.isViewer = value;
+    this.state.viewerMode = value;
     this.notify('isViewer', value);
   }
 
@@ -120,22 +123,38 @@ class ApplicationStateManager {
     this.notify('mapQuery', value);
   }
 
+  get workDimensions() { return this.state.workDimensions; }
+  set workDimensions(value) { 
+    this.state.workDimensions = value;
+    this.notify('workDimensions', value);
+  }
+
   // ===================
-  // PROJECT OPERATIONS
+  // ENHANCED PROJECT OPERATIONS WITH POSITIONING SUPPORT
   // ===================
 
   /**
-   * Build project for serialization
+   * Build project for serialization with enhanced positioning data
    */
   buildProject() {
     const fontFamilySelect = document.querySelector('#fontFamily');
     const fontSizeInput = document.querySelector('#fontSize');
     const fontColorInput = document.querySelector('#fontColor');
+    const work = document.querySelector('#work');
+    
+    // Capture current work dimensions for scaling calculations
+    let workDimensions = this.workDimensions;
+    if (work) {
+      const rect = work.getBoundingClientRect();
+      workDimensions = { width: rect.width, height: rect.height };
+      this.workDimensions = workDimensions;
+    }
     
     return {
-      v: 62,
+      v: 63, // Increment version for percentage positioning support
       slides: this.slides,
       activeIndex: this.activeIndex,
+      workDimensions: workDimensions, // Include work dimensions for proper scaling
       defaults: {
         fontFamily: fontFamilySelect?.value || this.state.defaults.fontFamily,
         fontSize: parseInt(fontSizeInput?.value, 10) || this.state.defaults.fontSize,
@@ -147,7 +166,7 @@ class ApplicationStateManager {
   }
 
   /**
-   * Apply project data to state
+   * ENHANCED: Apply project data to state with positioning support
    */
   applyProject(project) {
     if (!project || typeof project !== 'object') {
@@ -164,6 +183,11 @@ class ApplicationStateManager {
       // Apply active index
       if (typeof project.activeIndex === 'number') {
         this.activeIndex = Math.max(0, Math.min(project.activeIndex, this.slides.length - 1));
+      }
+
+      // Apply work dimensions if available
+      if (project.workDimensions) {
+        this.workDimensions = project.workDimensions;
       }
 
       // Apply RSVP choice
@@ -195,10 +219,202 @@ class ApplicationStateManager {
         this.state.defaults = { ...this.state.defaults, ...project.defaults };
       }
 
+      console.log('✅ Project applied with enhanced positioning support');
       this.notify('projectApplied', project);
     } catch (error) {
       console.error('Error applying project:', error);
     }
+  }
+
+  /**
+   * ENHANCED: Load slide into DOM with positioning support
+   */
+  async loadSlideIntoDOM(slide, slideIndex = null) {
+    if (!slide) return;
+
+    try {
+      // Clear existing content
+      const work = document.querySelector('#work');
+      if (!work) return;
+
+      // Clear existing layers
+      const existingLayers = work.querySelectorAll('.layer');
+      existingLayers.forEach(layer => layer.remove());
+
+      // Load image if present
+      if (slide.image) {
+        await this.loadSlideImage(slide.image);
+      }
+
+      // Load text layers if present
+      if (slide.layers && slide.layers.length > 0) {
+        await this.loadTextLayers(slide.layers);
+      }
+
+      console.log('✅ Slide loaded into DOM with positioning support');
+    } catch (error) {
+      console.error('Error loading slide into DOM:', error);
+    }
+  }
+
+  /**
+   * ENHANCED: Load slide image with percentage positioning support
+   */
+  async loadSlideImage(imageData) {
+    if (!imageData || !imageData.src) return;
+
+    const userBgEl = document.querySelector('#userBg');
+    if (!userBgEl) return;
+
+    return new Promise((resolve) => {
+      userBgEl.onload = async () => {
+        try {
+          // Import image manager functions
+          const imageManager = await import('./image-manager.js');
+          const { imgState, setImagePositionFromPercentage, setTransforms } = imageManager;
+
+          imgState.has = true;
+          imgState.natW = userBgEl.naturalWidth;
+          imgState.natH = userBgEl.naturalHeight;
+
+          const work = document.querySelector('#work');
+          if (!work) {
+            resolve();
+            return;
+          }
+
+          const rect = work.getBoundingClientRect();
+
+          // Check if we have percentage-based coordinates (new format)
+          if (imageData.cxPercent !== undefined && imageData.cyPercent !== undefined) {
+            console.log('📍 Loading image with percentage-based positioning');
+            
+            setImagePositionFromPercentage({
+              cxPercent: imageData.cxPercent,
+              cyPercent: imageData.cyPercent,
+              scale: imageData.scale || 1,
+              angle: imageData.angle || 0,
+              shearX: imageData.shearX || 0,
+              shearY: imageData.shearY || 0,
+              signX: imageData.signX || 1,
+              signY: imageData.signY || 1,
+              flip: imageData.flip || false
+            });
+          } else {
+            console.log('📍 Loading image with legacy absolute positioning');
+            
+            // Handle legacy absolute coordinates with scaling
+            const sourceWorkDimensions = this.workDimensions;
+            const currentWorkDimensions = { width: rect.width, height: rect.height };
+            
+            let scaleX = 1;
+            let scaleY = 1;
+            
+            // Calculate scaling factors if work dimensions changed
+            if (sourceWorkDimensions && 
+                (Math.abs(sourceWorkDimensions.width - currentWorkDimensions.width) > 10 ||
+                 Math.abs(sourceWorkDimensions.height - currentWorkDimensions.height) > 10)) {
+              
+              scaleX = currentWorkDimensions.width / sourceWorkDimensions.width;
+              scaleY = currentWorkDimensions.height / sourceWorkDimensions.height;
+              
+              console.log('🔧 Scaling legacy coordinates:', { 
+                from: sourceWorkDimensions,
+                to: currentWorkDimensions,
+                scale: { scaleX, scaleY }
+              });
+            }
+
+            imgState.cx = (imageData.cx || currentWorkDimensions.width / 2) * scaleX;
+            imgState.cy = (imageData.cy || currentWorkDimensions.height / 2) * scaleY;
+            imgState.scale = imageData.scale || 1;
+            imgState.angle = imageData.angle || 0;
+            imgState.shearX = imageData.shearX || 0;
+            imgState.shearY = imageData.shearY || 0;
+            imgState.signX = imageData.signX || 1;
+            imgState.signY = imageData.signY || 1;
+            imgState.flip = imageData.flip || false;
+
+            setTransforms();
+          }
+
+          // Apply image effects
+          if (imageData.fadeInMs) imgState.fadeInMs = imageData.fadeInMs;
+          if (imageData.fadeOutMs) imgState.fadeOutMs = imageData.fadeOutMs;
+          if (imageData.zoomInMs) imgState.zoomInMs = imageData.zoomInMs;
+          if (imageData.zoomOutMs) imgState.zoomOutMs = imageData.zoomOutMs;
+
+          resolve();
+        } catch (error) {
+          console.error('Error setting up image:', error);
+          resolve();
+        }
+      };
+
+      userBgEl.onerror = () => {
+        console.error('Failed to load image:', imageData.src);
+        resolve();
+      };
+
+      userBgEl.src = imageData.src;
+    });
+  }
+
+  /**
+   * ENHANCED: Load text layers with responsive scaling
+   */
+  async loadTextLayers(layers) {
+    const work = document.querySelector('#work');
+    if (!work || !layers.length) return;
+
+    const currentRect = work.getBoundingClientRect();
+    const sourceWorkDimensions = this.workDimensions;
+    
+    // Calculate scaling factors for responsive text positioning
+    let scaleX = 1;
+    let scaleY = 1;
+    let fontScale = 1;
+    
+    if (sourceWorkDimensions) {
+      scaleX = currentRect.width / sourceWorkDimensions.width;
+      scaleY = currentRect.height / sourceWorkDimensions.height;
+      fontScale = Math.min(scaleX, scaleY); // Use minimum scale to maintain readability
+    }
+
+    for (const layerData of layers) {
+      const element = document.createElement('div');
+      element.className = 'layer text-layer';
+      element.contentEditable = 'false';
+      element.textContent = layerData.text || 'Text';
+      element.id = layerData.id || `layer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Apply scaled positioning and styles
+      element.style.position = 'absolute';
+      element.style.left = ((layerData.left || 0) * scaleX) + 'px';
+      element.style.top = ((layerData.top || 0) * scaleY) + 'px';
+      element.style.fontSize = ((layerData.fontSize || 28) * fontScale) + 'px';
+      element.style.fontFamily = layerData.fontFamily || 'system-ui';
+      element.style.fontWeight = layerData.fontWeight || 'normal';
+      element.style.fontStyle = layerData.fontStyle || 'normal';
+      element.style.color = layerData.color || '#ffffff';
+      element.style.textAlign = layerData.textAlign || 'left';
+      element.style.textDecoration = layerData.textDecoration || 'none';
+      element.style.zIndex = layerData.zIndex || '30';
+
+      // Apply width if specified
+      if (layerData.width) {
+        element.style.width = (layerData.width * scaleX) + 'px';
+      }
+
+      // Apply transform if present
+      if (layerData.transform) {
+        element.style.transform = layerData.transform;
+      }
+
+      work.appendChild(element);
+    }
+
+    console.log('✅ Text layers loaded with responsive scaling');
   }
 
   /**
@@ -220,7 +436,7 @@ class ApplicationStateManager {
   }
 
   /**
-   * Save project
+   * Save project with enhanced positioning data
    */
   async save() {
     if (this.history.isLocked) return;
@@ -304,7 +520,7 @@ class ApplicationStateManager {
   }
 
   /**
-   * Undo last action
+   * Undo last action with positioning support
    */
   undo() {
     if (this.history.index <= 0) return false;
@@ -322,7 +538,7 @@ class ApplicationStateManager {
   }
 
   /**
-   * Redo last undone action
+   * Redo last undone action with positioning support
    */
   redo() {
     if (this.history.index >= this.history.stack.length - 1) return false;
@@ -340,7 +556,7 @@ class ApplicationStateManager {
   }
 
   /**
-   * Apply history snapshot
+   * ENHANCED: Apply history snapshot with positioning support
    */
   applyHistorySnapshot(snapshot) {
     try {
@@ -348,9 +564,9 @@ class ApplicationStateManager {
       const project = JSON.parse(snapshot);
       this.applyProject(project);
       
-      // Update slide display if needed
-      if (typeof window !== 'undefined' && window.loadSlideIntoDOM) {
-        window.loadSlideIntoDOM(this.slides[this.activeIndex]);
+      // Update slide display with enhanced positioning
+      if (this.slides.length > 0 && this.activeIndex >= 0) {
+        this.loadSlideIntoDOM(this.slides[this.activeIndex], this.activeIndex);
       }
     } catch (error) {
       console.error('Failed to apply history snapshot:', error);
@@ -390,6 +606,52 @@ class ApplicationStateManager {
    */
   lockHistory(locked = true) {
     this.history.isLocked = locked;
+  }
+
+  // ===================
+  // ENHANCED VIEWER MODE SUPPORT
+  // ===================
+
+  /**
+   * Setup viewer mode with positioning support
+   */
+  setupViewerMode() {
+    this.isViewer = true;
+    const body = document.body;
+    body.classList.add('viewer');
+    
+    // Apply viewer-specific layout
+    this.applyViewerLayout();
+    
+    console.log('🎬 Viewer mode setup complete');
+  }
+
+  /**
+   * Apply viewer-specific layout for consistent positioning
+   */
+  applyViewerLayout() {
+    const stage = document.querySelector('.stage');
+    const wrap = document.querySelector('.wrap');
+    
+    if (stage) {
+      stage.style.minHeight = '100vh';
+      stage.style.padding = '0';
+    }
+    
+    if (wrap) {
+      // Maintain aspect ratio for consistent coordinate system
+      const isMobile = window.innerWidth <= 768;
+      
+      if (isMobile) {
+        wrap.style.width = '100vw';
+        wrap.style.height = '100vh';
+        wrap.style.borderRadius = '0';
+      } else {
+        wrap.style.width = 'min(100vw, calc(100vh * 16/9))';
+        wrap.style.height = 'min(100vh, calc(100vw * 9/16))';
+        wrap.style.aspectRatio = '16 / 9';
+      }
+    }
   }
 
   // ===================
@@ -491,6 +753,25 @@ class ApplicationStateManager {
     return `https://www.google.com/maps?q=${encoded}`;
   }
 
+  /**
+   * ENHANCED: Update work dimensions when work area resizes
+   */
+  updateWorkDimensions() {
+    const work = document.querySelector('#work');
+    if (!work) return;
+    
+    const rect = work.getBoundingClientRect();
+    const newDimensions = { width: rect.width, height: rect.height };
+    
+    // Only update if dimensions changed significantly
+    if (Math.abs(this.workDimensions.width - newDimensions.width) > 5 ||
+        Math.abs(this.workDimensions.height - newDimensions.height) > 5) {
+      
+      this.workDimensions = newDimensions;
+      console.log('📐 Work dimensions updated:', newDimensions);
+    }
+  }
+
   deepMerge(target, source) {
     if (Array.isArray(source)) {
       return [...source];
@@ -521,6 +802,8 @@ class ApplicationStateManager {
       slideStartTs: 0,
       rsvpChoice: 'none',
       mapQuery: '',
+      viewerMode: false,
+      workDimensions: { width: 1280, height: 720 },
       defaults: {
         fontFamily: 'system-ui',
         fontSize: 28,
@@ -539,7 +822,7 @@ class ApplicationStateManager {
   }
 
   /**
-   * Get debug info
+   * Get debug info with positioning data
    */
   getDebugInfo() {
     return {
@@ -552,7 +835,13 @@ class ApplicationStateManager {
         isLocked: this.history.isLocked
       },
       listeners: Array.from(this.listeners.keys()),
-      projectId: this.currentProjectId
+      projectId: this.currentProjectId,
+      workDimensions: this.workDimensions,
+      positioningSupport: {
+        version: 63,
+        percentagePositioning: true,
+        responsiveScaling: true
+      }
     };
   }
 }
@@ -586,6 +875,9 @@ export const loadProject = () => stateManager.loadFromLocalStorage();
 export const saveProject = () => stateManager.save();
 export { saveProjectDebounced };
 
+// Enhanced slide operations
+export const loadSlideIntoDOM = (slide, slideIndex = null) => stateManager.loadSlideIntoDOM(slide, slideIndex);
+
 // History management
 export const initializeHistory = () => stateManager.initializeHistory();
 export const doUndo = () => stateManager.undo();
@@ -606,6 +898,7 @@ export const getSlideStartTs = () => stateManager.slideStartTs;
 export const getRsvpChoice = () => stateManager.rsvpChoice;
 export const getMapQuery = () => stateManager.mapQuery;
 export const getMapUrl = () => stateManager.getMapUrl();
+export const getWorkDimensions = () => stateManager.workDimensions;
 
 // State setters
 export const setIsViewer = (value) => { stateManager.isViewer = value; };
@@ -616,6 +909,11 @@ export const setPlaying = (value) => { stateManager.playing = value; };
 export const setRafId = (value) => { stateManager.rafId = value; };
 export const setSlideStartTs = (value) => { stateManager.slideStartTs = value; };
 export const setCurrentProjectId = (value) => { stateManager.currentProjectId = value; };
+export const setWorkDimensions = (value) => { stateManager.workDimensions = value; };
+
+// Enhanced viewer mode support
+export const setupViewerMode = () => stateManager.setupViewerMode();
+export const updateWorkDimensions = () => stateManager.updateWorkDimensions();
 
 // RSVP and map helpers
 export const handleRsvpChoice = (choice) => {

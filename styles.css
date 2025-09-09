@@ -1,3 +1,5 @@
+/* ===== COMPLETE ENHANCED CSS WITH VIEWER POSITIONING FIXES ===== */
+
 /* ===== CSS CUSTOM PROPERTIES ===== */
 :root {
   /* Sizing */
@@ -1365,7 +1367,9 @@ input[type="color"]:hover {
   background: linear-gradient(135deg, #6b7280, #4b5563) !important;
 }
 
-/* CRITICAL FIX: Viewer mode RSVP styling */
+/* ===== CRITICAL VIEWER MODE POSITIONING FIXES ===== */
+
+/* ENHANCED: Viewer mode RSVP styling with positioning fixes */
 body.viewer .rsvp,
 body.preview .rsvp,
 .rsvp.viewer-mode {
@@ -1384,6 +1388,118 @@ body.preview .rsvp,
   -webkit-backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* CRITICAL: Enhanced fullscreen viewer overrides with positioning fixes */
+body.viewer .topbar,
+body.viewer #topbarToggle,
+body.viewer .sidepanel,
+body.viewer #bgBox,
+body.viewer #uploadBgBtn,
+body.viewer .handle,
+body.viewer .guide {
+  display: none !important;
+}
+
+body.viewer {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+}
+
+body.viewer .stage {
+  min-height: 100vh !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* ENHANCED: Viewer wrap positioning for consistent coordinate system */
+body.viewer .wrap {
+  /* Maintain consistent coordinate system across devices */
+  width: min(100vw, calc(100vh * 16/9)) !important;
+  height: min(100vh, calc(100vw * 9/16)) !important;
+  aspect-ratio: 16 / 9 !important;
+  position: static !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* ENHANCED: Work area positioning fixes for viewer */
+body.viewer #work {
+  position: absolute !important;
+  inset: 0 !important;
+  border-radius: inherit !important;
+  overflow: hidden !important;
+}
+
+/* ENHANCED: FX Video positioning for viewer mode */
+body.viewer #fxVideo {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  z-index: 18 !important;
+  border-radius: inherit !important;
+  pointer-events: none !important;
+}
+
+/* ENHANCED: User background positioning fixes for viewer */
+body.viewer #userBgWrap {
+  position: absolute !important;
+  z-index: 15 !important; /* Below fx video but above background */
+  pointer-events: none !important;
+  transform-origin: center !important;
+}
+
+body.viewer #userBg {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  pointer-events: none !important;
+  border-radius: inherit !important;
+}
+
+/* ENHANCED: Layer positioning fixes for viewer */
+body.viewer .layer {
+  cursor: default !important;
+  outline: none !important;
+  pointer-events: none !important;
+}
+
+body.viewer .layer:hover {
+  outline: none !important;
+}
+
+/* ENHANCED: Mobile viewer positioning optimizations */
+@media (max-width: 768px) {
+  body.viewer .wrap {
+    width: 100vw !important;
+    height: 100vh !important;
+    aspect-ratio: auto !important;
+    border-radius: 0 !important;
+  }
+  
+  body.viewer #work {
+    border-radius: 0 !important;
+  }
+  
+  body.viewer #fxVideo,
+  body.viewer #userBg {
+    border-radius: 0 !important;
+  }
+  
+  body.viewer .rsvp {
+    left: max(8px, var(--safe-left)) !important;
+    right: max(8px, var(--safe-right)) !important;
+    bottom: max(8px, var(--safe-bottom)) !important;
+  }
 }
 
 /* Background upload button */
@@ -1457,58 +1573,6 @@ body.preview #hGuide {
 
 body.preview .handle {
   display: none !important;
-}
-
-/* Enhanced fullscreen viewer overrides */
-body.viewer .topbar,
-body.viewer #topbarToggle,
-body.viewer .sidepanel,
-body.viewer #bgBox,
-body.viewer #uploadBgBtn,
-body.viewer .handle,
-body.viewer .guide {
-  display: none !important;
-}
-
-body.viewer {
-  padding-top: 0 !important;
-  padding-left: 0 !important;
-}
-
-body.viewer .stage {
-  min-height: 100dvh;
-  padding: 0;
-}
-
-body.viewer .wrap {
-  width: 100vw;
-  height: 100dvh;
-  aspect-ratio: auto;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-body.viewer #work {
-  inset: 0;
-  border-radius: 0;
-}
-
-body.viewer #fxVideo {
-  object-fit: cover;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 18;
-  border-radius: 0;
-}
-
-body.viewer .layer {
-  cursor: default !important;
-  outline: none !important;
-}
-
-body.viewer .layer:hover {
-  outline: none !important;
 }
 
 /* ===== MOBILE & TOUCH OPTIMIZATIONS ===== */
@@ -2087,4 +2151,23 @@ body.resizing {
 
 .skip-link:focus {
   top: 6px;
+}
+
+/* ===== DEBUG OVERLAY STYLES ===== */
+.debug-positioning {
+  position: fixed !important;
+  top: 10px !important;
+  right: 10px !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+  color: #00ff00 !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+  font-family: 'Courier New', monospace !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
+  max-width: 300px !important;
+  border: 1px solid #333 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
 }
