@@ -8,6 +8,7 @@ import {
   setCurrentProjectId,
   historyState
 } from './state-manager.js';
+import { getFxScale } from './image-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -86,7 +87,11 @@ async function loadSlideImage(slide) {
           imageData: slide.image
         });
 
-        const defaultScale = Math.min(1, workRect.width / naturalWidth, workRect.height / naturalHeight);
+        const defaultScale = Math.min(
+          getFxScale(),
+          workRect.width / naturalWidth,
+          workRect.height / naturalHeight
+        );
         let finalX, finalY, finalScale = defaultScale;
 
         // Check if we have percentage coordinates (new format)

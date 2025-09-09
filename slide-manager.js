@@ -1,7 +1,7 @@
 // slide-manager.js - COMPLETE FIXED VERSION WITH IMAGE PERSISTENCE
 
 import { getSlides, getActiveIndex, setActiveIndex, setSlides, recordHistory, saveProjectDebounced } from './state-manager.js';
-import { imgState, setTransforms, enforceImageBounds, toggleUploadBtn } from './image-manager.js';
+import { imgState, setTransforms, enforceImageBounds, toggleUploadBtn, getFxScale } from './image-manager.js';
 import { clamp } from './utils.js';
 
 // Constants
@@ -357,10 +357,11 @@ class ImageLoader {
           } else {
             // Calculate fit-to-canvas defaults if no saved values
             const workRect = work.getBoundingClientRect();
-            const scaleToFitWidth = workRect.width / imgState.natW;
-            const scaleToFitHeight = workRect.height / imgState.natH;
-            
-            imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
+            imgState.scale = Math.min(
+              getFxScale(),
+              workRect.width / imgState.natW,
+              workRect.height / imgState.natH
+            );
             imgState.angle = 0;
             imgState.cx = workRect.width / 2;
             imgState.cy = workRect.height / 2;
