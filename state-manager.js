@@ -284,15 +284,16 @@ class ApplicationStateManager {
           }
 
           const rect = work.getBoundingClientRect();
+          const defaultScale = Math.min(1, rect.width / imgState.natW, rect.height / imgState.natH);
 
           // Check if we have percentage-based coordinates (new format)
           if (imageData.cxPercent !== undefined && imageData.cyPercent !== undefined) {
             console.log('📍 Loading image with percentage-based positioning');
-            
+
             setImagePositionFromPercentage({
               cxPercent: imageData.cxPercent,
               cyPercent: imageData.cyPercent,
-              scale: imageData.scale || 1,
+              scale: typeof imageData.scale === 'number' ? imageData.scale : defaultScale,
               angle: imageData.angle || 0,
               shearX: imageData.shearX || 0,
               shearY: imageData.shearY || 0,
@@ -327,7 +328,7 @@ class ApplicationStateManager {
 
             imgState.cx = (imageData.cx || currentWorkDimensions.width / 2) * scaleX;
             imgState.cy = (imageData.cy || currentWorkDimensions.height / 2) * scaleY;
-            imgState.scale = imageData.scale || 1;
+            imgState.scale = typeof imageData.scale === 'number' ? imageData.scale : defaultScale;
             imgState.angle = imageData.angle || 0;
             imgState.shearX = imageData.shearX || 0;
             imgState.shearY = imageData.shearY || 0;
