@@ -8,7 +8,7 @@ import {
   setCurrentProjectId,
   historyState
 } from './state-manager.js';
-import { getFxScale } from './image-manager.js';
+import { getFxScale, imgState, setTransforms } from './image-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -193,6 +193,13 @@ async function loadSlideImage(slide) {
           finalScale = 1;
         }
 
+        const angle = slide.image.angle || 0;
+        const shearX = slide.image.shearX || 0;
+        const shearY = slide.image.shearY || 0;
+        const flip = slide.image.flip || false;
+        const signX = slide.image.signX || 1;
+        const signY = slide.image.signY || 1;
+
         // Apply the positioning directly to userBgWrap
         applyImagePositioning(userBgWrap, {
           centerX: finalX,
@@ -200,13 +207,42 @@ async function loadSlideImage(slide) {
           scale: finalScale,
           naturalWidth,
           naturalHeight,
-          angle: slide.image.angle || 0,
-          shearX: slide.image.shearX || 0,
-          shearY: slide.image.shearY || 0,
-          flip: slide.image.flip || false,
-          signX: slide.image.signX || 1,
-          signY: slide.image.signY || 1
+          angle,
+          shearX,
+          shearY,
+          flip,
+          signX,
+          signY
         });
+
+        // Sync image state so subsequent loads use the updated values
+        imgState.cx = finalX;
+        imgState.cy = finalY;
+        imgState.scale = finalScale;
+        imgState.angle = angle;
+        imgState.shearX = shearX;
+        imgState.shearY = shearY;
+        imgState.flip = flip;
+        imgState.signX = signX;
+        imgState.signY = signY;
+        imgState.natW = naturalWidth;
+        imgState.natH = naturalHeight;
+        imgState.has = true;
+
+        // Mirror values back onto slide.image
+        slide.image.cx = finalX;
+        slide.image.cy = finalY;
+        slide.image.scale = finalScale;
+        slide.image.angle = angle;
+        slide.image.shearX = shearX;
+        slide.image.shearY = shearY;
+        slide.image.flip = flip;
+        slide.image.signX = signX;
+        slide.image.signY = signY;
+        slide.image.natW = naturalWidth;
+        slide.image.natH = naturalHeight;
+
+        setTransforms();
 
         console.log('Image positioned successfully at:', Math.round(finalX), Math.round(finalY));
         resolve();
