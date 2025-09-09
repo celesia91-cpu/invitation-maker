@@ -1,4 +1,4 @@
-// share-manager.js - COMPLETE ENHANCED VERSION WITH PERCENTAGE-BASED POSITIONING
+// share-manager.js - COMPLETE FIXED VERSION WITH PROPER FUNCTION ORDERING
 
 import { encodeState, decodeState } from './utils.js';
 import {
@@ -21,6 +21,489 @@ function getViewerOrigin() {
     return CANONICAL_VIEWER_ORIGIN;
   } catch {
     return CANONICAL_VIEWER_ORIGIN;
+  }
+}
+
+// Apply image positioning directly to wrapper element
+function applyImagePositioning(element, params) {
+  const { 
+    centerX, centerY, scale, naturalWidth, naturalHeight,
+    angle, shearX, shearY, flip, signX, signY
+  } = params;
+  
+  const displayWidth = naturalWidth * scale;
+  const displayHeight = naturalHeight * scale;
+  
+  const sx = (flip ? -1 : 1) * (signX || 1);
+  const sy = signY || 1;
+  
+  const transform = [
+    'translate(-50%, -50%)',
+    `rotate(${angle || 0}rad)`,
+    `skew(${shearX || 0}rad, ${shearY || 0}rad)`,
+    `scale(${sx}, ${sy})`
+  ].join(' ');
+
+  // Apply styles directly
+  element.style.width = displayWidth + 'px';
+  element.style.height = displayHeight + 'px';
+  element.style.left = centerX + 'px';
+  element.style.top = centerY + 'px';
+  element.style.transform = transform;
+  element.style.transformOrigin = 'center center';
+  element.style.zIndex = '15';
+  element.style.position = 'absolute';
+  
+  console.log('Applied positioning:', {
+    center: { x: Math.round(centerX), y: Math.round(centerY) },
+    size: { width: Math.round(displayWidth), height: Math.round(displayHeight) },
+    transform: transform
+  });
+}
+
+// ENHANCED: Load slide image with robust positioning support
+async function loadSlideImage(slide) {
+  if (!slide.image || !slide.image.src) return;
+  
+  const userBgEl = document.querySelector('#userBg');
+  const userBgWrap = document.querySelector('#userBgWrap');
+  const work = document.querySelector('#work');
+  
+  if (!userBgEl || !userBgWrap || !work) return;
+
+  return new Promise((resolve) => {
+    userBgEl.onload = () => {
+      try {
+        const workRect = work.getBoundingClientRect();
+        const naturalWidth = userBgEl.naturalWidth;
+        const naturalHeight = userBgEl.naturalHeight;
+        
+        console.log('Loading image:', {
+          naturalSize: { width: naturalWidth, height: naturalHeight },
+          workArea: { width: workRect.width, height: workRect.height },
+          imageData: slide.image
+        });
+
+        let finalX, finalY, finalScale;
+
+        // Check if we have percentage coordinates (new format)
+        if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
+          console.log('Using percentage positioning');
+          
+          finalX = (slide.image.cxPercent / 100) * workRect.width;
+          finalY = (slide.image.cyPercent / 100) * workRect.height;
+          finalScale = slide.image.scale || 1;
+          
+        } else if (slide.image.cx !== undefined && slide.image.cy !== undefined) {
+          console.log('Using legacy absolute coordinates - applying smart scaling');
+          
+          const sourceCoords = { cx: slide.image.cx, cy: slide.image.cy };
+          
+          // Smart coordinate detection - check against common editor sizes
+          const commonSizes = [
+            { w: 1280, h: 720 },   // Standard 16:9
+            { w: 1920, h: 1080 },  // Full HD 16:9  
+            { w: 1024, h: 576 },   // Smaller 16:9
+            { w: 800, h: 450 },    // Even smaller 16:9
+          ];
+          
+          let bestMatch = null;
+          let bestScore = Infinity;
+          
+          // Find most likely source size
+          for (const size of commonSizes) {
+            if (sourceCoords.cx <= size.w && sourceCoords.cy <= size.h) {
+              const centerDistance = Math.abs(sourceCoords.cx - size.w/2) + Math.abs(sourceCoords.cy - size.h/2);
+              if (centerDistance < bestScore) {
+                bestScore = centerDistance;
+                bestMatch = size;
+              }
+            }
+          }
+          
+          if (bestMatch) {
+            console.log('Detected source work area:', bestMatch);
+            
+            // Convert to percentage and scale to current work area
+            const sourceXPercent = (sourceCoords.cx / bestMatch.w) * 100;
+            const sourceYPercent = (sourceCoords.cy / bestMatch.h) * 100;
+            
+            finalX = (sourceXPercent / 100) * workRect.width;
+            finalY = (sourceYPercent / 100) * workRect.height;
+            finalScale = slide.image.scale || 1;
+            
+            console.log('Converted coordinates:', {
+              source: sourceCoords,
+              sourcePercent: { x: sourceXPercent.toFixed(1), y: sourceYPercent.toFixed(1) },
+              final: { x: Math.round(finalX), y: Math.round(finalY) }
+            });
+          } else {
+            console.log('Centering image (coordinates out of range)');
+            finalX = workRect.width / 2;
+            finalY = workRect.height / 2;
+            finalScale = slide.image.scale || 1;
+          }
+        } else {
+          console.log('No positioning data - centering and auto-scaling');
+          
+          finalX = workRect.width / 2;
+          finalY = workRect.height / 2;
+          
+          // Auto-scale to cover like fx video
+          const workAspect = workRect.width / workRect.height;
+          const imageAspect = naturalWidth / naturalHeight;
+          
+          if (imageAspect > workAspect) {
+            // Image is wider - scale by height
+            finalScale = workRect.height / naturalHeight;
+          } else {
+            // Image is taller - scale by width
+            finalScale = workRect.width / naturalWidth;
+          }
+          
+          // Scale down slightly to avoid perfect overlap
+          finalScale *= 0.9;
+        }
+
+        // Apply the positioning directly to userBgWrap
+        applyImagePositioning(userBgWrap, {
+          centerX: finalX,
+          centerY: finalY,
+          scale: finalScale,
+          naturalWidth,
+          naturalHeight,
+          angle: slide.image.angle || 0,
+          shearX: slide.image.shearX || 0,
+          shearY: slide.image.shearY || 0,
+          flip: slide.image.flip || false,
+          signX: slide.image.signX || 1,
+          signY: slide.image.signY || 1
+        });
+
+        console.log('Image positioned successfully at:', Math.round(finalX), Math.round(finalY));
+        resolve();
+        
+      } catch (error) {
+        console.error('Error positioning image:', error);
+        resolve();
+      }
+    };
+
+    userBgEl.onerror = () => {
+      console.error('Failed to load image:', slide.image.src);
+      resolve();
+    };
+
+    userBgEl.src = slide.image.src;
+  });
+}
+
+// ENHANCED: Load text layers for shared project with responsive scaling
+async function loadTextLayers(layers) {
+  const work = document.querySelector('#work');
+  if (!work || !layers.length) return;
+  
+  // Clear existing layers
+  const existingLayers = work.querySelectorAll('.layer');
+  existingLayers.forEach(layer => layer.remove());
+  
+  const workRect = work.getBoundingClientRect();
+  
+  // Add new layers with responsive scaling
+  for (const layerData of layers) {
+    const element = document.createElement('div');
+    element.className = 'layer text-layer';
+    element.contentEditable = 'false';
+    element.textContent = layerData.text || 'Text';
+    
+    // Apply positioning and styles with viewport scaling
+    const scaleFactorX = workRect.width / (layerData.workWidth || 1280);
+    const scaleFactorY = workRect.height / (layerData.workHeight || 720);
+    const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
+    
+    element.style.left = (layerData.left * scaleFactorX) + 'px';
+    element.style.top = (layerData.top * scaleFactorY) + 'px';
+    element.style.fontSize = (layerData.fontSize * scaleFactor) + 'px';
+    element.style.fontFamily = layerData.fontFamily || 'system-ui';
+    element.style.fontWeight = layerData.fontWeight || 'normal';
+    element.style.color = layerData.color || '#ffffff';
+    element.style.textAlign = layerData.textAlign || 'left';
+    
+    if (layerData.transform) {
+      element.style.transform = layerData.transform;
+    }
+    
+    work.appendChild(element);
+  }
+  
+  console.log('Text layers loaded and scaled for viewer');
+}
+
+// ENHANCED: Setup viewer layout for consistent positioning
+function setupViewerLayout() {
+  const body = document.body;
+  const stage = document.querySelector('.stage');
+  const wrap = document.querySelector('.wrap');
+  
+  console.log('Setting up viewer layout...');
+  
+  // Force viewer body styles
+  body.style.paddingTop = '0';
+  body.style.paddingLeft = '0';
+  body.style.margin = '0';
+  body.style.overflow = 'hidden';
+
+  // Setup stage for proper centering
+  if (stage) {
+    stage.style.minHeight = '100vh';
+    stage.style.height = '100vh';
+    stage.style.padding = '0';
+    stage.style.display = 'flex';
+    stage.style.alignItems = 'center';
+    stage.style.justifyContent = 'center';
+  }
+  
+  if (wrap) {
+    // Calculate proper dimensions maintaining 16:9 aspect ratio
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const targetAspect = 16 / 9;
+    const viewportAspect = vw / vh;
+
+    let wrapWidth, wrapHeight;
+    
+    // Determine dimensions based on viewport aspect ratio
+    if (viewportAspect > targetAspect) {
+      // Viewport is wider than 16:9, constrain by height
+      wrapHeight = vh;
+      wrapWidth = vh * targetAspect;
+    } else {
+      // Viewport is taller than 16:9, constrain by width
+      wrapWidth = vw;
+      wrapHeight = vw / targetAspect;
+    }
+
+    // Apply the calculated dimensions
+    wrap.style.width = wrapWidth + 'px';
+    wrap.style.height = wrapHeight + 'px';
+    wrap.style.aspectRatio = '16 / 9';
+    wrap.style.borderRadius = '0';
+    wrap.style.boxShadow = 'none';
+    wrap.style.position = 'relative';
+    wrap.style.transform = 'none';
+    wrap.style.maxWidth = 'none';
+    wrap.style.maxHeight = 'none';
+
+    console.log('Viewer dimensions set:', { 
+      viewport: { width: vw, height: vh },
+      wrap: { width: wrapWidth, height: wrapHeight },
+      aspectRatio: targetAspect
+    });
+  }
+
+  // Setup work area
+  const work = document.querySelector('#work');
+  if (work) {
+    work.style.position = 'absolute';
+    work.style.inset = '0';
+    work.style.width = '100%';
+    work.style.height = '100%';
+    work.style.borderRadius = 'inherit';
+  }
+
+  // Handle window resize for viewer
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      if (document.body.classList.contains('viewer')) {
+        setupViewerLayout();
+        // Re-position image after layout change
+        setTimeout(() => {
+          const slides = window.stateManager?.slides || [];
+          if (slides.length > 0 && slides[0].image) {
+            loadSlideImage(slides[0]);
+          }
+        }, 50);
+      }
+    }, 250);
+  });
+  
+  console.log('Viewer layout configured');
+}
+
+// Enhanced fullscreen prompt
+function showFullscreenPrompt() {
+  console.log('Showing fullscreen prompt');
+  
+  const overlay = document.createElement('div');
+  overlay.className = 'fs-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(180deg, rgba(11,11,34,0.95), rgba(11,11,34,0.9));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: fadeIn 0.3s ease;
+  `;
+  
+  overlay.innerHTML = `
+    <div class="fs-card" style="
+      max-width: min(92vw, 480px);
+      color: #eef1ff;
+      background: rgba(17,20,50,0.8);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 18px;
+      padding: 32px;
+      box-shadow: 0 20px 25px rgba(0,0,0,0.1), inset 0 0 80px rgba(255,255,255,0.04);
+      animation: slideUp 0.3s ease;
+    ">
+      <h2 style="margin: 0 0 12px; font-size: 24px; font-weight: 800;">View Invitation</h2>
+      <p style="margin: 0 0 24px; color: #cfd2ff; line-height: 1.6;">
+        For the best experience, we recommend viewing this invitation in fullscreen.
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <button onclick="
+          document.documentElement.requestFullscreen().catch(console.log);
+          this.parentElement.parentElement.parentElement.remove();
+        " style="
+          appearance: none;
+          border: 0;
+          cursor: pointer;
+          padding: 12px 24px;
+          border-radius: 12px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          color: white;
+          background: linear-gradient(135deg, #2563eb, #7c3aed);
+          box-shadow: 0 10px 30px rgba(37,99,235,0.3), 0 1px 0 rgba(255,255,255,0.2) inset;
+          transition: all 0.15s ease;
+        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 35px rgba(37,99,235,0.4), 0 1px 0 rgba(255,255,255,0.2) inset';"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 30px rgba(37,99,235,0.3), 0 1px 0 rgba(255,255,255,0.2) inset';">
+          Enter Fullscreen
+        </button>
+        <button onclick="this.parentElement.parentElement.parentElement.remove();" style="
+          appearance: none;
+          border: 1px solid rgba(255,255,255,0.3);
+          background: transparent;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 12px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.15s ease;
+        " onmouseover="this.style.background='rgba(255,255,255,0.1)';"
+           onmouseout="this.style.background='transparent';">
+          Continue in Window
+        </button>
+      </div>
+      <div style="margin-top: 16px; font-size: 12px; color: rgba(207,210,255,0.7);">
+        Press Escape to exit fullscreen anytime
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    if (overlay.parentElement) {
+      overlay.remove();
+      console.log('Fullscreen prompt auto-hidden');
+    }
+  }, 10000);
+  
+  // Handle fullscreen change events
+  const handleFullscreenChange = () => {
+    if (document.fullscreenElement) {
+      console.log('Entered fullscreen mode');
+      if (overlay.parentElement) overlay.remove();
+    }
+  };
+  
+  document.addEventListener('fullscreenchange', handleFullscreenChange, { once: true });
+}
+
+// Show viewer UI including fullscreen prompt and RSVP
+function showViewerUI() {
+  console.log('Setting up viewer UI...');
+  
+  // Show RSVP buttons
+  const rsvp = document.querySelector('.rsvp');
+  if (rsvp) {
+    rsvp.style.display = 'flex';
+    rsvp.style.visibility = 'visible';
+    rsvp.style.opacity = '1';
+    rsvp.classList.add('viewer-mode');
+    console.log('RSVP buttons shown');
+  }
+
+  // Show fullscreen prompt if supported and not already in fullscreen
+  if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+    setTimeout(() => {
+      showFullscreenPrompt();
+    }, 500); // Small delay for better UX
+  }
+}
+
+// Show viewer error message
+function showViewerError(message) {
+  const errorDiv = document.createElement('div');
+  errorDiv.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    z-index: 9999;
+    font-family: system-ui, sans-serif;
+    max-width: 400px;
+  `;
+  errorDiv.innerHTML = `
+    <h3 style="margin: 0 0 10px; font-size: 18px;">Error Loading Invitation</h3>
+    <p style="margin: 0; font-size: 14px; line-height: 1.4;">${message}</p>
+  `;
+  document.body.appendChild(errorDiv);
+  
+  // Auto-remove after 8 seconds
+  setTimeout(() => errorDiv.remove(), 8000);
+}
+
+// ENHANCED: Apply shared project data with improved positioning
+export async function applySharedProject(projectData) {
+  if (!projectData || !projectData.slides) {
+    console.warn('Invalid project data for sharing');
+    return;
+  }
+
+  try {
+    console.log('Applying shared project data...');
+    
+    // Process each slide
+    for (const slide of projectData.slides) {
+      if (slide.image) {
+        await loadSlideImage(slide);
+      }
+      
+      // Apply text layers
+      if (slide.layers) {
+        await loadTextLayers(slide.layers);
+      }
+    }
+    
+    console.log('Successfully applied shared project with enhanced positioning');
+  } catch (error) {
+    console.error('Failed to apply shared project:', error);
   }
 }
 
@@ -171,7 +654,7 @@ export async function shareCurrent() {
         }
         
         await navigator.clipboard.writeText(url);
-        console.log('Link copied to clipboard ✓');
+        console.log('Link copied to clipboard');
         return;
       } catch (err) {
         console.warn('Clipboard write failed:', err);
@@ -202,183 +685,6 @@ function manualCopy(url) {
     console.warn('Prompt failed:', err);
   }
   console.log('Copy the link manually');
-}
-
-// ENHANCED: Load slide image with percentage positioning support
-async function loadSlideImage(slide) {
-  if (!slide.image || !slide.image.src) return;
-  
-  const userBgEl = document.querySelector('#userBg');
-  if (!userBgEl) return;
-
-  return new Promise((resolve) => {
-    userBgEl.onload = async () => {
-      try {
-        const { imgState, setImagePositionFromPercentage, setTransforms } = await import('./image-manager.js');
-        
-        imgState.has = true;
-        imgState.natW = userBgEl.naturalWidth;
-        imgState.natH = userBgEl.naturalHeight;
-        
-        const work = document.querySelector('#work');
-        if (!work) {
-          resolve();
-          return;
-        }
-
-        // Check if we have percentage-based coordinates (new format)
-        if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
-          console.log('📍 Loading with percentage-based positioning');
-          
-          // Use percentage-based positioning for consistent cross-device display
-          setImagePositionFromPercentage({
-            cxPercent: slide.image.cxPercent,
-            cyPercent: slide.image.cyPercent,
-            scale: slide.image.scale || 1,
-            angle: slide.image.angle || 0,
-            shearX: slide.image.shearX || 0,
-            shearY: slide.image.shearY || 0,
-            signX: slide.image.signX || 1,
-            signY: slide.image.signY || 1,
-            flip: slide.image.flip || false
-          });
-          
-        } else {
-          console.log('📍 Loading with legacy absolute positioning');
-          
-          // Fallback to absolute positioning (legacy format)
-          const rect = work.getBoundingClientRect();
-          
-          // Try to detect if coordinates are from a different sized work area
-          const isLegacyCoords = (slide.image.cx > rect.width * 2) || (slide.image.cy > rect.height * 2);
-          
-          if (isLegacyCoords) {
-            // Assume legacy coordinates were from a standard work area size
-            // Common editor sizes: 1280x720 or similar 16:9 ratios
-            const assumedLegacyWidth = 1280;
-            const assumedLegacyHeight = 720;
-            
-            const scaleX = rect.width / assumedLegacyWidth;
-            const scaleY = rect.height / assumedLegacyHeight;
-            
-            imgState.cx = (slide.image.cx || assumedLegacyWidth / 2) * scaleX;
-            imgState.cy = (slide.image.cy || assumedLegacyHeight / 2) * scaleY;
-            
-            console.log('🔧 Scaled legacy coordinates:', { 
-              original: { cx: slide.image.cx, cy: slide.image.cy },
-              scaled: { cx: imgState.cx, cy: imgState.cy },
-              factors: { scaleX, scaleY }
-            });
-          } else {
-            // Use coordinates as-is (should work for similar sized work areas)
-            imgState.cx = slide.image.cx || rect.width / 2;
-            imgState.cy = slide.image.cy || rect.height / 2;
-          }
-          
-          // Apply other transform properties
-          imgState.scale = slide.image.scale || 1;
-          imgState.angle = slide.image.angle || 0;
-          imgState.shearX = slide.image.shearX || 0;
-          imgState.shearY = slide.image.shearY || 0;
-          imgState.signX = slide.image.signX || 1;
-          imgState.signY = slide.image.signY || 1;
-          imgState.flip = slide.image.flip || false;
-          
-          setTransforms();
-        }
-        
-        // Apply image effects if present
-        if (slide.image.fadeInMs) imgState.fadeInMs = slide.image.fadeInMs;
-        if (slide.image.fadeOutMs) imgState.fadeOutMs = slide.image.fadeOutMs;
-        if (slide.image.zoomInMs) imgState.zoomInMs = slide.image.zoomInMs;
-        if (slide.image.zoomOutMs) imgState.zoomOutMs = slide.image.zoomOutMs;
-        
-        console.log('✅ Image loaded and positioned for viewer');
-        resolve();
-        
-      } catch (error) {
-        console.error('Error setting up loaded image:', error);
-        resolve();
-      }
-    };
-    
-    userBgEl.onerror = () => {
-      console.error('Failed to load shared image:', slide.image.src);
-      resolve();
-    };
-    
-    // Trigger load
-    userBgEl.src = slide.image.src;
-  });
-}
-
-// ENHANCED: Load text layers for shared project with responsive scaling
-async function loadTextLayers(layers) {
-  const work = document.querySelector('#work');
-  if (!work || !layers.length) return;
-  
-  // Clear existing layers
-  const existingLayers = work.querySelectorAll('.layer');
-  existingLayers.forEach(layer => layer.remove());
-  
-  const workRect = work.getBoundingClientRect();
-  
-  // Add new layers with responsive scaling
-  for (const layerData of layers) {
-    const element = document.createElement('div');
-    element.className = 'layer text-layer';
-    element.contentEditable = 'false';
-    element.textContent = layerData.text || 'Text';
-    
-    // Apply positioning and styles with viewport scaling
-    const scaleFactorX = workRect.width / (layerData.workWidth || 1280);
-    const scaleFactorY = workRect.height / (layerData.workHeight || 720);
-    const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
-    
-    element.style.left = (layerData.left * scaleFactorX) + 'px';
-    element.style.top = (layerData.top * scaleFactorY) + 'px';
-    element.style.fontSize = (layerData.fontSize * scaleFactor) + 'px';
-    element.style.fontFamily = layerData.fontFamily || 'system-ui';
-    element.style.fontWeight = layerData.fontWeight || 'normal';
-    element.style.color = layerData.color || '#ffffff';
-    element.style.textAlign = layerData.textAlign || 'left';
-    
-    if (layerData.transform) {
-      element.style.transform = layerData.transform;
-    }
-    
-    work.appendChild(element);
-  }
-  
-  console.log('✅ Text layers loaded and scaled for viewer');
-}
-
-// ENHANCED: Apply shared project data with improved positioning
-export async function applySharedProject(projectData) {
-  if (!projectData || !projectData.slides) {
-    console.warn('Invalid project data for sharing');
-    return;
-  }
-
-  try {
-    console.log('📋 Applying shared project data...');
-    
-    // Process each slide
-    for (const slide of projectData.slides) {
-      if (slide.image) {
-        await loadSlideImage(slide);
-      }
-      
-      // Apply text layers
-      if (slide.layers) {
-        await loadTextLayers(slide.layers);
-      }
-    }
-    
-    console.log('✅ Successfully applied shared project with enhanced positioning');
-  } catch (error) {
-    console.error('Failed to apply shared project:', error);
-  }
 }
 
 // ENHANCED: Apply viewer mode from URL parameters with better error handling
@@ -436,21 +742,34 @@ export function applyViewerFromUrl() {
       historyState.lock = true;
       applyProject(data);
 
-      // ENHANCED: Apply shared project with improved positioning
+      // ENHANCED: Load with improved positioning and UI
       if (data.slides && data.slides.length > 0) {
-        import('./slide-manager.js').then(async ({ loadSlideIntoDOM, updateSlidesUI, startPlay }) => {
+        setTimeout(async () => {
           try {
             const activeIndex = Math.max(0, Math.min(data.activeIndex || 0, data.slides.length - 1));
             
             // Apply the shared project data with enhanced positioning
             await applySharedProject(data);
             
-            // Load the active slide
-            await loadSlideIntoDOM(data.slides[activeIndex]);
-            updateSlidesUI();
+            // Load the active slide with enhanced positioning
+            await loadSlideImage(data.slides[activeIndex]);
+            
+            // Load text layers if present
+            if (data.slides[activeIndex].layers) {
+              await loadTextLayers(data.slides[activeIndex].layers);
+            }
 
             if (isViewer) {
-              startPlay();
+              // Setup viewer UI
+              showViewerUI();
+              
+              // Start playback if needed
+              try {
+                const { startPlay } = await import('./slide-manager.js');
+                if (startPlay) startPlay();
+              } catch {}
+              
+              // Ensure layers are not editable
               [...document.querySelectorAll('.layer')].forEach((el) =>
                 el.setAttribute('contenteditable', 'false')
               );
@@ -458,13 +777,12 @@ export function applyViewerFromUrl() {
           } catch (error) {
             console.error('Error loading shared slide:', error);
           }
-        });
+        }, 100);
       }
 
       historyState.lock = false;
     } catch (error) {
       console.warn('Failed to decode shared state:', error);
-      console.error('Invalid share link');
       
       // Show user-friendly error in viewer mode
       if (isViewer) {
@@ -472,71 +790,6 @@ export function applyViewerFromUrl() {
       }
     }
   }
-}
-
-// ENHANCED: Setup viewer layout for consistent positioning
-function setupViewerLayout() {
-  const body = document.body;
-  const wrap = document.querySelector('.wrap');
-  const stage = document.querySelector('.stage');
-  
-  // Apply viewer-specific layout styles
-  if (stage) {
-    stage.style.minHeight = '100vh';
-    stage.style.padding = '0';
-    stage.style.display = 'flex';
-    stage.style.alignItems = 'center';
-    stage.style.justifyContent = 'center';
-  }
-  
-  if (wrap) {
-    // Maintain aspect ratio for consistent coordinate system
-    const isMobile = window.innerWidth <= 768;
-    
-    if (isMobile) {
-      // Mobile: use full screen
-      wrap.style.width = '100vw';
-      wrap.style.height = '100vh';
-      wrap.style.borderRadius = '0';
-      wrap.style.aspectRatio = 'auto';
-    } else {
-      // Desktop: maintain 16:9 aspect ratio for consistent positioning
-      wrap.style.width = 'min(100vw, calc(100vh * 16/9))';
-      wrap.style.height = 'min(100vh, calc(100vw * 9/16))';
-      wrap.style.aspectRatio = '16 / 9';
-      wrap.style.position = 'static';
-      wrap.style.transform = 'none';
-    }
-  }
-  
-  console.log('📱 Viewer layout configured');
-}
-
-// Show viewer error message
-function showViewerError(message) {
-  const errorDiv = document.createElement('div');
-  errorDiv.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(239, 68, 68, 0.9);
-    color: white;
-    padding: 20px;
-    border-radius: 12px;
-    text-align: center;
-    z-index: 9999;
-    font-family: system-ui, sans-serif;
-    max-width: 400px;
-  `;
-  errorDiv.innerHTML = `
-    <h3 style="margin: 0 0 10px; font-size: 18px;">Error Loading Invitation</h3>
-    <p style="margin: 0; font-size: 14px; line-height: 1.4;">${message}</p>
-  `;
-  document.body.appendChild(errorDiv);
-  
-  // Auto-remove after 8 seconds
-  setTimeout(() => errorDiv.remove(), 8000);
 }
 
 // Setup share button handler
@@ -564,7 +817,7 @@ export function buildProjectForShare() {
 export function debugSharedProject() {
   try {
     const project = safeProjectForShare();
-    console.log('🔍 Shared Project Debug:', {
+    console.log('Shared Project Debug:', {
       slides: project.slides?.length || 0,
       activeIndex: project.activeIndex,
       hasPercentageCoords: project.slides?.some(s => 
@@ -598,7 +851,7 @@ if (typeof window !== 'undefined') {
       userBgWrap.style.left = (rect.width / 2) + 'px';
       userBgWrap.style.top = (rect.height / 2) + 'px';
       userBgWrap.style.zIndex = '15';
-      console.log('✅ Emergency image centering applied');
+      console.log('Emergency image centering applied');
     }
   };
   
@@ -608,7 +861,7 @@ if (typeof window !== 'undefined') {
     const fxVideo = document.querySelector('#fxVideo');
     
     if (work && userBgWrap && fxVideo) {
-      console.log('🔍 Current Positioning Debug:', {
+      console.log('Current Positioning Debug:', {
         workArea: work.getBoundingClientRect(),
         imageWrapper: userBgWrap.getBoundingClientRect(),
         fxVideo: fxVideo.getBoundingClientRect(),
