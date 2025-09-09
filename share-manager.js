@@ -578,9 +578,49 @@ export function debugSharedProject() {
   }
 }
 
-// Make debug functions available globally
+// Make debug functions available globally for troubleshooting
 if (typeof window !== 'undefined') {
   window.debugSharedProject = debugSharedProject;
   window.safeProjectForShare = safeProjectForShare;
   window.applySharedProject = applySharedProject;
+  window.loadSlideImage = loadSlideImage;
+  window.applyImagePositioning = applyImagePositioning;
+  window.setupViewerLayout = setupViewerLayout;
+  window.showViewerUI = showViewerUI;
+  window.showFullscreenPrompt = showFullscreenPrompt;
+  
+  // Emergency fix functions for console debugging
+  window.fixImageCentering = function() {
+    const work = document.querySelector('#work');
+    const userBgWrap = document.querySelector('#userBgWrap');
+    if (work && userBgWrap) {
+      const rect = work.getBoundingClientRect();
+      userBgWrap.style.left = (rect.width / 2) + 'px';
+      userBgWrap.style.top = (rect.height / 2) + 'px';
+      userBgWrap.style.zIndex = '15';
+      console.log('✅ Emergency image centering applied');
+    }
+  };
+  
+  window.debugCurrentPositioning = function() {
+    const work = document.querySelector('#work');
+    const userBgWrap = document.querySelector('#userBgWrap');
+    const fxVideo = document.querySelector('#fxVideo');
+    
+    if (work && userBgWrap && fxVideo) {
+      console.log('🔍 Current Positioning Debug:', {
+        workArea: work.getBoundingClientRect(),
+        imageWrapper: userBgWrap.getBoundingClientRect(),
+        fxVideo: fxVideo.getBoundingClientRect(),
+        imageStyles: {
+          left: userBgWrap.style.left,
+          top: userBgWrap.style.top,
+          width: userBgWrap.style.width,
+          height: userBgWrap.style.height,
+          transform: userBgWrap.style.transform,
+          zIndex: userBgWrap.style.zIndex
+        }
+      });
+    }
+  };
 }
