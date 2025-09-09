@@ -222,7 +222,7 @@ export function enforceImageBounds() {
   // Only clamp center when the image fits within the work area.
   // If the image exceeds the work area in both dimensions, preserve
   // the center so viewer playback matches editing.
-  if (w <= r.width || h <= r.height) {
+  if (w <= r.width && h <= r.height) {
     imgState.cx = clamp(imgState.cx, w / 2, r.width - w / 2);
     imgState.cy = clamp(imgState.cy, h / 2, r.height - h / 2);
   }

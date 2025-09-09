@@ -86,16 +86,17 @@ async function loadSlideImage(slide) {
           imageData: slide.image
         });
 
-        let finalX, finalY, finalScale;
+        const defaultScale = Math.min(1, workRect.width / naturalWidth, workRect.height / naturalHeight);
+        let finalX, finalY, finalScale = defaultScale;
 
         // Check if we have percentage coordinates (new format)
         if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
           console.log('Using percentage positioning');
-          
+
           finalX = (slide.image.cxPercent / 100) * workRect.width;
           finalY = (slide.image.cyPercent / 100) * workRect.height;
-          finalScale = slide.image.scale || 1;
-          
+          if (typeof slide.image.scale === 'number') finalScale = slide.image.scale;
+
         } else if (slide.image.cx !== undefined && slide.image.cy !== undefined) {
           console.log('Using legacy absolute coordinates - applying smart scaling');
           
@@ -143,7 +144,9 @@ async function loadSlideImage(slide) {
             
             finalX = (sourceXPercent / 100) * workRect.width;
             finalY = (sourceYPercent / 100) * workRect.height;
-            finalScale = slide.image.scale || 1;
+            if (typeof slide.image.scale === 'number') {
+              finalScale = slide.image.scale;
+            }
             
             console.log('Converted coordinates:', {
               source: sourceCoords,
@@ -156,7 +159,9 @@ async function loadSlideImage(slide) {
             console.log('Centering image - coordinates invalid or not centered enough');
             finalX = workRect.width / 2;
             finalY = workRect.height / 2;
-            finalScale = slide.image.scale || 1;
+            if (typeof slide.image.scale === 'number') {
+              finalScale = slide.image.scale;
+            }
             
             console.log('Applied centering:', {
               center: { x: Math.round(finalX), y: Math.round(finalY) },
@@ -165,21 +170,13 @@ async function loadSlideImage(slide) {
           }
         } else {
           console.log('No positioning data - centering and auto-scaling');
-          
+
           // FIXED: Ensure proper centering
           finalX = workRect.width / 2;
           finalY = workRect.height / 2;
-          
-          // Auto-scale to cover like fx video
-          const workAspect = workRect.width / workRect.height;
-          const imageAspect = naturalWidth / naturalHeight;
-          
-          if (imageAspect > workAspect) {
-            // Image is wider - scale by height
-            finalScale = (workRect.height / naturalHeight) * 0.9;
-          } else {
-            // Image is taller - scale by width  
-            finalScale = (workRect.width / naturalWidth) * 0.9;
+
+          if (typeof slide.image.scale === 'number') {
+            finalScale = slide.image.scale;
           }
         }
 
