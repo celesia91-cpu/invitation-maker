@@ -64,6 +64,20 @@ function fmtSec(ms) {
   return (ms / 1000).toFixed(1) + 's';
 }
 
+// Helper to compute the scale used by the fx video so images can match it
+export function getFxScale() {
+  const fxVideo = document.getElementById('fxVideo');
+  const work = document.getElementById('work');
+  if (!fxVideo || !work) return 1;
+
+  const videoWidth = fxVideo.videoWidth;
+  const videoHeight = fxVideo.videoHeight;
+  if (!videoWidth || !videoHeight) return 1;
+
+  const workRect = work.getBoundingClientRect();
+  return Math.max(workRect.width / videoWidth, workRect.height / videoHeight);
+}
+
 // ENHANCED: Convert absolute coordinates to percentages for sharing
 export function getImagePositionAsPercentage() {
   if (!imgState.has) return null;
@@ -361,14 +375,13 @@ export async function handleImageUpload(file) {
           
           const r = work.getBoundingClientRect();
 
-          // Set default scale so image fits entirely within work area
-          const scaleToFitWidth = r.width / imgState.natW;
-          const scaleToFitHeight = r.height / imgState.natH;
-
+          // Default scale matches fx video growth but never exceeds image's own size
           const { shearX, shearY } = imgState;
-
-          // Use the smaller scale and avoid upscaling beyond 100%
-          imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
+          imgState.scale = Math.min(
+            getFxScale(),
+            r.width / imgState.natW,
+            r.height / imgState.natH
+          );
           imgState.angle = 0;
           imgState.signX = 1;
           imgState.signY = 1;
@@ -451,13 +464,14 @@ function fallbackToLocalUpload(file) {
       }
       
       const r = work.getBoundingClientRect();
-      
-      // Set default scale so image fits within work area
-      const scaleToFitWidth = r.width / imgState.natW;
-      const scaleToFitHeight = r.height / imgState.natH;
 
+      // Default scale matches fx video growth but never exceeds image's own size
       const { shearX, shearY, signX, signY, flip } = imgState;
-      imgState.scale = Math.min(1, scaleToFitWidth, scaleToFitHeight);
+      imgState.scale = Math.min(
+        getFxScale(),
+        r.width / imgState.natW,
+        r.height / imgState.natH
+      );
       imgState.angle = 0;
       imgState.cx = r.width / 2;
       imgState.cy = r.height / 2;
