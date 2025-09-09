@@ -61,7 +61,9 @@ function applyImagePositioning(element, params) {
   });
 }
 
-// ENHANCED: Load slide image with robust positioning support
+// Fix for the loadSlideImage function in share-manager.js
+// Replace the existing coordinate conversion logic with this:
+
 async function loadSlideImage(slide) {
   if (!slide.image || !slide.image.src) return;
   
@@ -99,29 +101,40 @@ async function loadSlideImage(slide) {
           
           const sourceCoords = { cx: slide.image.cx, cy: slide.image.cy };
           
-          // Smart coordinate detection - check against common editor sizes
+          // FIXED: More robust coordinate validation and centering logic
+          const isValidCoordinate = (coord, max) => coord >= 0 && coord <= max && !isNaN(coord);
+          
+          // Common editor sizes for detection
           const commonSizes = [
-            { w: 1280, h: 720 },   // Standard 16:9
             { w: 1920, h: 1080 },  // Full HD 16:9  
+            { w: 1280, h: 720 },   // Standard 16:9
             { w: 1024, h: 576 },   // Smaller 16:9
             { w: 800, h: 450 },    // Even smaller 16:9
+            { w: 1000, h: 1000 },  // Square format
+            { w: 1007, h: 1000 },  // Current work area from console
           ];
           
           let bestMatch = null;
           let bestScore = Infinity;
           
-          // Find most likely source size
+          // Find most likely source size with improved scoring
           for (const size of commonSizes) {
-            if (sourceCoords.cx <= size.w && sourceCoords.cy <= size.h) {
-              const centerDistance = Math.abs(sourceCoords.cx - size.w/2) + Math.abs(sourceCoords.cy - size.h/2);
-              if (centerDistance < bestScore) {
-                bestScore = centerDistance;
+            if (isValidCoordinate(sourceCoords.cx, size.w) && 
+                isValidCoordinate(sourceCoords.cy, size.h)) {
+              
+              // Score based on how centered the coordinates are
+              const centerDistance = Math.abs(sourceCoords.cx - size.w/2) + 
+                                   Math.abs(sourceCoords.cy - size.h/2);
+              const normalizedScore = centerDistance / (size.w + size.h); // Normalize by size
+              
+              if (normalizedScore < bestScore) {
+                bestScore = normalizedScore;
                 bestMatch = size;
               }
             }
           }
           
-          if (bestMatch) {
+          if (bestMatch && bestScore < 0.5) { // Only use if reasonably centered
             console.log('Detected source work area:', bestMatch);
             
             // Convert to percentage and scale to current work area
@@ -134,18 +147,26 @@ async function loadSlideImage(slide) {
             
             console.log('Converted coordinates:', {
               source: sourceCoords,
+              sourceSize: bestMatch,
               sourcePercent: { x: sourceXPercent.toFixed(1), y: sourceYPercent.toFixed(1) },
               final: { x: Math.round(finalX), y: Math.round(finalY) }
             });
           } else {
-            console.log('Centering image (coordinates out of range)');
+            // FIXED: Force centering for invalid/suspicious coordinates
+            console.log('Centering image - coordinates invalid or not centered enough');
             finalX = workRect.width / 2;
             finalY = workRect.height / 2;
             finalScale = slide.image.scale || 1;
+            
+            console.log('Applied centering:', {
+              center: { x: Math.round(finalX), y: Math.round(finalY) },
+              workArea: { width: workRect.width, height: workRect.height }
+            });
           }
         } else {
           console.log('No positioning data - centering and auto-scaling');
           
+          // FIXED: Ensure proper centering
           finalX = workRect.width / 2;
           finalY = workRect.height / 2;
           
@@ -155,14 +176,19 @@ async function loadSlideImage(slide) {
           
           if (imageAspect > workAspect) {
             // Image is wider - scale by height
-            finalScale = workRect.height / naturalHeight;
+            finalScale = (workRect.height / naturalHeight) * 0.9;
           } else {
-            // Image is taller - scale by width
-            finalScale = workRect.width / naturalWidth;
+            // Image is taller - scale by width  
+            finalScale = (workRect.width / naturalWidth) * 0.9;
           }
-          
-          // Scale down slightly to avoid perfect overlap
-          finalScale *= 0.9;
+        }
+
+        // FIXED: Validate final coordinates before applying
+        if (isNaN(finalX) || isNaN(finalY) || isNaN(finalScale)) {
+          console.warn('Invalid final coordinates, forcing center');
+          finalX = workRect.width / 2;
+          finalY = workRect.height / 2;
+          finalScale = 1;
         }
 
         // Apply the positioning directly to userBgWrap
