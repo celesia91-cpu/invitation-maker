@@ -365,18 +365,50 @@ export class ResponsiveManager {
   }
 
   /**
+   * Wait until the viewport stops changing size
+   */
+  waitForViewportStability(callback, delay = 300) {
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let lastChange = performance.now();
+
+    const check = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (w !== width || h !== height) {
+        width = w;
+        height = h;
+        lastChange = performance.now();
+      }
+
+      if (performance.now() - lastChange >= delay) {
+        callback();
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+
+    requestAnimationFrame(check);
+  }
+
+  /**
    * Handle orientation changes (mobile)
    */
-  handleOrientationChange() {
+  handleOrientationChange(viewportStable = false) {
     this.forceLandscape();
     if ('orientation' in screen) {
       const orientation = screen.orientation?.angle;
       console.log('📱 Orientation changed:', orientation);
+    }
 
-      // Force resize check after orientation change
-      setTimeout(() => {
-        this.forceResizeCheck();
-      }, 100);
+    const triggerResize = () => {
+      this.forceResizeCheck();
+    };
+
+    if (viewportStable) {
+      triggerResize();
+    } else {
+      this.waitForViewportStability(triggerResize);
     }
   }
 
@@ -392,9 +424,9 @@ export class ResponsiveManager {
     
     // Fallback for older browsers
     window.addEventListener('orientationchange', () => {
-      setTimeout(() => {
-        this.handleOrientationChange();
-      }, 100);
+      this.waitForViewportStability(() => {
+        this.handleOrientationChange(true);
+      });
     });
   }
 
