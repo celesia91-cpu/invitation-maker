@@ -380,9 +380,6 @@ class ImageLoader {
           }
           
           setTransforms();
-          if (!document.body.classList.contains('viewer')) {
-            enforceImageBounds();
-          }
           toggleUploadBtn();
           
           console.log('Image loaded and state restored from slide data');
