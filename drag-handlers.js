@@ -1,5 +1,7 @@
 // drag-handlers.js - COMPLETE FIXED VERSION - Fixes the pointer capture release issue
 
+import { syncImageCoordinates } from './image-manager.js';
+
 /**
  * Enhanced Drag Handlers Manager
  * Handles image transforms, text positioning/resizing, snap guides, touch support
@@ -603,6 +605,8 @@ export class DragHandlersManager {
       if (wasMoving) {
         setTimeout(() => {
           if (ctx.writeCurrentSlide) ctx.writeCurrentSlide();
+          // Ensure slide data has synced coordinates
+          syncImageCoordinates(true);
           if (ctx.saveProjectDebounced) ctx.saveProjectDebounced();
         }, 10);
       }

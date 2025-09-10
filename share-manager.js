@@ -8,7 +8,7 @@ import {
   setCurrentProjectId,
   historyState
 } from './state-manager.js';
-import { setImagePositionFromPercentage, setTransforms, imgState } from './image-manager.js';
+import { setImagePositionFromPercentage, setTransforms, imgState, syncImageCoordinates } from './image-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -519,6 +519,9 @@ export async function shareCurrent() {
       console.warn('Could not import slide-manager:', error);
     }
 
+    // Ensure active slide has up-to-date image coordinates
+    syncImageCoordinates(true);
+
     // Small delay allows layout/state microtasks to flush
     await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -660,6 +663,7 @@ export function applyViewerFromUrl() {
             
             // Load the active slide with enhanced positioning
             await loadSlideImage(data.slides[activeIndex]);
+            syncImageCoordinates();
             
             // Load text layers if present
             if (data.slides[activeIndex].layers) {
