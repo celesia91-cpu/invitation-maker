@@ -351,16 +351,22 @@ export class ResponsiveManager {
   async forceLandscape() {
     const { isMobile, isTablet } = this.checkBreakpoints();
     const overlay = document.getElementById('rotateOverlay');
-    if ((isMobile || isTablet) && screen.orientation?.lock) {
+
+    if (!(isMobile || isTablet)) return;
+
+    const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+    overlay?.classList.toggle('show', !isLandscape);
+
+    if (screen.orientation?.lock) {
       try {
         await screen.orientation.lock('landscape');
         overlay?.classList.remove('show');
       } catch (err) {
         console.warn('Orientation lock failed', err);
+        if (!isLandscape) {
+          overlay?.classList.add('show');
+        }
       }
-    } else if ((isMobile || isTablet) && overlay) {
-      const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-      overlay.classList.toggle('show', !isLandscape);
     }
   }
 
