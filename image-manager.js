@@ -373,21 +373,21 @@ export async function handleImageUpload(file) {
             throw new Error('Invalid image dimensions');
           }
           
-          const r = work.getBoundingClientRect();
+          const workRect = work.getBoundingClientRect();
 
-          // Default scale matches fx video growth but never exceeds image's own size
+          // Initial scale should cover the work area but not exceed the fx video scale
           const { shearX, shearY } = imgState;
-          imgState.scale = Math.min(
-            getFxScale(),
-            r.width / imgState.natW,
-            r.height / imgState.natH
+          const coverScale = Math.max(
+            workRect.width / imgState.natW,
+            workRect.height / imgState.natH
           );
+          imgState.scale = Math.min(getFxScale(), coverScale);
           imgState.angle = 0;
           imgState.signX = 1;
           imgState.signY = 1;
           imgState.flip = false;
-          imgState.cx = r.width / 2;
-          imgState.cy = r.height / 2;
+          imgState.cx = workRect.width / 2;
+          imgState.cy = workRect.height / 2;
           imgState.has = true;
           imgState.shearX = shearX;
           imgState.shearY = shearY;
@@ -463,18 +463,18 @@ function fallbackToLocalUpload(file) {
         throw new Error('Invalid image dimensions');
       }
       
-      const r = work.getBoundingClientRect();
+      const workRect = work.getBoundingClientRect();
 
-      // Default scale matches fx video growth but never exceeds image's own size
+      // Initial scale should cover the work area but not exceed the fx video scale
       const { shearX, shearY, signX, signY, flip } = imgState;
-      imgState.scale = Math.min(
-        getFxScale(),
-        r.width / imgState.natW,
-        r.height / imgState.natH
+      const coverScale = Math.max(
+        workRect.width / imgState.natW,
+        workRect.height / imgState.natH
       );
+      imgState.scale = Math.min(getFxScale(), coverScale);
       imgState.angle = 0;
-      imgState.cx = r.width / 2;
-      imgState.cy = r.height / 2;
+      imgState.cx = workRect.width / 2;
+      imgState.cy = workRect.height / 2;
       imgState.has = true;
       imgState.shearX = shearX;
       imgState.shearY = shearY;

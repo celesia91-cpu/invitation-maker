@@ -355,13 +355,13 @@ class ImageLoader {
             imgState.signY = imageData.signY || 1;
             imgState.flip = imageData.flip || false;
           } else {
-            // Calculate fit-to-canvas defaults if no saved values
+            // Calculate cover scale defaults if no saved values
             const workRect = work.getBoundingClientRect();
-            imgState.scale = Math.min(
-              getFxScale(),
+            const coverScale = Math.max(
               workRect.width / imgState.natW,
               workRect.height / imgState.natH
             );
+            imgState.scale = Math.min(getFxScale(), coverScale);
             imgState.angle = 0;
             imgState.cx = workRect.width / 2;
             imgState.cy = workRect.height / 2;
