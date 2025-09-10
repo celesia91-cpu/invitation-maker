@@ -119,98 +119,6 @@ async function loadTextLayers(layers) {
   console.log('Text layers loaded and scaled for viewer');
 }
 
-// ENHANCED: Setup viewer layout for consistent positioning
-function setupViewerLayout() {
-  const body = document.body;
-  const stage = document.querySelector('.stage');
-  const wrap = document.querySelector('.wrap');
-  
-  console.log('Setting up viewer layout...');
-  
-  // Force viewer body styles
-  body.style.paddingTop = '0';
-  body.style.paddingLeft = '0';
-  body.style.margin = '0';
-  body.style.overflow = 'hidden';
-
-  // Setup stage for proper centering
-  if (stage) {
-    stage.style.minHeight = '100vh';
-    stage.style.height = '100vh';
-    stage.style.padding = '0';
-    stage.style.display = 'flex';
-    stage.style.alignItems = 'center';
-    stage.style.justifyContent = 'center';
-  }
-  
-  if (wrap) {
-    // Calculate proper dimensions maintaining 16:9 aspect ratio
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const targetAspect = 16 / 9;
-    const viewportAspect = vw / vh;
-
-    let wrapWidth, wrapHeight;
-    
-    // Determine dimensions based on viewport aspect ratio
-    if (viewportAspect > targetAspect) {
-      // Viewport is wider than 16:9, constrain by height
-      wrapHeight = vh;
-      wrapWidth = vh * targetAspect;
-    } else {
-      // Viewport is taller than 16:9, constrain by width
-      wrapWidth = vw;
-      wrapHeight = vw / targetAspect;
-    }
-
-    // Apply the calculated dimensions
-    wrap.style.width = wrapWidth + 'px';
-    wrap.style.height = wrapHeight + 'px';
-    wrap.style.aspectRatio = '16 / 9';
-    wrap.style.borderRadius = '0';
-    wrap.style.boxShadow = 'none';
-    wrap.style.position = 'relative';
-    wrap.style.transform = 'none';
-    wrap.style.maxWidth = 'none';
-    wrap.style.maxHeight = 'none';
-
-    console.log('Viewer dimensions set:', { 
-      viewport: { width: vw, height: vh },
-      wrap: { width: wrapWidth, height: wrapHeight },
-      aspectRatio: targetAspect
-    });
-  }
-
-  // Setup work area
-  const work = document.querySelector('#work');
-  if (work) {
-    work.style.position = 'absolute';
-    work.style.inset = '0';
-    work.style.width = '100%';
-    work.style.height = '100%';
-    work.style.borderRadius = 'inherit';
-  }
-
-  // Handle window resize for viewer
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      if (document.body.classList.contains('viewer')) {
-        setupViewerLayout();
-        // Re-position image after layout change
-        setTimeout(() => {
-          const slides = window.stateManager?.slides || [];
-          if (slides.length > 0 && slides[0].image) {
-            loadSlideImage(slides[0]);
-          }
-        }, 50);
-      }
-    }, 250);
-  });
-  
-  console.log('Viewer layout configured');
-}
 
 // Enhanced fullscreen prompt
 function showFullscreenPrompt() {
@@ -584,11 +492,7 @@ export function applyViewerFromUrl() {
   if (isViewer) {
     setIsViewer(true);
     setCurrentProjectId(null); // hard reset; prevents any backend saves with stale ids
-    const body = document.body;
-    body.classList.add('viewer');
-
-    // Apply viewer-specific CSS for consistent positioning
-    setupViewerLayout();
+    document.body.classList.add('viewer');
 
     // Disable editor-centric shortcuts in viewer
     window.addEventListener('keydown', (e) => {
@@ -721,7 +625,6 @@ if (typeof window !== 'undefined') {
   window.safeProjectForShare = safeProjectForShare;
   window.applySharedProject = applySharedProject;
   window.loadSlideImage = loadSlideImage;
-  window.setupViewerLayout = setupViewerLayout;
   window.showViewerUI = showViewerUI;
   window.showFullscreenPrompt = showFullscreenPrompt;
   
