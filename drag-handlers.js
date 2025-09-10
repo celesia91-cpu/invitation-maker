@@ -447,8 +447,8 @@ export class DragHandlersManager {
     imgState.cx = newCx;
     imgState.cy = newCy;
     
-    if (enforceImageBounds) enforceImageBounds();
-    if (setTransforms) setTransforms();
+    if (enforceImageBounds && !document.body.classList.contains('viewer')) enforceImageBounds();
+    if (setTransforms && !document.body.classList.contains('viewer')) setTransforms();
     if (showGuides && this.ctx.enableGuides) {
       showGuides({ v: snapV, h: snapH });
     }
@@ -559,8 +559,8 @@ export class DragHandlersManager {
       }
     }
 
-    if (enforceImageBounds) enforceImageBounds();
-    if (setTransforms) setTransforms();
+    if (enforceImageBounds && !document.body.classList.contains('viewer')) enforceImageBounds();
+    if (setTransforms && !document.body.classList.contains('viewer')) setTransforms();
   }
 
   /**

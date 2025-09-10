@@ -592,8 +592,8 @@ class InvitationMakerApp {
           imgState.cx = dragState.startCx + dx;
           imgState.cy = dragState.startCy + dy;
           
-          if (enforceImageBounds) enforceImageBounds();
-          if (setTransforms) setTransforms();
+          if (enforceImageBounds && !document.body.classList.contains('viewer')) enforceImageBounds();
+          if (setTransforms && !document.body.classList.contains('viewer')) setTransforms();
         } catch (error) {
           console.warn('Could not update image position');
         }

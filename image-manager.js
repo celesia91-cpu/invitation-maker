@@ -396,7 +396,7 @@ export async function handleImageUpload(file) {
           Object.assign(imgFilters, PRESETS.none);
           highlightPreset('none');
           updatePresetThumb();
-          setTransforms();
+          if (!document.body.classList.contains('viewer')) setTransforms();
           toggleUploadBtn();
           
           // Store backend image info for saving
@@ -485,9 +485,9 @@ function fallbackToLocalUpload(file) {
       // Reset filters
       Object.assign(imgFilters, PRESETS.none);
       highlightPreset('none');
-      updatePresetThumb();
-      setTransforms();
-      toggleUploadBtn();
+        updatePresetThumb();
+        if (!document.body.classList.contains('viewer')) setTransforms();
+        toggleUploadBtn();
       
       // Clear backend info for local images
       delete imgState.backendImageId;
@@ -514,17 +514,17 @@ function fallbackToLocalUpload(file) {
       console.log('Local image loaded and saved to project');
       
     } catch (error) {
-      console.error('Error processing local image:', error);
-      imgState.has = false;
-      setTransforms();
-    }
+        console.error('Error processing local image:', error);
+        imgState.has = false;
+        if (!document.body.classList.contains('viewer')) setTransforms();
+      }
   };
   
-  userBgEl.onerror = () => {
-    console.error('Failed to load local image');
-    imgState.has = false;
-    setTransforms();
-  };
+    userBgEl.onerror = () => {
+      console.error('Failed to load local image');
+      imgState.has = false;
+      if (!document.body.classList.contains('viewer')) setTransforms();
+    };
   
   // Create data URL for local file
   const reader = new FileReader();
@@ -534,7 +534,7 @@ function fallbackToLocalUpload(file) {
   reader.onerror = () => {
     console.error('Failed to read image file');
     imgState.has = false;
-    setTransforms();
+    if (!document.body.classList.contains('viewer')) setTransforms();
   };
   reader.readAsDataURL(file);
 }
@@ -578,7 +578,7 @@ export function detectPresetFromFilters() {
 export function applyPreset(name) {
   Object.assign(imgFilters, PRESETS[name] || PRESETS.none);
   highlightPreset(name);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
@@ -686,8 +686,10 @@ export function handleImageZoomOutRange(value) {
 export function handleImageScale(value) {
   if (!imgState.has) return;
   imgState.scale = clamp(parseInt(value, 10) / 100, 0.05, 10);
-  enforceImageBounds();
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) {
+    enforceImageBounds();
+    setTransforms();
+  }
   saveImageSettings();
   saveAndRecord();
 }
@@ -697,8 +699,10 @@ export function handleImageRotate(value) {
   if (!imgState.has) return;
   const deg = parseInt(value, 10) || 0;
   imgState.angle = deg * Math.PI / 180; // store in radians
-  enforceImageBounds();
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) {
+    enforceImageBounds();
+    setTransforms();
+  }
   saveImageSettings();
   saveAndRecord();
 }
@@ -707,7 +711,7 @@ export function handleImageRotate(value) {
 export function handleImageFlip() {
   if (!imgState.has) return;
   imgState.flip = !imgState.flip;
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveImageSettings();
   saveAndRecord();
 }
@@ -757,55 +761,55 @@ export function preloadSlideImageAt(idx) {
 // Filter handling for individual sliders
 export function handleBlur(value) {
   imgFilters.blur = clamp(parseInt(value, 10), 0, 20);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleBrightness(value) {
   imgFilters.brightness = clamp(parseInt(value, 10), 0, 200);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleContrast(value) {
   imgFilters.contrast = clamp(parseInt(value, 10), 0, 200);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleGrayscale(value) {
   imgFilters.grayscale = clamp(parseInt(value, 10), 0, 100);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleHueRotate(value) {
   imgFilters.hueRotate = clamp(parseInt(value, 10), 0, 360);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleInvert(value) {
   imgFilters.invert = clamp(parseInt(value, 10), 0, 100);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleSaturate(value) {
   imgFilters.saturate = clamp(parseInt(value, 10), 0, 200);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleSepia(value) {
   imgFilters.sepia = clamp(parseInt(value, 10), 0, 100);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
 export function handleOpacity(value) {
   imgFilters.opacity = clamp(parseInt(value, 10), 0, 100);
-  setTransforms();
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveAndRecord();
 }
 
@@ -918,8 +922,8 @@ export async function centerImageToVideo() {
     );
     imgState.scale = scaleToFit;
   }
-  
-  setTransforms();
+
+  if (!document.body.classList.contains('viewer')) setTransforms();
   saveImageSettings();
   console.log('✅ Image centered and scaled to match fx video');
 }
