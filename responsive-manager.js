@@ -31,9 +31,11 @@ export class ResponsiveManager {
       this.setupResizeObserver();
       this.setupWindowResizeHandler();
       this.initializeWorkWidth();
-      
+      this.setupOrientationHandling();
+
       this.isInitialized = true;
       console.log('✅ ResponsiveManager initialized');
+      await this.forceLandscape();
       
     } catch (error) {
       console.error('❌ Failed to initialize ResponsiveManager:', error);
@@ -344,13 +346,33 @@ export class ResponsiveManager {
   }
 
   /**
+   * Attempt to lock orientation to landscape on mobile/tablet
+   */
+  async forceLandscape() {
+    const { isMobile, isTablet } = this.checkBreakpoints();
+    const overlay = document.getElementById('rotateOverlay');
+    if ((isMobile || isTablet) && screen.orientation?.lock) {
+      try {
+        await screen.orientation.lock('landscape');
+        overlay?.classList.remove('show');
+      } catch (err) {
+        console.warn('Orientation lock failed', err);
+      }
+    } else if ((isMobile || isTablet) && overlay) {
+      const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+      overlay.classList.toggle('show', !isLandscape);
+    }
+  }
+
+  /**
    * Handle orientation changes (mobile)
    */
   handleOrientationChange() {
+    this.forceLandscape();
     if ('orientation' in screen) {
       const orientation = screen.orientation?.angle;
       console.log('📱 Orientation changed:', orientation);
-      
+
       // Force resize check after orientation change
       setTimeout(() => {
         this.forceResizeCheck();
