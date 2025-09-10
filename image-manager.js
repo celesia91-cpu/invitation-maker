@@ -279,12 +279,19 @@ export function enforceImageBounds() {
   const r = work.getBoundingClientRect();
   const w = imgState.natW * imgState.scale;
   const h = imgState.natH * imgState.scale;
-  // Only clamp center when the image fits within the work area.
+
+  // Account for rotation when determining the visible bounding box.
+  const cos = Math.cos(imgState.angle);
+  const sin = Math.sin(imgState.angle);
+  const rotatedW = Math.abs(w * cos) + Math.abs(h * sin);
+  const rotatedH = Math.abs(w * sin) + Math.abs(h * cos);
+
+  // Only clamp center when the rotated image fits within the work area.
   // If the image exceeds the work area in both dimensions, preserve
   // the center so viewer playback matches editing.
-  if (w <= r.width && h <= r.height) {
-    imgState.cx = clamp(imgState.cx, w / 2, r.width - w / 2);
-    imgState.cy = clamp(imgState.cy, h / 2, r.height - h / 2);
+  if (rotatedW <= r.width && rotatedH <= r.height) {
+    imgState.cx = clamp(imgState.cx, rotatedW / 2, r.width - rotatedW / 2);
+    imgState.cy = clamp(imgState.cy, rotatedH / 2, r.height - rotatedH / 2);
   }
 }
 
