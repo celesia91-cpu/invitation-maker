@@ -45,9 +45,12 @@ async function loadSlideImage(slide) {
           setImagePositionFromPercentage(slide.image);
         } else {
           const defaultScale = Math.min(1, rect.width / imgState.natW, rect.height / imgState.natH);
-          imgState.cx = rect.width / 2;
-          imgState.cy = rect.height / 2;
           imgState.scale = typeof slide.image.scale === 'number' ? slide.image.scale : defaultScale;
+          // Compute the scaled dimensions to center the image identically to fxVideo
+          const scaledW = imgState.natW * imgState.scale;
+          const scaledH = imgState.natH * imgState.scale;
+          imgState.cx = (rect.width - scaledW) / 2 + scaledW / 2;
+          imgState.cy = (rect.height - scaledH) / 2 + scaledH / 2;
           imgState.angle = slide.image.angle || 0;
           imgState.shearX = slide.image.shearX || 0;
           imgState.shearY = slide.image.shearY || 0;
