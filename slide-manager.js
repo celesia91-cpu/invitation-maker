@@ -342,13 +342,32 @@ class ImageLoader {
           imgState.natW = imageData.natW || userBg.naturalWidth;
           imgState.natH = imageData.natH || userBg.naturalHeight;
           imgState.has = true;
-          
-          // Restore transform values or use defaults
-          if (typeof imageData.scale === 'number') {
+
+          const workRect = work.getBoundingClientRect();
+
+          // Prefer percentage-based positioning if available
+          if (imageData.cxPercent !== undefined && imageData.cyPercent !== undefined) {
+            const coverScale = Math.max(
+              workRect.width / imgState.natW,
+              workRect.height / imgState.natH
+            );
+            const scale = typeof imageData.scale === 'number'
+              ? imageData.scale
+              : Math.min(getFxScale(), coverScale);
+            imgState.scale = scale;
+            imgState.angle = imageData.angle || 0;
+            imgState.cx = (imageData.cxPercent / 100) * workRect.width;
+            imgState.cy = (imageData.cyPercent / 100) * workRect.height;
+            imgState.shearX = imageData.shearX || 0;
+            imgState.shearY = imageData.shearY || 0;
+            imgState.signX = imageData.signX || 1;
+            imgState.signY = imageData.signY || 1;
+            imgState.flip = imageData.flip || false;
+          } else if (typeof imageData.scale === 'number') {
             imgState.scale = imageData.scale;
             imgState.angle = imageData.angle || 0;
-            imgState.cx = imageData.cx || (work.getBoundingClientRect().width / 2);
-            imgState.cy = imageData.cy || (work.getBoundingClientRect().height / 2);
+            imgState.cx = imageData.cx || (workRect.width / 2);
+            imgState.cy = imageData.cy || (workRect.height / 2);
             imgState.shearX = imageData.shearX || 0;
             imgState.shearY = imageData.shearY || 0;
             imgState.signX = imageData.signX || 1;
@@ -356,7 +375,6 @@ class ImageLoader {
             imgState.flip = imageData.flip || false;
           } else {
             // Calculate cover scale defaults if no saved values
-            const workRect = work.getBoundingClientRect();
             const coverScale = Math.max(
               workRect.width / imgState.natW,
               workRect.height / imgState.natH

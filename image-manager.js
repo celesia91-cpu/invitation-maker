@@ -118,8 +118,44 @@ export function setImagePositionFromPercentage(percentageData) {
   imgState.signX = percentageData.signX || 1;
   imgState.signY = percentageData.signY || 1;
   imgState.flip = percentageData.flip || false;
-  
+
   setTransforms();
+}
+
+// ENHANCED: Synchronize current image coordinates back to slide data
+export function syncImageCoordinates(force = false) {
+  const slides = getSlides();
+  const activeIndex = getActiveIndex();
+  const slide = slides?.[activeIndex];
+  if (!slide) return;
+
+  const work = document.querySelector('#work');
+  if (!work) return;
+
+  if (!slide.image) slide.image = {};
+
+  const rect = work.getBoundingClientRect();
+  const data = {
+    cx: imgState.cx,
+    cy: imgState.cy,
+    cxPercent: rect.width ? (imgState.cx / rect.width) * 100 : 0,
+    cyPercent: rect.height ? (imgState.cy / rect.height) * 100 : 0,
+    scale: imgState.scale,
+    angle: imgState.angle,
+    shearX: imgState.shearX,
+    shearY: imgState.shearY,
+    signX: imgState.signX,
+    signY: imgState.signY,
+    flip: imgState.flip
+  };
+
+  for (const [key, value] of Object.entries(data)) {
+    if (force || slide.image[key] === undefined) {
+      slide.image[key] = value;
+    }
+  }
+
+  setSlides([...slides]);
 }
 
 // Toggle upload button visibility
