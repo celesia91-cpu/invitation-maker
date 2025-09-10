@@ -2088,6 +2088,26 @@ body.resizing {
   animation: slideUp 0.3s ease;
 }
 
+/* ===== ROTATE DEVICE OVERLAY ===== */
+.rotate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #0b0b22f0, #0b0b22e6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.rotate-overlay.show {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
 .fs-card h2 {
   margin: 0.1em 0 0.35em;
   font-size: 1.35rem;
