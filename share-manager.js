@@ -62,15 +62,33 @@ async function loadSlideImage(slide) {
         imgState.has = true;
         setTransforms();
 
-        slide.image.cxPercent = (imgState.cx / rect.width) * 100;
-        slide.image.cyPercent = (imgState.cy / rect.height) * 100;
-        slide.image.scale = imgState.scale;
-        slide.image.angle = imgState.angle;
-        slide.image.shearX = imgState.shearX;
-        slide.image.shearY = imgState.shearY;
-        slide.image.signX = imgState.signX;
-        slide.image.signY = imgState.signY;
-        slide.image.flip = imgState.flip;
+        if (slide.image.cxPercent === undefined) {
+          slide.image.cxPercent = (imgState.cx / rect.width) * 100;
+        }
+        if (slide.image.cyPercent === undefined) {
+          slide.image.cyPercent = (imgState.cy / rect.height) * 100;
+        }
+        if (slide.image.scale === undefined) {
+          slide.image.scale = imgState.scale;
+        }
+        if (slide.image.angle === undefined) {
+          slide.image.angle = imgState.angle;
+        }
+        if (slide.image.shearX === undefined) {
+          slide.image.shearX = imgState.shearX;
+        }
+        if (slide.image.shearY === undefined) {
+          slide.image.shearY = imgState.shearY;
+        }
+        if (slide.image.signX === undefined) {
+          slide.image.signX = imgState.signX;
+        }
+        if (slide.image.signY === undefined) {
+          slide.image.signY = imgState.signY;
+        }
+        if (slide.image.flip === undefined) {
+          slide.image.flip = imgState.flip;
+        }
 
       } catch (error) {
         console.error('Error positioning image:', error);
