@@ -8,7 +8,7 @@ import {
   setCurrentProjectId,
   historyState
 } from './state-manager.js';
-import { getFxScale, imgState, setTransforms } from './image-manager.js';
+import { setImagePositionFromPercentage, setTransforms, imgState } from './image-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -25,232 +25,54 @@ function getViewerOrigin() {
   }
 }
 
-// Apply image positioning directly to wrapper element
-function applyImagePositioning(element, params) {
-  const { 
-    centerX, centerY, scale, naturalWidth, naturalHeight,
-    angle, shearX, shearY, flip, signX, signY
-  } = params;
-  
-  const displayWidth = naturalWidth * scale;
-  const displayHeight = naturalHeight * scale;
-  
-  const sx = (flip ? -1 : 1) * (signX || 1);
-  const sy = signY || 1;
-  
-  const transform = [
-    'translate(-50%, -50%)',
-    `rotate(${angle || 0}rad)`,
-    `skew(${shearX || 0}rad, ${shearY || 0}rad)`,
-    `scale(${sx}, ${sy})`
-  ].join(' ');
-
-  // Apply styles directly
-  element.style.width = displayWidth + 'px';
-  element.style.height = displayHeight + 'px';
-  element.style.left = centerX + 'px';
-  element.style.top = centerY + 'px';
-  element.style.transform = transform;
-  element.style.transformOrigin = 'center center';
-  element.style.zIndex = '15';
-  element.style.position = 'absolute';
-  
-  console.log('Applied positioning:', {
-    center: { x: Math.round(centerX), y: Math.round(centerY) },
-    size: { width: Math.round(displayWidth), height: Math.round(displayHeight) },
-    transform: transform
-  });
-}
-
-// Fix for the loadSlideImage function in share-manager.js
-// Replace the existing coordinate conversion logic with this:
-
 async function loadSlideImage(slide) {
   if (!slide.image || !slide.image.src) return;
-  
+
   const userBgEl = document.querySelector('#userBg');
-  const userBgWrap = document.querySelector('#userBgWrap');
   const work = document.querySelector('#work');
-  
-  if (!userBgEl || !userBgWrap || !work) return;
+
+  if (!userBgEl || !work) return;
 
   return new Promise((resolve) => {
     userBgEl.onload = () => {
       try {
-        const workRect = work.getBoundingClientRect();
-        const naturalWidth = userBgEl.naturalWidth;
-        const naturalHeight = userBgEl.naturalHeight;
-        
-        console.log('Loading image:', {
-          naturalSize: { width: naturalWidth, height: naturalHeight },
-          workArea: { width: workRect.width, height: workRect.height },
-          imageData: slide.image
-        });
+        const rect = work.getBoundingClientRect();
 
-        const defaultScale = Math.min(
-          getFxScale(),
-          workRect.width / naturalWidth,
-          workRect.height / naturalHeight
-        );
-        let finalX, finalY, finalScale = defaultScale;
+        imgState.natW = userBgEl.naturalWidth;
+        imgState.natH = userBgEl.naturalHeight;
 
-        // Check if we have percentage coordinates (new format)
         if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
-          console.log('Using percentage positioning');
-
-          finalX = (slide.image.cxPercent / 100) * workRect.width;
-          finalY = (slide.image.cyPercent / 100) * workRect.height;
-          if (typeof slide.image.scale === 'number') finalScale = slide.image.scale;
-
-        } else if (slide.image.cx !== undefined && slide.image.cy !== undefined) {
-          console.log('Using legacy absolute coordinates - applying smart scaling');
-          
-          const sourceCoords = { cx: slide.image.cx, cy: slide.image.cy };
-          
-          // FIXED: More robust coordinate validation and centering logic
-          const isValidCoordinate = (coord, max) => coord >= 0 && coord <= max && !isNaN(coord);
-          
-          // Common editor sizes for detection
-          const commonSizes = [
-            { w: 1920, h: 1080 },  // Full HD 16:9  
-            { w: 1280, h: 720 },   // Standard 16:9
-            { w: 1024, h: 576 },   // Smaller 16:9
-            { w: 800, h: 450 },    // Even smaller 16:9
-            { w: 1000, h: 1000 },  // Square format
-            { w: 1007, h: 1000 },  // Current work area from console
-          ];
-          
-          let bestMatch = null;
-          let bestScore = Infinity;
-          
-          // Find most likely source size with improved scoring
-          for (const size of commonSizes) {
-            if (isValidCoordinate(sourceCoords.cx, size.w) && 
-                isValidCoordinate(sourceCoords.cy, size.h)) {
-              
-              // Score based on how centered the coordinates are
-              const centerDistance = Math.abs(sourceCoords.cx - size.w/2) + 
-                                   Math.abs(sourceCoords.cy - size.h/2);
-              const normalizedScore = centerDistance / (size.w + size.h); // Normalize by size
-              
-              if (normalizedScore < bestScore) {
-                bestScore = normalizedScore;
-                bestMatch = size;
-              }
-            }
-          }
-          
-          if (bestMatch && bestScore < 0.5) { // Only use if reasonably centered
-            console.log('Detected source work area:', bestMatch);
-            
-            // Convert to percentage and scale to current work area
-            const sourceXPercent = (sourceCoords.cx / bestMatch.w) * 100;
-            const sourceYPercent = (sourceCoords.cy / bestMatch.h) * 100;
-            
-            finalX = (sourceXPercent / 100) * workRect.width;
-            finalY = (sourceYPercent / 100) * workRect.height;
-            if (typeof slide.image.scale === 'number') {
-              finalScale = slide.image.scale;
-            }
-            
-            console.log('Converted coordinates:', {
-              source: sourceCoords,
-              sourceSize: bestMatch,
-              sourcePercent: { x: sourceXPercent.toFixed(1), y: sourceYPercent.toFixed(1) },
-              final: { x: Math.round(finalX), y: Math.round(finalY) }
-            });
-          } else {
-            // FIXED: Force centering for invalid/suspicious coordinates
-            console.log('Centering image - coordinates invalid or not centered enough');
-            finalX = workRect.width / 2;
-            finalY = workRect.height / 2;
-            if (typeof slide.image.scale === 'number') {
-              finalScale = slide.image.scale;
-            }
-            
-            console.log('Applied centering:', {
-              center: { x: Math.round(finalX), y: Math.round(finalY) },
-              workArea: { width: workRect.width, height: workRect.height }
-            });
-          }
+          setImagePositionFromPercentage(slide.image);
         } else {
-          console.log('No positioning data - centering and auto-scaling');
-
-          // FIXED: Ensure proper centering
-          finalX = workRect.width / 2;
-          finalY = workRect.height / 2;
-
-          if (typeof slide.image.scale === 'number') {
-            finalScale = slide.image.scale;
-          }
+          const defaultScale = Math.min(1, rect.width / imgState.natW, rect.height / imgState.natH);
+          imgState.cx = rect.width / 2;
+          imgState.cy = rect.height / 2;
+          imgState.scale = typeof slide.image.scale === 'number' ? slide.image.scale : defaultScale;
+          imgState.angle = slide.image.angle || 0;
+          imgState.shearX = slide.image.shearX || 0;
+          imgState.shearY = slide.image.shearY || 0;
+          imgState.signX = slide.image.signX || 1;
+          imgState.signY = slide.image.signY || 1;
+          imgState.flip = slide.image.flip || false;
         }
 
-        // FIXED: Validate final coordinates before applying
-        if (isNaN(finalX) || isNaN(finalY) || isNaN(finalScale)) {
-          console.warn('Invalid final coordinates, forcing center');
-          finalX = workRect.width / 2;
-          finalY = workRect.height / 2;
-          finalScale = 1;
-        }
-
-        const angle = slide.image.angle || 0;
-        const shearX = slide.image.shearX || 0;
-        const shearY = slide.image.shearY || 0;
-        const flip = slide.image.flip || false;
-        const signX = slide.image.signX || 1;
-        const signY = slide.image.signY || 1;
-
-        // Apply the positioning directly to userBgWrap
-        applyImagePositioning(userBgWrap, {
-          centerX: finalX,
-          centerY: finalY,
-          scale: finalScale,
-          naturalWidth,
-          naturalHeight,
-          angle,
-          shearX,
-          shearY,
-          flip,
-          signX,
-          signY
-        });
-
-        // Sync image state so subsequent loads use the updated values
-        imgState.cx = finalX;
-        imgState.cy = finalY;
-        imgState.scale = finalScale;
-        imgState.angle = angle;
-        imgState.shearX = shearX;
-        imgState.shearY = shearY;
-        imgState.flip = flip;
-        imgState.signX = signX;
-        imgState.signY = signY;
-        imgState.natW = naturalWidth;
-        imgState.natH = naturalHeight;
         imgState.has = true;
-
-        // Mirror values back onto slide.image
-        slide.image.cx = finalX;
-        slide.image.cy = finalY;
-        slide.image.scale = finalScale;
-        slide.image.angle = angle;
-        slide.image.shearX = shearX;
-        slide.image.shearY = shearY;
-        slide.image.flip = flip;
-        slide.image.signX = signX;
-        slide.image.signY = signY;
-        slide.image.natW = naturalWidth;
-        slide.image.natH = naturalHeight;
-
         setTransforms();
 
-        console.log('Image positioned successfully at:', Math.round(finalX), Math.round(finalY));
-        resolve();
-        
+        slide.image.cxPercent = (imgState.cx / rect.width) * 100;
+        slide.image.cyPercent = (imgState.cy / rect.height) * 100;
+        slide.image.scale = imgState.scale;
+        slide.image.angle = imgState.angle;
+        slide.image.shearX = imgState.shearX;
+        slide.image.shearY = imgState.shearY;
+        slide.image.signX = imgState.signX;
+        slide.image.signY = imgState.signY;
+        slide.image.flip = imgState.flip;
+
       } catch (error) {
         console.error('Error positioning image:', error);
-        resolve();
       }
+      resolve();
     };
 
     userBgEl.onerror = () => {
@@ -901,7 +723,6 @@ if (typeof window !== 'undefined') {
   window.safeProjectForShare = safeProjectForShare;
   window.applySharedProject = applySharedProject;
   window.loadSlideImage = loadSlideImage;
-  window.applyImagePositioning = applyImagePositioning;
   window.setupViewerLayout = setupViewerLayout;
   window.showViewerUI = showViewerUI;
   window.showFullscreenPrompt = showFullscreenPrompt;
