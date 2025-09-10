@@ -1,4 +1,7 @@
 // image-manager.js - COMPLETE ENHANCED VERSION WITH PERCENTAGE-BASED POSITIONING
+// This module owns the canonical background image transform state. Other modules
+// should update `imgState`, call `setTransforms()`, and rely on
+// `syncImageCoordinates()` rather than mutating `slide.image.*` directly.
 
 import { apiClient } from './api-client.js';
 import { clamp } from './utils.js';
@@ -101,14 +104,14 @@ export function getImagePositionAsPercentage() {
 }
 
 // ENHANCED: Apply percentage-based coordinates when loading
-export function setImagePositionFromPercentage(percentageData) {
+export function setImagePositionFromPercentage(percentageData, sync = true) {
   if (!percentageData) return;
-  
+
   const work = document.querySelector('#work');
   if (!work) return;
-  
+
   const rect = work.getBoundingClientRect();
-  
+
   imgState.cx = (percentageData.cxPercent / 100) * rect.width;
   imgState.cy = (percentageData.cyPercent / 100) * rect.height;
   imgState.scale = percentageData.scale || 1;
@@ -119,14 +122,19 @@ export function setImagePositionFromPercentage(percentageData) {
   imgState.signY = percentageData.signY || 1;
   imgState.flip = percentageData.flip || false;
 
-  setTransforms();
+  setTransforms(sync);
 }
 
 // ENHANCED: Synchronize current image coordinates back to slide data
-export function syncImageCoordinates(force = false) {
-  const slides = getSlides();
-  const activeIndex = getActiveIndex();
-  const slide = slides?.[activeIndex];
+export function syncImageCoordinates(force = false, targetSlide = null) {
+  let slides, slide;
+  if (targetSlide) {
+    slide = targetSlide;
+  } else {
+    slides = getSlides();
+    const activeIndex = getActiveIndex();
+    slide = slides?.[activeIndex];
+  }
   if (!slide) return;
 
   const work = document.querySelector('#work');
@@ -155,7 +163,9 @@ export function syncImageCoordinates(force = false) {
     }
   }
 
-  setSlides([...slides]);
+  if (!targetSlide && slides) {
+    setSlides([...slides]);
+  }
 }
 
 // Toggle upload button visibility
@@ -279,7 +289,7 @@ export function enforceImageBounds() {
 }
 
 // ENHANCED: Set image transforms with viewer mode support
-export function setTransforms() {
+export function setTransforms(sync = true) {
   const body = document.body;
   const userBgWrap = document.querySelector('#userBgWrap');
   const bgBox = document.querySelector('#bgBox');
@@ -294,11 +304,13 @@ export function setTransforms() {
     }
     applyFilters();
     syncImageControls();
+    if (sync) syncImageCoordinates(true);
     return;
   }
   
-  // Don't enforce bounds in viewer mode to maintain positioning
-  if (!inViewer) {
+  // Don't enforce bounds in viewer mode to maintain positioning.
+  // Skip enforcement when sync is disabled so callers can manage it manually.
+  if (sync && !inViewer) {
     enforceImageBounds();
   }
   
@@ -340,6 +352,7 @@ export function setTransforms() {
 
   applyFilters();
   syncImageControls();
+  if (sync) syncImageCoordinates(true);
 }
 
 // CRITICAL: Save image data to slide for persistence

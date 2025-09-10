@@ -593,7 +593,7 @@ class InvitationMakerApp {
           imgState.cy = dragState.startCy + dy;
           
           if (enforceImageBounds && !document.body.classList.contains('viewer')) enforceImageBounds();
-          if (setTransforms && !document.body.classList.contains('viewer')) setTransforms();
+          if (setTransforms && !document.body.classList.contains('viewer')) setTransforms(false);
         } catch (error) {
           console.warn('Could not update image position');
         }
@@ -612,6 +612,8 @@ class InvitationMakerApp {
       
       // Save changes
       try {
+        const { syncImageCoordinates } = await import('./image-manager.js');
+        syncImageCoordinates(true);
         const stateModule = await import('./state-manager.js');
         if (stateModule.writeCurrentSlide) stateModule.writeCurrentSlide();
         if (stateModule.saveProjectDebounced) stateModule.saveProjectDebounced();
