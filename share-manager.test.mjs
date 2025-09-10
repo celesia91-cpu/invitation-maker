@@ -19,8 +19,8 @@ function makeEl() {
 
 const userBgEl = {
   style: {},
-  naturalWidth: 100,
-  naturalHeight: 50,
+  naturalWidth: 160,
+  naturalHeight: 90,
   onload: null,
   onerror: null,
   set src(v) { this._src = v; if (this.onload) this.onload(); }
@@ -48,6 +48,7 @@ global.window = { addEventListener() {}, removeEventListener() {}, location: { h
 global.fetch = async () => ({ ok: true, json: async () => ({}) });
 
 await import('./share-manager.js');
+const { setTransforms, imgState } = await import('./image-manager.js');
 
 // Test default centering
 const slide1 = { image: { src: 'foo.jpg' } };
@@ -69,3 +70,14 @@ assert.strictEqual(slide2.image.signY, 1);
 assert.strictEqual(slide2.image.flip, true);
 
 console.log('loadSlideImage centers and preserves transforms');
+
+// Test rotation preserves center when image is near the edge
+const slide3 = { image: { src: 'foo.jpg' } };
+await window.loadSlideImage(slide3);
+imgState.cx = 50;
+imgState.cy = 50;
+imgState.angle = Math.PI / 2; // 90 degrees
+setTransforms();
+assert.strictEqual(imgState.cx, 50);
+assert.strictEqual(imgState.cy, 50);
+console.log('rotation preserves center');
