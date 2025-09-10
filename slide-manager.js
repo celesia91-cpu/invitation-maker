@@ -314,7 +314,7 @@ class ImageLoader {
       imgState.shearX = 0;
       imgState.shearY = 0;
       if (userBg) userBg.src = '';
-      setTransforms();
+      setTransforms(false);
       return;
     }
 
@@ -405,7 +405,7 @@ class ImageLoader {
         } catch (error) {
           console.error('Error restoring image state:', error);
           imgState.has = false;
-          setTransforms();
+          setTransforms(false);
         }
 
         resolve();
@@ -428,7 +428,7 @@ class ImageLoader {
         }
         
         imgState.has = false;
-        setTransforms();
+        setTransforms(false);
         resolve();
       };
 
@@ -487,7 +487,7 @@ export async function loadSlideIntoDOM(slide) {
     if (slide?.image?.src || slide?.image?.thumb) {
       await imageLoader.loadSlideImage(slide);
     } else {
-      setTransforms();
+      setTransforms(false);
     }
 
     // Create text layers

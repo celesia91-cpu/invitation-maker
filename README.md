@@ -44,6 +44,11 @@ The editor supports basic background image adjustments:
 - Drag corner handles to resize the background image or bounding box.
 - Hold **Shift** while dragging a corner to shear the background image/bounding box.
 
+## Transform State Ownership
+`image-manager.js` is the single source of truth for background image transforms.
+Other modules should modify the shared `imgState`, call `setTransforms()`, and let it
+sync via `syncImageCoordinates()` rather than writing to `slide.image.*` directly.
+
 ## Backend API
 Start the development server:
 

@@ -42,7 +42,7 @@ async function loadSlideImage(slide) {
         imgState.natH = userBgEl.naturalHeight;
 
         if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
-          setImagePositionFromPercentage(slide.image);
+          setImagePositionFromPercentage(slide.image, false);
         } else {
           const defaultScale = Math.min(1, rect.width / imgState.natW, rect.height / imgState.natH);
           imgState.scale = typeof slide.image.scale === 'number' ? slide.image.scale : defaultScale;
@@ -60,35 +60,8 @@ async function loadSlideImage(slide) {
         }
 
         imgState.has = true;
-        setTransforms();
-
-        if (slide.image.cxPercent === undefined) {
-          slide.image.cxPercent = (imgState.cx / rect.width) * 100;
-        }
-        if (slide.image.cyPercent === undefined) {
-          slide.image.cyPercent = (imgState.cy / rect.height) * 100;
-        }
-        if (slide.image.scale === undefined) {
-          slide.image.scale = imgState.scale;
-        }
-        if (slide.image.angle === undefined) {
-          slide.image.angle = imgState.angle;
-        }
-        if (slide.image.shearX === undefined) {
-          slide.image.shearX = imgState.shearX;
-        }
-        if (slide.image.shearY === undefined) {
-          slide.image.shearY = imgState.shearY;
-        }
-        if (slide.image.signX === undefined) {
-          slide.image.signX = imgState.signX;
-        }
-        if (slide.image.signY === undefined) {
-          slide.image.signY = imgState.signY;
-        }
-        if (slide.image.flip === undefined) {
-          slide.image.flip = imgState.flip;
-        }
+        setTransforms(false);
+        syncImageCoordinates(true, slide);
 
       } catch (error) {
         console.error('Error positioning image:', error);
