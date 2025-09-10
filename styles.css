@@ -1541,20 +1541,20 @@ body.preview .handle {
   }
 }
 
-@media (min-width: 600px) and (max-width: 959px) {
-  body.viewer #work {
-    border-radius: 0 !important;
+@media (max-width: 768px) {
+  body.viewer.mobile #work {
+    border-radius: 0;
   }
 
-  body.viewer #fxVideo,
-  body.viewer #userBg {
-    border-radius: 0 !important;
+  body.viewer.mobile #fxVideo,
+  body.viewer.mobile #userBg {
+    border-radius: 0;
   }
 
-  body.viewer .rsvp {
-    left: max(8px, var(--safe-left)) !important;
-    right: max(8px, var(--safe-right)) !important;
-    bottom: max(8px, var(--safe-bottom)) !important;
+  body.viewer.mobile .rsvp {
+    left: max(8px, var(--safe-left));
+    right: max(8px, var(--safe-right));
+    bottom: max(8px, var(--safe-bottom));
   }
 
   /* ===== MOBILE & TOUCH OPTIMIZATIONS ===== */
@@ -1590,9 +1590,9 @@ body.preview .handle {
   /* Better touch targets for mobile */
   .rsvp-btn {
     flex: 1 1 45%;
-    height: 48px !important;
-    font-size: 16px !important;
-    padding: 0 20px !important;
+    height: 48px;
+    font-size: 16px;
+    padding: 0 20px;
   }
 
   /* Responsive design adjustments */
@@ -1700,89 +1700,7 @@ body.preview .handle {
   }
 
   .mb-topbar-collapsed .topbar .mb-hide-when-collapsed {
-    display: none !important;
-  }
-
-  body.viewer #work {
-    border-radius: 0 !important;
-  }
-
-  body.viewer #fxVideo,
-  body.viewer #userBg {
-    border-radius: 0 !important;
-  }
-
-  body.viewer .rsvp {
-    left: max(8px, var(--safe-left)) !important;
-    right: max(8px, var(--safe-right)) !important;
-    bottom: max(8px, var(--safe-bottom)) !important;
-  }
-
-  /* ===== MOBILE & TOUCH OPTIMIZATIONS ===== */
-  .handle {
-    width: 18px;
-    height: 18px;
-  }
-
-  .handle.nw { left: -9px; top: -9px; }
-  .handle.ne { right: -9px; top: -9px; }
-  .handle.se { right: -9px; bottom: -9px; }
-  .handle.sw { left: -9px; bottom: -9px; }
-
-  .handle.rotate {
-    width: 20px;
-    height: 20px;
-    top: -36px;
-  }
-
-  .layer.text-layer.active:not(.editing)::after {
-    width: 16px;
-    height: 16px;
-    bottom: -4px;
-    right: -4px;
-  }
-
-  .layer.text-layer:not(.editing)::before {
-    font-size: 11px;
-    padding: 3px 6px;
-    top: -28px;
-  }
-
-  /* Better touch targets for mobile */
-  .rsvp-btn {
-    flex: 1 1 45%;
-    height: 48px !important;
-    font-size: 16px !important;
-    padding: 0 20px !important;
-  }
-
-  /* Responsive design adjustments */
-  .sidepanel {
-    width: min(88vw, 420px);
-  }
-
-  .backdrop {
     display: none;
-  }
-
-  .panel-open .backdrop {
-    display: block;
-    position: fixed;
-    inset: var(--topbar-h) 0 0 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
-  .row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .row label {
-    flex: unset;
-    width: auto;
-    margin-bottom: 4px;
   }
 
   .rsvp {
@@ -1795,13 +1713,7 @@ body.preview .handle {
 
   .rsvp-btn {
     font-weight: 700;
-    padding: 0 16px !important;
-  }
-
-  body.viewer .rsvp {
-    left: max(8px, var(--safe-left));
-    right: max(8px, var(--safe-right));
-    bottom: max(8px, var(--safe-bottom));
+    padding: 0 16px;
   }
 
   /* Optimize form controls for mobile */
@@ -1812,7 +1724,7 @@ body.preview .handle {
     font-size: 16px;
   }
 
-  /* Stack layout for very small phones (formerly 480px) */
+  /* Stack layout for very small phones */
   .rsvp {
     flex-direction: column;
     align-items: stretch;
@@ -1821,7 +1733,7 @@ body.preview .handle {
 
   .rsvp-btn {
     width: 100%;
-    padding: 0 16px !important;
+    padding: 0 16px;
   }
 
   .preset-grid {
