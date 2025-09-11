@@ -107,7 +107,10 @@ export function getImagePositionAsPercentage() {
 }
 
 // ENHANCED: Apply percentage-based coordinates when loading
-export function setImagePositionFromPercentage(percentageData, sync = true) {
+// fitMode determines how scaling adjusts when viewport size changes:
+// - 'contain' (default): image fits entirely within viewport using Math.min ratio
+// - 'cover': image fills viewport using Math.max ratio
+export function setImagePositionFromPercentage(percentageData, sync = true, fitMode = 'contain') {
   if (!percentageData) return;
 
   const work = document.querySelector('#work');
@@ -120,8 +123,9 @@ export function setImagePositionFromPercentage(percentageData, sync = true) {
   if (percentageData.originalWidth && percentageData.originalHeight) {
     const widthRatio = rect.width / percentageData.originalWidth;
     const heightRatio = rect.height / percentageData.originalHeight;
-    // Use the minimum ratio to ensure image fits within bounds
-    scaleAdjustment = Math.min(widthRatio, heightRatio);
+    scaleAdjustment = fitMode === 'cover'
+      ? Math.max(widthRatio, heightRatio)
+      : Math.min(widthRatio, heightRatio);
   }
 
   imgState.cx = (percentageData.cxPercent / 100) * rect.width;

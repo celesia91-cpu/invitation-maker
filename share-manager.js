@@ -46,7 +46,8 @@ async function loadSlideImage(slide) {
             slide.image.cyPercent !== undefined) {
           
           // Use the enhanced function that handles viewport scaling
-          setImagePositionFromPercentage(slide.image, false);
+          // Viewer defaults to 'cover' so images fill the viewport
+          setImagePositionFromPercentage(slide.image, false, 'cover');
           
         } else {
           // Fallback to absolute positioning
