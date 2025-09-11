@@ -3,6 +3,16 @@
 // Math and validation utilities
 export const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
+// Viewport scaling utility used by both image and text layers
+export function calculateViewportScale(viewportW, viewportH, contentW, contentH, fitMode = 'contain') {
+  const scaleX = viewportW / contentW;
+  const scaleY = viewportH / contentH;
+  const scale = fitMode === 'cover'
+    ? Math.max(scaleX, scaleY)
+    : Math.min(scaleX, scaleY);
+  return { scaleX, scaleY, scale };
+}
+
 // Unique ID generation
 export function generateId(prefix = 'id') {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;

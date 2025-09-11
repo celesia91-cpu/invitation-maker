@@ -4,7 +4,7 @@
 // `syncImageCoordinates()` rather than mutating `slide.image.*` directly.
 
 import { apiClient } from './api-client.js';
-import { clamp } from './utils.js';
+import { clamp, calculateViewportScale } from './utils.js';
 import { getSlides, getActiveIndex, setSlides, saveProjectDebounced, recordHistory } from './state-manager.js';
 
 // Image state management
@@ -121,11 +121,14 @@ export function setImagePositionFromPercentage(percentageData, sync = true, fitM
   // Calculate scale adjustment if original dimensions are available
   let scaleAdjustment = 1;
   if (percentageData.originalWidth && percentageData.originalHeight) {
-    const widthRatio = rect.width / percentageData.originalWidth;
-    const heightRatio = rect.height / percentageData.originalHeight;
-    scaleAdjustment = fitMode === 'cover'
-      ? Math.max(widthRatio, heightRatio)
-      : Math.min(widthRatio, heightRatio);
+    const { scale } = calculateViewportScale(
+      rect.width,
+      rect.height,
+      percentageData.originalWidth,
+      percentageData.originalHeight,
+      fitMode
+    );
+    scaleAdjustment = scale;
   }
 
   imgState.cx = (percentageData.cxPercent / 100) * rect.width;
@@ -448,9 +451,12 @@ export async function handleImageUpload(file) {
 
           // Initial scale should cover the work area but not exceed the fx video scale
           const { shearX, shearY } = imgState;
-          const containScale = Math.min(
-            workRect.width / imgState.natW,
-            workRect.height / imgState.natH
+          const { scale: containScale } = calculateViewportScale(
+            workRect.width,
+            workRect.height,
+            imgState.natW,
+            imgState.natH,
+            'contain'
           );
           imgState.scale = Math.min(getFxScale(), containScale);
           imgState.angle = 0;
@@ -538,9 +544,12 @@ function fallbackToLocalUpload(file) {
 
       // Initial scale should cover the work area but not exceed the fx video scale
       const { shearX, shearY, signX, signY, flip } = imgState;
-      const containScale = Math.min(
-        workRect.width / imgState.natW,
-        workRect.height / imgState.natH
+      const { scale: containScale } = calculateViewportScale(
+        workRect.width,
+        workRect.height,
+        imgState.natW,
+        imgState.natH,
+        'contain'
       );
       imgState.scale = Math.min(getFxScale(), containScale);
       imgState.angle = 0;
@@ -989,11 +998,14 @@ export async function centerImageToVideo() {
   
   // Use Math.min for "contain" behavior (fits entirely within bounds)
   // This matches the fx video's object-fit: contain
-  const scaleToContain = Math.min(
-    rect.width / imgState.natW,
-    rect.height / imgState.natH
+  const { scale: scaleToContain } = calculateViewportScale(
+    rect.width,
+    rect.height,
+    imgState.natW,
+    imgState.natH,
+    'contain'
   );
-  
+
   imgState.scale = scaleToContain;
 
   if (!document.body.classList.contains('viewer')) setTransforms();
