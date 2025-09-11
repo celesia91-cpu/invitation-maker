@@ -321,8 +321,8 @@ export function setTransforms(sync = true) {
     enforceImageBounds();
   }
   
-  const w = imgState.natW * imgState.scale;
-  const h = imgState.natH * imgState.scale;
+  const w = imgState.natW;
+  const h = imgState.natH;
   const sx = (imgState.flip ? -1 : 1) * (imgState.signX ?? 1);
   const sy = imgState.signY ?? 1;
   
