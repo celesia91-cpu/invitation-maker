@@ -27,7 +27,17 @@ const userBgEl = {
 };
 
 const workEl = {
-  getBoundingClientRect() { return { width: 200, height: 100 }; }
+  children: [],
+  _rect: { width: 200, height: 100 },
+  getBoundingClientRect() { return this._rect; },
+  querySelectorAll() { return this.children; },
+  appendChild(el) {
+    this.children.push(el);
+    el.remove = () => {
+      const idx = this.children.indexOf(el);
+      if (idx !== -1) this.children.splice(idx, 1);
+    };
+  },
 };
 
 const elements = {
@@ -89,3 +99,47 @@ const slide4 = { image: { src: 'foo.jpg', cxPercent: 25, cyPercent: 25 } };
 await window.loadSlideImage(slide4);
 assert.strictEqual(slide4.image.scale, 0.5);
 console.log('percentage positioning falls back to getFxScale');
+
+// Alignment tests across multiple viewport ratios
+userBgEl.naturalWidth = 100;
+userBgEl.naturalHeight = 100;
+
+const baseSlide = {
+  image: {
+    src: 'foo.jpg',
+    cxPercent: 50,
+    cyPercent: 50,
+    scale: 1,
+    originalWidth: 100,
+    originalHeight: 100
+  }
+};
+
+const textLayer = {
+  text: 'Center',
+  left: 50,
+  top: 50,
+  fontSize: 10,
+  workWidth: 100,
+  workHeight: 100
+};
+
+// Scenario 1: wide viewport
+workEl._rect = { width: 200, height: 100 };
+workEl.children = [];
+await window.loadSlideImage(baseSlide);
+await window.loadTextLayers([textLayer]);
+let layer = workEl.children[0];
+assert.strictEqual(parseFloat(layer.style.left), imgState.cx);
+assert.strictEqual(parseFloat(layer.style.top), imgState.cy);
+
+// Scenario 2: tall viewport
+workEl._rect = { width: 100, height: 200 };
+workEl.children = [];
+await window.loadSlideImage(baseSlide);
+await window.loadTextLayers([textLayer]);
+layer = workEl.children[0];
+assert.strictEqual(parseFloat(layer.style.left), imgState.cx);
+assert.strictEqual(parseFloat(layer.style.top), imgState.cy);
+
+console.log('text and image layers align across viewport ratios');

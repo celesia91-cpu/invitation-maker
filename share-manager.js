@@ -1,6 +1,6 @@
 // share-manager.js - COMPLETE FIXED VERSION WITH PROPER FUNCTION ORDERING
 
-import { encodeState, decodeState } from './utils.js';
+import { encodeState, decodeState, calculateViewportScale } from './utils.js';
 import {
   buildProject,
   applyProject,
@@ -42,16 +42,25 @@ async function loadSlideImage(slide) {
         imgState.natH = userBgEl.naturalHeight;
 
         // Check if we have percentage coordinates with viewport dimensions
-        if (slide.image.cxPercent !== undefined && 
+        if (slide.image.cxPercent !== undefined &&
             slide.image.cyPercent !== undefined) {
-          
+
           // Use the enhanced function that handles viewport scaling
           // Viewer defaults to 'cover' so images fill the viewport
-          setImagePositionFromPercentage(slide.image, false, 'cover');
-          
+          const baseScale = typeof slide.image.scale === 'number'
+            ? slide.image.scale
+            : getFxScale();
+          setImagePositionFromPercentage({ ...slide.image, scale: baseScale }, false, 'cover');
+
         } else {
           // Fallback to absolute positioning
-          const coverScale = Math.max(rect.width / imgState.natW, rect.height / imgState.natH);
+          const { scale: coverScale } = calculateViewportScale(
+            rect.width,
+            rect.height,
+            imgState.natW,
+            imgState.natH,
+            'cover'
+          );
           const defaultScale = Math.min(getFxScale(), coverScale);
           
           imgState.scale = typeof slide.image.scale === 'number'
@@ -98,31 +107,35 @@ async function loadTextLayers(layers) {
   existingLayers.forEach(layer => layer.remove());
   
   const workRect = work.getBoundingClientRect();
-  
+
   // Add new layers with responsive scaling
   for (const layerData of layers) {
     const element = document.createElement('div');
     element.className = 'layer text-layer';
     element.contentEditable = 'false';
     element.textContent = layerData.text || 'Text';
-    
-    // Apply positioning and styles with viewport scaling
-    const scaleFactorX = workRect.width / (layerData.workWidth || 1280);
-    const scaleFactorY = workRect.height / (layerData.workHeight || 720);
-    const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
-    
-    element.style.left = (layerData.left * scaleFactorX) + 'px';
-    element.style.top = (layerData.top * scaleFactorY) + 'px';
-    element.style.fontSize = (layerData.fontSize * scaleFactor) + 'px';
+
+    // Apply positioning and styles with viewport scaling using shared utility
+    const { scaleX, scaleY, scale } = calculateViewportScale(
+      workRect.width,
+      workRect.height,
+      layerData.workWidth || 1280,
+      layerData.workHeight || 720,
+      'cover'
+    );
+
+    element.style.left = (layerData.left * scaleX) + 'px';
+    element.style.top = (layerData.top * scaleY) + 'px';
+    element.style.fontSize = (layerData.fontSize * scale) + 'px';
     element.style.fontFamily = layerData.fontFamily || 'system-ui';
     element.style.fontWeight = layerData.fontWeight || 'normal';
     element.style.color = layerData.color || '#ffffff';
     element.style.textAlign = layerData.textAlign || 'left';
-    
+
     if (layerData.transform) {
       element.style.transform = layerData.transform;
     }
-    
+
     work.appendChild(element);
   }
   
@@ -635,6 +648,7 @@ if (typeof window !== 'undefined') {
   window.safeProjectForShare = safeProjectForShare;
   window.applySharedProject = applySharedProject;
   window.loadSlideImage = loadSlideImage;
+  window.loadTextLayers = loadTextLayers;
   window.showViewerUI = showViewerUI;
   window.showFullscreenPrompt = showFullscreenPrompt;
 }

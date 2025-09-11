@@ -2,7 +2,7 @@
 
 import { getSlides, getActiveIndex, setActiveIndex, setSlides, recordHistory, saveProjectDebounced } from './state-manager.js';
 import { imgState, setTransforms, enforceImageBounds, toggleUploadBtn, getFxScale } from './image-manager.js';
-import { clamp } from './utils.js';
+import { clamp, calculateViewportScale } from './utils.js';
 
 // Constants
 const DEFAULT_DUR = 3000;
@@ -347,9 +347,12 @@ class ImageLoader {
 
           // Prefer percentage-based positioning if available
           if (imageData.cxPercent !== undefined && imageData.cyPercent !== undefined) {
-            const containScale = Math.min(
-              workRect.width / imgState.natW,
-              workRect.height / imgState.natH
+            const { scale: containScale } = calculateViewportScale(
+              workRect.width,
+              workRect.height,
+              imgState.natW,
+              imgState.natH,
+              'contain'
             );
             const scale = typeof imageData.scale === 'number'
               ? imageData.scale
@@ -375,9 +378,12 @@ class ImageLoader {
             imgState.flip = imageData.flip || false;
           } else {
             // Calculate cover scale defaults if no saved values
-            const containScale = Math.min(
-              workRect.width / imgState.natW,
-              workRect.height / imgState.natH
+            const { scale: containScale } = calculateViewportScale(
+              workRect.width,
+              workRect.height,
+              imgState.natW,
+              imgState.natH,
+              'contain'
             );
             imgState.scale = Math.min(getFxScale(), containScale);
             imgState.angle = 0;

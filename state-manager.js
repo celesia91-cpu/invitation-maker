@@ -1,5 +1,7 @@
 // state-manager.js - COMPLETE ENHANCED VERSION WITH PERCENTAGE-BASED POSITIONING SUPPORT
 
+import { calculateViewportScale } from './utils.js';
+
 // Import dependencies
 let apiClient;
 try {
@@ -284,7 +286,14 @@ class ApplicationStateManager {
           }
 
           const rect = work.getBoundingClientRect();
-          const defaultScale = Math.min(1, rect.width / imgState.natW, rect.height / imgState.natH);
+          const { scale: containScale } = calculateViewportScale(
+            rect.width,
+            rect.height,
+            imgState.natW,
+            imgState.natH,
+            'contain'
+          );
+          const defaultScale = Math.min(1, containScale);
 
           // Check if we have percentage-based coordinates (new format)
           if (imageData.cxPercent !== undefined && imageData.cyPercent !== undefined) {
@@ -308,18 +317,24 @@ class ApplicationStateManager {
             const sourceWorkDimensions = this.workDimensions;
             const currentWorkDimensions = { width: rect.width, height: rect.height };
             
+            // Calculate scaling factors if work dimensions changed
             let scaleX = 1;
             let scaleY = 1;
-            
-            // Calculate scaling factors if work dimensions changed
-            if (sourceWorkDimensions && 
+
+            if (sourceWorkDimensions &&
                 (Math.abs(sourceWorkDimensions.width - currentWorkDimensions.width) > 10 ||
                  Math.abs(sourceWorkDimensions.height - currentWorkDimensions.height) > 10)) {
-              
-              scaleX = currentWorkDimensions.width / sourceWorkDimensions.width;
-              scaleY = currentWorkDimensions.height / sourceWorkDimensions.height;
-              
-              console.log('🔧 Scaling legacy coordinates:', { 
+              const scales = calculateViewportScale(
+                currentWorkDimensions.width,
+                currentWorkDimensions.height,
+                sourceWorkDimensions.width,
+                sourceWorkDimensions.height,
+                'contain'
+              );
+              scaleX = scales.scaleX;
+              scaleY = scales.scaleY;
+
+              console.log('🔧 Scaling legacy coordinates:', {
                 from: sourceWorkDimensions,
                 to: currentWorkDimensions,
                 scale: { scaleX, scaleY }
