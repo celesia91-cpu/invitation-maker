@@ -8,7 +8,7 @@ import {
   setCurrentProjectId,
   historyState
 } from './state-manager.js';
-import { setImagePositionFromPercentage, setTransforms, imgState, syncImageCoordinates } from './image-manager.js';
+import { setImagePositionFromPercentage, setTransforms, imgState, syncImageCoordinates, getFxScale } from './image-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -41,11 +41,18 @@ async function loadSlideImage(slide) {
         imgState.natW = userBgEl.naturalWidth;
         imgState.natH = userBgEl.naturalHeight;
 
+        const coverScale = Math.max(rect.width / imgState.natW, rect.height / imgState.natH);
+        const defaultScale = Math.min(getFxScale(), coverScale);
+
         if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
           setImagePositionFromPercentage(slide.image, false);
+          if (typeof slide.image.scale !== 'number') {
+            imgState.scale = defaultScale;
+          }
         } else {
-          const defaultScale = Math.min(1, rect.width / imgState.natW, rect.height / imgState.natH);
-          imgState.scale = typeof slide.image.scale === 'number' ? slide.image.scale : defaultScale;
+          imgState.scale = typeof slide.image.scale === 'number'
+            ? slide.image.scale
+            : defaultScale;
           // Compute the scaled dimensions to center the image identically to fxVideo
           const scaledW = imgState.natW * imgState.scale;
           const scaledH = imgState.natH * imgState.scale;

@@ -34,7 +34,8 @@ const elements = {
   '#userBg': userBgEl,
   '#work': workEl,
   '#userBgWrap': makeEl(),
-  '#bgBox': makeEl()
+  '#bgBox': makeEl(),
+  '#fxVideo': { videoWidth: 400, videoHeight: 200 }
 };
 
 global.document = {
@@ -55,6 +56,7 @@ const slide1 = { image: { src: 'foo.jpg' } };
 await window.loadSlideImage(slide1);
 assert.strictEqual(Math.round(slide1.image.cxPercent), 50);
 assert.strictEqual(Math.round(slide1.image.cyPercent), 50);
+assert.strictEqual(imgState.scale, 0.5);
 
 // Test preserving existing transforms
 const slide2 = { image: { src: 'foo.jpg', cxPercent: 10, cyPercent: 20, scale: 0.5, angle: 0.1, shearX: 0.2, shearY: 0.3, signX: -1, signY: 1, flip: true } };
@@ -81,3 +83,9 @@ setTransforms();
 assert.strictEqual(imgState.cx, 50);
 assert.strictEqual(imgState.cy, 50);
 console.log('rotation preserves center');
+
+// Test percentage-based positioning without scale uses getFxScale fallback
+const slide4 = { image: { src: 'foo.jpg', cxPercent: 25, cyPercent: 25 } };
+await window.loadSlideImage(slide4);
+assert.strictEqual(slide4.image.scale, 0.5);
+console.log('percentage positioning falls back to getFxScale');
