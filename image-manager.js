@@ -433,11 +433,11 @@ export async function handleImageUpload(file) {
 
           // Initial scale should cover the work area but not exceed the fx video scale
           const { shearX, shearY } = imgState;
-          const coverScale = Math.max(
+          const containScale = Math.min(
             workRect.width / imgState.natW,
             workRect.height / imgState.natH
           );
-          imgState.scale = Math.min(getFxScale(), coverScale);
+          imgState.scale = Math.min(getFxScale(), containScale);
           imgState.angle = 0;
           imgState.signX = 1;
           imgState.signY = 1;
@@ -955,33 +955,35 @@ export async function centerImageToVideo() {
   }
   
   const work = document.querySelector('#work');
-  if (!work) {
-    console.log('❌ Work area not found');
+  const fxVideo = document.querySelector('#fxVideo');
+  
+  if (!work || !fxVideo) {
+    console.log('❌ Work area or fx video not found');
     return;
   }
   
   const rect = work.getBoundingClientRect();
   
-  // Center the image in the work area (matching fx video positioning)
+  // Center the image in the work area
   imgState.cx = rect.width / 2;
   imgState.cy = rect.height / 2;
   
-  // Optionally adjust scale to better match video coverage
+  // Match the fx video's "contain" behavior instead of "cover"
   const imageAspect = imgState.natW / imgState.natH;
   const workAspect = rect.width / rect.height;
   
-  if (imageAspect !== workAspect) {
-    // Scale to cover (similar to object-fit: cover)
-    const scaleToFit = Math.max(
-      rect.width / imgState.natW,
-      rect.height / imgState.natH
-    );
-    imgState.scale = scaleToFit;
-  }
+  // Use Math.min for "contain" behavior (fits entirely within bounds)
+  // This matches the fx video's object-fit: contain
+  const scaleToContain = Math.min(
+    rect.width / imgState.natW,
+    rect.height / imgState.natH
+  );
+  
+  imgState.scale = scaleToContain;
 
   if (!document.body.classList.contains('viewer')) setTransforms();
   saveImageSettings();
-  console.log('✅ Image centered and scaled to match fx video');
+  console.log('✅ Image centered and scaled to match fx video (contain mode)');
 }
 
 // Validation function for debugging image persistence
