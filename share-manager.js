@@ -41,23 +41,25 @@ async function loadSlideImage(slide) {
         imgState.natW = userBgEl.naturalWidth;
         imgState.natH = userBgEl.naturalHeight;
 
-        const containScale = Math.min(rect.width / imgState.natW, rect.height / imgState.natH);
-        const defaultScale = Math.min(getFxScale(), containScale);
-
-        if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
+        // Check if we have percentage coordinates with viewport dimensions
+        if (slide.image.cxPercent !== undefined && 
+            slide.image.cyPercent !== undefined) {
+          
+          // Use the enhanced function that handles viewport scaling
           setImagePositionFromPercentage(slide.image, false);
-          if (typeof slide.image.scale !== 'number') {
-            imgState.scale = defaultScale;
-          }
+          
         } else {
+          // Fallback to absolute positioning
+          const coverScale = Math.max(rect.width / imgState.natW, rect.height / imgState.natH);
+          const defaultScale = Math.min(getFxScale(), coverScale);
+          
           imgState.scale = typeof slide.image.scale === 'number'
             ? slide.image.scale
             : defaultScale;
-          // Compute the scaled dimensions to center the image identically to fxVideo
-          const scaledW = imgState.natW * imgState.scale;
-          const scaledH = imgState.natH * imgState.scale;
-          imgState.cx = (rect.width - scaledW) / 2 + scaledW / 2;
-          imgState.cy = (rect.height - scaledH) / 2 + scaledH / 2;
+            
+          // Center the image
+          imgState.cx = rect.width / 2;
+          imgState.cy = rect.height / 2;
           imgState.angle = slide.image.angle || 0;
           imgState.shearX = slide.image.shearX || 0;
           imgState.shearY = slide.image.shearY || 0;

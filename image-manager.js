@@ -99,7 +99,10 @@ export function getImagePositionAsPercentage() {
     shearY: imgState.shearY,
     signX: imgState.signX,
     signY: imgState.signY,
-    flip: imgState.flip
+    flip: imgState.flip,
+    // ADD: Store original viewport dimensions
+    originalWidth: rect.width,
+    originalHeight: rect.height
   };
 }
 
@@ -111,10 +114,22 @@ export function setImagePositionFromPercentage(percentageData, sync = true) {
   if (!work) return;
 
   const rect = work.getBoundingClientRect();
+  
+  // Calculate scale adjustment if original dimensions are available
+  let scaleAdjustment = 1;
+  if (percentageData.originalWidth && percentageData.originalHeight) {
+    const widthRatio = rect.width / percentageData.originalWidth;
+    const heightRatio = rect.height / percentageData.originalHeight;
+    // Use the minimum ratio to ensure image fits within bounds
+    scaleAdjustment = Math.min(widthRatio, heightRatio);
+  }
 
   imgState.cx = (percentageData.cxPercent / 100) * rect.width;
   imgState.cy = (percentageData.cyPercent / 100) * rect.height;
-  imgState.scale = percentageData.scale || 1;
+  
+  // Adjust scale based on viewport size difference
+  imgState.scale = (percentageData.scale || 1) * scaleAdjustment;
+  
   imgState.angle = percentageData.angle || 0;
   imgState.shearX = percentageData.shearX || 0;
   imgState.shearY = percentageData.shearY || 0;
@@ -125,7 +140,6 @@ export function setImagePositionFromPercentage(percentageData, sync = true) {
   setTransforms(sync);
 }
 
-// ENHANCED: Synchronize current image coordinates back to slide data
 export function syncImageCoordinates(force = false, targetSlide = null) {
   let slides, slide;
   if (targetSlide) {
@@ -135,36 +149,28 @@ export function syncImageCoordinates(force = false, targetSlide = null) {
     const activeIndex = getActiveIndex();
     slide = slides?.[activeIndex];
   }
-  if (!slide) return;
 
-  const work = document.querySelector('#work');
-  if (!work) return;
+  if (!slide || !imgState.has) return;
 
-  if (!slide.image) slide.image = {};
-
-  const rect = work.getBoundingClientRect();
-  const data = {
-    cx: imgState.cx,
-    cy: imgState.cy,
-    cxPercent: rect.width ? (imgState.cx / rect.width) * 100 : 0,
-    cyPercent: rect.height ? (imgState.cy / rect.height) * 100 : 0,
-    scale: imgState.scale,
-    angle: imgState.angle,
-    shearX: imgState.shearX,
-    shearY: imgState.shearY,
-    signX: imgState.signX,
-    signY: imgState.signY,
-    flip: imgState.flip
-  };
-
-  for (const [key, value] of Object.entries(data)) {
-    if (force || slide.image[key] === undefined) {
-      slide.image[key] = value;
+  const percentagePos = getImagePositionAsPercentage();
+  
+  if (percentagePos && slide.image) {
+    slide.image.cxPercent = percentagePos.cxPercent;
+    slide.image.cyPercent = percentagePos.cyPercent;
+    slide.image.originalWidth = percentagePos.originalWidth;
+    slide.image.originalHeight = percentagePos.originalHeight;
+    slide.image.scale = imgState.scale;
+    slide.image.angle = imgState.angle;
+    slide.image.shearX = imgState.shearX;
+    slide.image.shearY = imgState.shearY;
+    slide.image.signX = imgState.signX;
+    slide.image.signY = imgState.signY;
+    slide.image.flip = imgState.flip;
+    
+    // Update slide in place
+    if (slides) {
+      setSlides([...slides]);
     }
-  }
-
-  if (!targetSlide && slides) {
-    setSlides([...slides]);
   }
 }
 
@@ -369,19 +375,21 @@ function saveImageToSlide(src, imageData) {
     const activeIndex = getActiveIndex();
     
     if (slides && slides[activeIndex]) {
-      // Get percentage position for sharing compatibility
+      // Get percentage position with viewport dimensions
       const percentagePos = getImagePositionAsPercentage();
       
       // Create/update image object in slide
       slides[activeIndex].image = {
         src: src,
         thumb: imageData.backendThumbnailUrl || src,
-        // Store both absolute and percentage coordinates for compatibility
+        // Store both absolute and percentage coordinates
         cx: imgState.cx,
         cy: imgState.cy,
-        // Store percentage coordinates for consistent cross-device sharing
+        // Store percentage coordinates with viewport dimensions
         cxPercent: percentagePos?.cxPercent,
         cyPercent: percentagePos?.cyPercent,
+        originalWidth: percentagePos?.originalWidth,
+        originalHeight: percentagePos?.originalHeight,
         ...imageData
       };
       
@@ -397,7 +405,10 @@ function saveImageToSlide(src, imageData) {
         });
       }, 0);
       
-      console.log('Image data saved to slide with percentage positioning:', activeIndex);
+      console.log('Image data saved to slide with viewport dimensions:', {
+        width: percentagePos?.originalWidth,
+        height: percentagePos?.originalHeight
+      });
     }
   } catch (error) {
     console.error('Failed to save image to slide:', error);
