@@ -41,8 +41,8 @@ async function loadSlideImage(slide) {
         imgState.natW = userBgEl.naturalWidth;
         imgState.natH = userBgEl.naturalHeight;
 
-        const coverScale = Math.max(rect.width / imgState.natW, rect.height / imgState.natH);
-        const defaultScale = Math.min(getFxScale(), coverScale);
+        const containScale = Math.min(rect.width / imgState.natW, rect.height / imgState.natH);
+        const defaultScale = Math.min(getFxScale(), containScale);
 
         if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
           setImagePositionFromPercentage(slide.image, false);

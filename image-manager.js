@@ -523,11 +523,11 @@ function fallbackToLocalUpload(file) {
 
       // Initial scale should cover the work area but not exceed the fx video scale
       const { shearX, shearY, signX, signY, flip } = imgState;
-      const coverScale = Math.max(
+      const containScale = Math.min(
         workRect.width / imgState.natW,
         workRect.height / imgState.natH
       );
-      imgState.scale = Math.min(getFxScale(), coverScale);
+      imgState.scale = Math.min(getFxScale(), containScale);
       imgState.angle = 0;
       imgState.cx = workRect.width / 2;
       imgState.cy = workRect.height / 2;

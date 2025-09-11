@@ -347,13 +347,13 @@ class ImageLoader {
 
           // Prefer percentage-based positioning if available
           if (imageData.cxPercent !== undefined && imageData.cyPercent !== undefined) {
-            const coverScale = Math.max(
+            const containScale = Math.min(
               workRect.width / imgState.natW,
               workRect.height / imgState.natH
             );
             const scale = typeof imageData.scale === 'number'
               ? imageData.scale
-              : Math.min(getFxScale(), coverScale);
+              : Math.min(getFxScale(), containScale);
             imgState.scale = scale;
             imgState.angle = imageData.angle || 0;
             imgState.cx = (imageData.cxPercent / 100) * workRect.width;
@@ -375,11 +375,11 @@ class ImageLoader {
             imgState.flip = imageData.flip || false;
           } else {
             // Calculate cover scale defaults if no saved values
-            const coverScale = Math.max(
+            const containScale = Math.min(
               workRect.width / imgState.natW,
               workRect.height / imgState.natH
             );
-            imgState.scale = Math.min(getFxScale(), coverScale);
+            imgState.scale = Math.min(getFxScale(), containScale);
             imgState.angle = 0;
             imgState.cx = workRect.width / 2;
             imgState.cy = workRect.height / 2;
