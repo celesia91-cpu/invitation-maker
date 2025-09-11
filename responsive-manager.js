@@ -16,6 +16,7 @@ export class ResponsiveManager {
     // Bind methods to preserve context
     this.handleWorkResize = this.handleWorkResize.bind(this);
     this.handleWindowResize = this.handleWindowResize.bind(this);
+    this.applySafeAreaInsets = this.applySafeAreaInsets.bind(this);
   }
 
   /**
@@ -32,6 +33,7 @@ export class ResponsiveManager {
       this.setupWindowResizeHandler();
       this.initializeWorkWidth();
       this.setupOrientationHandling();
+      this.applySafeAreaInsets();
 
       this.isInitialized = true;
       console.log('✅ ResponsiveManager initialized');
@@ -86,6 +88,43 @@ export class ResponsiveManager {
   }
 
   /**
+   * Get current viewport size using visualViewport when available
+   */
+  getViewportSize() {
+    const vv = window.visualViewport;
+    return {
+      width: vv?.width || window.innerWidth,
+      height: vv?.height || window.innerHeight
+    };
+  }
+
+  /**
+   * Apply safe area insets to the work element
+   */
+  applySafeAreaInsets() {
+    const work = document.getElementById('work');
+    if (!work) return;
+
+    const supportsEnv = globalThis.CSS?.supports?.('padding-left: env(safe-area-inset-left)');
+    if (supportsEnv) {
+      work.style.top = 'env(safe-area-inset-top)';
+      work.style.right = 'env(safe-area-inset-right)';
+      work.style.bottom = 'env(safe-area-inset-bottom)';
+      work.style.left = 'env(safe-area-inset-left)';
+    } else if (window.visualViewport) {
+      const vv = window.visualViewport;
+      const left = vv.offsetLeft;
+      const top = vv.offsetTop;
+      const right = window.innerWidth - vv.width - left;
+      const bottom = window.innerHeight - vv.height - top;
+      work.style.left = left + 'px';
+      work.style.top = top + 'px';
+      work.style.right = right + 'px';
+      work.style.bottom = bottom + 'px';
+    }
+  }
+
+  /**
    * Handle work area resize with scaling
    */
   handleWorkResize() {
@@ -119,9 +158,10 @@ export class ResponsiveManager {
   handleWindowResize() {
     // Could add window resize logic here if needed
     // This is separate from work area resize
-    console.log('🖥️ Window resized:', { 
-      width: window.innerWidth, 
-      height: window.innerHeight 
+    const { width, height } = this.getViewportSize();
+    console.log('🖥️ Window resized:', {
+      width,
+      height
     });
   }
 
@@ -328,7 +368,7 @@ export class ResponsiveManager {
    * Add responsive breakpoint handling
    */
   checkBreakpoints() {
-    const width = window.innerWidth;
+    const { width } = this.getViewportSize();
     const work = document.getElementById('work');
     
     if (!work) return;
@@ -374,13 +414,11 @@ export class ResponsiveManager {
    * Wait until the viewport stops changing size
    */
   waitForViewportStability(callback, delay = 300) {
-    let width = window.innerWidth;
-    let height = window.innerHeight;
+    let { width, height } = this.getViewportSize();
     let lastChange = performance.now();
 
     const check = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const { width: w, height: h } = this.getViewportSize();
       if (w !== width || h !== height) {
         width = w;
         height = h;
@@ -408,6 +446,7 @@ export class ResponsiveManager {
     }
 
     const triggerResize = () => {
+      this.applySafeAreaInsets();
       this.forceResizeCheck();
     };
 
