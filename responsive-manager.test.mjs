@@ -101,7 +101,9 @@ window.visualViewport.offsetLeft = 20;
 window.visualViewport.offsetTop = 10;
 window.innerWidth = 320;
 window.innerHeight = 480;
-rm.handleOrientationChange(true);
+rm.updateRotateOverlay();
+rm.applySafeAreaInsets();
+rm.forceResizeCheck();
 await new Promise(r => setTimeout(r, 0));
 
 assert.strictEqual(textEl.style.left, '150px');

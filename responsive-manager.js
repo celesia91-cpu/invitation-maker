@@ -420,43 +420,18 @@ export class ResponsiveManager {
   }
 
   /**
-   * Handle orientation changes (mobile)
-   */
-  handleOrientationChange(viewportStable = false) {
-    this.updateRotateOverlay();
-    if ('orientation' in screen) {
-      const orientation = screen.orientation?.angle;
-      console.log('📱 Orientation changed:', orientation);
-    }
-
-    const triggerResize = () => {
-      this.applySafeAreaInsets();
-      this.forceResizeCheck();
-    };
-
-    if (viewportStable) {
-      triggerResize();
-    } else {
-      this.waitForViewportStability(triggerResize);
-    }
-  }
-
-  /**
    * Setup orientation change handling
    */
   setupOrientationHandling() {
     if ('orientation' in screen) {
-      screen.orientation?.addEventListener('change', () => {
-        this.handleOrientationChange();
+      screen.orientation.addEventListener('change', () => {
+        this.updateRotateOverlay();
+        this.waitForViewportStability(() => {
+          this.applySafeAreaInsets();
+          this.forceResizeCheck();
+        });
       });
     }
-    
-    // Fallback for older browsers
-    window.addEventListener('orientationchange', () => {
-      this.waitForViewportStability(() => {
-        this.handleOrientationChange(true);
-      });
-    });
   }
 
   /**
