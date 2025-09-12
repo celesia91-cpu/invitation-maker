@@ -36,10 +36,15 @@ const elements = {
   '#userBg': makeEl()
 };
 
+const fullscreenListeners = [];
+
 global.document = {
   querySelector(sel) { return elements[sel] || makeEl(); },
   getElementById(id) { return elements['#' + id] || makeEl(); },
-  body: { classList: { contains() { return false; }, add() {}, remove() {}, toggle() {} } }
+  body: { classList: { contains() { return false; }, add() {}, remove() {}, toggle() {} } },
+  addEventListener(type, cb) { if (type === 'fullscreenchange') fullscreenListeners.push(cb); },
+  removeEventListener() {},
+  dispatchFullscreen() { fullscreenListeners.forEach(cb => cb()); }
 };
 
 global.window = {
@@ -73,6 +78,12 @@ global.performance = { now: () => Date.now() };
 
 global.sessionStorage = { getItem() {}, setItem() {}, removeItem() {} };
 global.getComputedStyle = (el) => ({ fontSize: el.style.fontSize });
+
+global.ResizeObserver = class {
+  constructor(cb) { this.cb = cb; }
+  observe() {}
+  disconnect() {}
+};
 
 const { imgState } = await import('./image-manager.js');
 
@@ -144,3 +155,26 @@ await rm.handleWorkResize();
 await new Promise(r => setTimeout(r, 1000));
 assert.strictEqual(historyState.stack.length, 2);
 console.log('recordHistoryAfterResize prevents extra history entries during rapid resizes');
+
+// --- fullscreenchange triggers resize handler ---
+const rmFullscreen = new ResponsiveManager();
+rmFullscreen.updateRotateOverlay = () => {};
+rmFullscreen.scheduleSave = () => {};
+workWidth = 100;
+window.visualViewport.width = 100;
+await rmFullscreen.initialize();
+
+const fsTextEl = {
+  style: { left: '10px', top: '10px', width: '20px', fontSize: '10px' },
+  classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }
+};
+workEl.querySelectorAll = () => [fsTextEl];
+
+workWidth = 200;
+window.visualViewport.width = 200;
+document.dispatchFullscreen();
+await new Promise(r => setTimeout(r, 0));
+
+assert.strictEqual(fsTextEl.style.left, '20px');
+assert.strictEqual(fsTextEl.style.width, '40px');
+console.log('fullscreenchange triggers handleWorkResize');
