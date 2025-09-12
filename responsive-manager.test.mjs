@@ -77,6 +77,7 @@ global.getComputedStyle = (el) => ({ fontSize: el.style.fontSize });
 const { imgState } = await import('./image-manager.js');
 
 const { ResponsiveManager } = await import('./responsive-manager.js');
+const { default: stateManager, initializeHistory, setSlides, historyState } = await import('./state-manager.js');
 
 const rm = new ResponsiveManager();
 rm.isInitialized = true;
@@ -121,3 +122,25 @@ assert.strictEqual(workEl.style.left, '20px');
 assert.strictEqual(workEl.style.top, '10px');
 
 console.log('ResponsiveManager scales elements and applies safe area offsets correctly');
+
+// Allow any pending history operations to complete
+await new Promise(r => setTimeout(r, 600));
+
+// --- History recording during rapid resize ---
+stateManager.reset();
+initializeHistory();
+setSlides([{ image: null, layers: [], workSize: { w: 100, h: 100 }, durationMs: 3000 }]);
+
+workWidth = 400;
+window.visualViewport.width = 400;
+await rm.handleWorkResize();
+workWidth = 500;
+window.visualViewport.width = 500;
+await rm.handleWorkResize();
+workWidth = 600;
+window.visualViewport.width = 600;
+await rm.handleWorkResize();
+
+await new Promise(r => setTimeout(r, 1000));
+assert.strictEqual(historyState.stack.length, 2);
+console.log('recordHistoryAfterResize prevents extra history entries during rapid resizes');

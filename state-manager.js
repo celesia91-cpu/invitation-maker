@@ -512,8 +512,12 @@ class ApplicationStateManager {
     if (this.history.isLocked) return;
 
     try {
-      const stateSnapshot = JSON.stringify(this.buildProject());
-      
+      const snapshotObj = this.buildProject();
+      if (!snapshotObj || typeof snapshotObj !== 'object' || !Array.isArray(snapshotObj.slides)) {
+        throw new Error('Invalid snapshot: missing slides array');
+      }
+      const stateSnapshot = JSON.stringify(snapshotObj);
+
       // Remove future states if we're not at the end
       if (this.history.index < this.history.stack.length - 1) {
         this.history.stack = this.history.stack.slice(0, this.history.index + 1);
@@ -531,7 +535,7 @@ class ApplicationStateManager {
 
       this.updateUndoRedoUI();
     } catch (error) {
-      console.error('Failed to push history:', error);
+      console.error('Failed to push history:', error?.message || error);
     }
   }
 
@@ -778,12 +782,13 @@ class ApplicationStateManager {
     
     const rect = work.getBoundingClientRect();
     const newDimensions = { width: rect.width, height: rect.height };
-    
+
     // Only update if dimensions changed significantly
     if (Math.abs(this.workDimensions.width - newDimensions.width) > 5 ||
         Math.abs(this.workDimensions.height - newDimensions.height) > 5) {
-      
-      this.workDimensions = newDimensions;
+
+      this.setState({ workDimensions: newDimensions }, { skipHistory: true });
+      this.recordHistoryAfterResize?.();
       console.log('📐 Work dimensions updated:', newDimensions);
     }
   }
@@ -868,9 +873,11 @@ const stateManager = new ApplicationStateManager();
 // Create debounced functions
 const saveProjectDebounced = debounce(() => stateManager.save(), 300);
 const pushHistoryDebounced = debounce(() => stateManager.pushHistory(), 350);
+const recordHistoryAfterResize = debounce(() => stateManager.pushHistory(), 500);
 
 // Assign to instance for internal use
 stateManager.pushHistoryDebounced = pushHistoryDebounced;
+stateManager.recordHistoryAfterResize = recordHistoryAfterResize;
 
 // Backward compatibility - expose history state
 export const historyState = {
@@ -900,7 +907,7 @@ export const doUndo = () => stateManager.undo();
 export const doRedo = () => stateManager.redo();
 export const updateUndoRedoUI = () => stateManager.updateUndoRedoUI();
 export const pushHistory = () => stateManager.pushHistory();
-export { pushHistoryDebounced };
+export { pushHistoryDebounced, recordHistoryAfterResize };
 export const recordHistory = () => stateManager.pushHistoryDebounced();
 
 // State getters

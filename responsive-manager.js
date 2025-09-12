@@ -138,17 +138,24 @@ export class ResponsiveManager {
     }
 
     const scaleFactor = w / this.lastWorkWidth;
-    
+
     if (Math.abs(scaleFactor - 1) > 0.001) {
-      console.log('📐 Work area resized:', { 
-        oldWidth: this.lastWorkWidth, 
-        newWidth: w, 
-        scaleFactor 
+      console.log('📐 Work area resized:', {
+        oldWidth: this.lastWorkWidth,
+        newWidth: w,
+        scaleFactor
       });
-      
+
       await this.scaleAllElements(scaleFactor);
       this.lastWorkWidth = w;
       this.scheduleSave();
+
+      try {
+        const { updateWorkDimensions } = await import('./state-manager.js');
+        updateWorkDimensions();
+      } catch (error) {
+        console.warn('Failed to update work dimensions:', error);
+      }
     }
   }
 
