@@ -51,6 +51,7 @@ const elements = {
 
 let isViewer = false;
 const fullscreenListeners = [];
+const resizeListeners = [];
 global.document = {
   querySelector(sel) { return elements[sel] || makeEl(); },
   querySelectorAll() { return []; },
@@ -66,16 +67,24 @@ global.document = {
   createElement() { return makeEl(); },
   addEventListener(type, cb) { if (type === 'fullscreenchange') fullscreenListeners.push(cb); },
   removeEventListener() {},
-  dispatchFullscreen() { fullscreenListeners.forEach(cb => cb()); }
+  dispatchFullscreen() { return Promise.all(fullscreenListeners.map(cb => cb())); }
 };
-
-global.window = { addEventListener() {}, removeEventListener() {}, location: { hostname: 'localhost' } };
+global.window = {
+  addEventListener(type, cb) { if (type === 'resize') resizeListeners.push(cb); },
+  removeEventListener() {},
+  location: { hostname: 'localhost' },
+  dispatchResize() { return Promise.all(resizeListeners.map(cb => cb())); }
+};
 global.fetch = async () => ({ ok: true, json: async () => ({}) });
+global.getComputedStyle = (el) => ({ fontSize: el.style.fontSize || '10px' });
 
 await import('./share-manager.js');
 const { setTransforms, imgState } = await import('./image-manager.js');
 const { setSlides, setActiveIndex } = await import('./state-manager.js');
+const { ResponsiveManager } = await import('./responsive-manager.js');
+ResponsiveManager.prototype.syncToolbarAfterScaling = async () => {};
 assert.ok(fullscreenListeners.length > 0);
+assert.ok(resizeListeners.length > 0);
 
 // Test default centering
 const slide1 = { image: { src: 'foo.jpg' } };
@@ -104,6 +113,7 @@ const slide3 = { image: { src: 'foo.jpg' } };
 await window.loadSlideImage(slide3);
 imgState.cx = 50;
 imgState.cy = 50;
+imgState.scale = 1;
 imgState.angle = Math.PI / 2; // 90 degrees
 setTransforms();
 assert.strictEqual(imgState.cx, 50);
@@ -171,18 +181,38 @@ const fsSlide = {
     originalHeight: 100
   }
 };
+const fsTextLayer = {
+  text: 'Center',
+  left: 50,
+  top: 50,
+  fontSize: 10,
+  workWidth: 100,
+  workHeight: 100
+};
 workEl._rect = { width: 100, height: 100 };
 setSlides([fsSlide]);
 setActiveIndex(0);
 global.document.body.classList.add('viewer');
 await window.loadSlideImage(fsSlide);
+await window.loadTextLayers([fsTextLayer]);
+await window.rescaleViewerContent();
 assert.strictEqual(imgState.scale, 1);
+assert.strictEqual(parseFloat(workEl.children[0].style.left), 50);
 workEl._rect = { width: 200, height: 100 };
-global.document.dispatchFullscreen();
-assert.strictEqual(imgState.cx, 100);
-assert.strictEqual(imgState.cy, 50);
-assert.strictEqual(imgState.scale, 2);
-console.log('rescaleViewerContent updates image on fullscreen change');
+await global.document.dispatchFullscreen();
+  assert.strictEqual(imgState.cx, 100);
+  assert.strictEqual(imgState.cy, 100);
+  assert.strictEqual(imgState.scale, 2);
+  assert.strictEqual(parseFloat(workEl.children[0].style.left), 100);
+console.log('rescaleViewerContent updates image and text on fullscreen change');
+
+// Test rescaling on window resize
+workEl._rect = { width: 400, height: 100 };
+await global.window.dispatchResize();
+assert.strictEqual(imgState.cx, 200);
+assert.strictEqual(imgState.scale, 4);
+assert.strictEqual(parseFloat(workEl.children[0].style.left), 200);
+console.log('rescaleViewerContent updates image and text on window resize');
 
 // --- ResponsiveManager initialization in viewer mode ---
 let resizeObserverCount = 0;
