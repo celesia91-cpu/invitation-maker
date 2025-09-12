@@ -83,7 +83,7 @@ rm.isInitialized = true;
 rm.setLastWorkWidth(workWidth);
 rm.updateRotateOverlay = () => {};
 rm.scheduleSave = () => {};
-rm.syncToolbarAfterScaling = () => {};
+rm.syncToolbarAfterScaling = async () => {};
 
 imgState.has = true;
 imgState.cx = 50;
@@ -93,8 +93,7 @@ imgState.scale = 1;
 // Simulate viewport width change
 workWidth = 200;
 window.visualViewport.width = 200;
-rm.handleWorkResize();
-await new Promise(r => setTimeout(r, 0));
+await rm.handleWorkResize();
 
 assert.strictEqual(textEl.style.left, '100px');
 assert.strictEqual(textEl.style.top, '100px');
@@ -111,8 +110,7 @@ window.innerWidth = 320;
 window.innerHeight = 480;
 rm.updateRotateOverlay();
 rm.applySafeAreaInsets();
-rm.forceResizeCheck();
-await new Promise(r => setTimeout(r, 0));
+await rm.forceResizeCheck();
 
 assert.strictEqual(textEl.style.left, '150px');
 assert.strictEqual(textEl.style.top, '150px');

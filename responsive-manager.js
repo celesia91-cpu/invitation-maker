@@ -127,7 +127,7 @@ export class ResponsiveManager {
   /**
    * Handle work area resize with scaling
    */
-  handleWorkResize() {
+  async handleWorkResize() {
     const { w } = workSize();
 
     if (w <= 0) return;
@@ -146,7 +146,7 @@ export class ResponsiveManager {
         scaleFactor 
       });
       
-      this.scaleAllElements(scaleFactor);
+      await this.scaleAllElements(scaleFactor);
       this.lastWorkWidth = w;
       this.scheduleSave();
     }
@@ -168,7 +168,7 @@ export class ResponsiveManager {
   /**
    * Scale all elements proportionally
    */
-  scaleAllElements(factor) {
+  async scaleAllElements(factor) {
     if (!isFinite(factor) || Math.abs(factor - 1) < 0.0001) {
       return;
     }
@@ -176,8 +176,8 @@ export class ResponsiveManager {
     console.log('🔄 Scaling all elements by factor:', factor);
 
     this.scaleTextLayers(factor);
-    this.scaleImageElements(factor);
-    this.syncToolbarAfterScaling();
+    await this.scaleImageElements(factor);
+    await this.syncToolbarAfterScaling();
   }
 
   /**
@@ -270,19 +270,19 @@ export class ResponsiveManager {
   /**
    * Manually trigger scaling (for testing or special cases)
    */
-  scaleBy(factor) {
+  async scaleBy(factor) {
     if (!this.isInitialized) {
       console.warn('ResponsiveManager not initialized');
       return;
     }
     
-    this.scaleAllElements(factor);
+    await this.scaleAllElements(factor);
   }
 
   /**
    * Reset to natural size
    */
-  resetScaling() {
+  async resetScaling() {
     if (!this.isInitialized) {
       console.warn('ResponsiveManager not initialized');
       return;
@@ -291,7 +291,7 @@ export class ResponsiveManager {
     const { w } = workSize();
     if (this.lastWorkWidth > 0 && w > 0) {
       const resetFactor = 1 / (w / this.lastWorkWidth);
-      this.scaleAllElements(resetFactor);
+      await this.scaleAllElements(resetFactor);
       this.lastWorkWidth = w;
     }
   }
@@ -334,7 +334,7 @@ export class ResponsiveManager {
   /**
    * Force a resize check (useful after DOM changes)
    */
-  forceResizeCheck() {
+  async forceResizeCheck() {
     if (this.resizeObserver) {
       // Disconnect and reconnect to trigger observation
       const work = document.getElementById('work');
@@ -345,9 +345,8 @@ export class ResponsiveManager {
     }
     
     // Also manually trigger resize check
-    setTimeout(() => {
-      this.handleWorkResize();
-    }, 0);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await this.handleWorkResize();
   }
 
   /**
