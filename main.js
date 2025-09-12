@@ -19,6 +19,7 @@ import { updateSlidesUI, loadSlideIntoDOM } from './slide-manager.js';
 import { addTextLayer } from './text-manager.js';
 import { preloadSlideImageAt } from './image-manager.js';
 import { workSize } from './utils.js';
+import { initializeCollapsibleGroups, collapseAllGroups, expandAllGroups } from './collapsible-groups.js';
 
 /**
  * Main Application Class with Enhanced Text Editing Support
@@ -768,14 +769,18 @@ const invitationApp = new InvitationMakerApp();
 
 // Make app available globally
 window.invitationApp = invitationApp;
+window.collapseAllGroups = collapseAllGroups;
+window.expandAllGroups = expandAllGroups;
 
 // Start initialization when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     invitationApp.initialize();
+    initializeCollapsibleGroups();
   });
 } else {
   invitationApp.initialize();
+  initializeCollapsibleGroups();
 }
 
 export { invitationApp };
