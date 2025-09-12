@@ -451,6 +451,11 @@ body.panel-open .sidepanel {
   gap: 6px;
 }
 
+.group-title:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .group-title .chevron {
   transition: transform var(--collapse-duration);
 }

@@ -74,6 +74,16 @@ assert.ok(groupA.group.classList.contains('collapsed'));
 assert.strictEqual(groupA.title.getAttribute('aria-expanded'), 'false');
 assert.ok(!groupB.group.classList.contains('collapsed'));
 assert.strictEqual(groupB.title.getAttribute('aria-expanded'), 'true');
+assert.strictEqual(groupA.title.getAttribute('role'), 'button');
+assert.strictEqual(groupA.title.getAttribute('tabindex'), '0');
+const keyHandler = groupA.title.handlers.keydown;
+keyHandler({ key: 'Enter', preventDefault() {} });
+assert.ok(!groupA.group.classList.contains('collapsed'));
+assert.strictEqual(groupA.title.getAttribute('aria-expanded'), 'true');
+keyHandler({ key: ' ', preventDefault() {} });
+assert.ok(groupA.group.classList.contains('collapsed'));
+assert.strictEqual(groupA.title.getAttribute('aria-expanded'), 'false');
+console.log('keyboard toggle works');
 console.log('restore state works');
 
 // Click handler toggles state and persists
