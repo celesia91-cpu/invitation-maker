@@ -37,7 +37,7 @@ export class ResponsiveManager {
 
       this.isInitialized = true;
       console.log('✅ ResponsiveManager initialized');
-      await this.forceLandscape();
+      this.updateRotateOverlay();
       
     } catch (error) {
       console.error('❌ Failed to initialize ResponsiveManager:', error);
@@ -386,28 +386,12 @@ export class ResponsiveManager {
   }
 
   /**
-   * Attempt to lock orientation to landscape on mobile/tablet
+   * Toggle rotate overlay based on current orientation
    */
-  async forceLandscape() {
-    const { isMobile, isTablet } = this.checkBreakpoints();
+  updateRotateOverlay() {
     const overlay = document.getElementById('rotateOverlay');
-
-    if (!(isMobile || isTablet)) return;
-
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
     overlay?.classList.toggle('show', !isLandscape);
-
-    if (screen.orientation?.lock) {
-      try {
-        await screen.orientation.lock('landscape');
-        overlay?.classList.remove('show');
-      } catch (err) {
-        console.warn('Orientation lock failed', err);
-        if (!isLandscape) {
-          overlay?.classList.add('show');
-        }
-      }
-    }
   }
 
   /**
@@ -439,7 +423,7 @@ export class ResponsiveManager {
    * Handle orientation changes (mobile)
    */
   handleOrientationChange(viewportStable = false) {
-    this.forceLandscape();
+    this.updateRotateOverlay();
     if ('orientation' in screen) {
       const orientation = screen.orientation?.angle;
       console.log('📱 Orientation changed:', orientation);
