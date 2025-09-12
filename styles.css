@@ -373,6 +373,12 @@ body.panel-open .sidepanel {
   color: var(--text-primary);
 }
 
+.panel-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .panel-body {
   padding: 12px;
   height: 100%;
@@ -415,6 +421,10 @@ body.panel-open .sidepanel {
   position: relative;
 }
 
+.group.collapsed > :not(.group-title) {
+  display: none;
+}
+
 .group:hover {
   border-color: rgba(37, 99, 235, 0.3);
   background: rgba(15, 26, 45, 0.8);
@@ -430,6 +440,14 @@ body.panel-open .sidepanel {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.group-title .chevron {
+  transition: transform var(--transition-fast);
+}
+
+.group.collapsed .group-title .chevron {
+  transform: rotate(-90deg);
 }
 
 .group-title::before {

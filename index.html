@@ -83,10 +83,16 @@
 
   <!-- Side Panel -->
   <aside class="sidepanel" id="sidepanel" aria-label="Design panel">
+    <div class="panel-header">
+      <div class="panel-controls">
+        <button id="collapseAllBtn" class="btn" type="button">Collapse All</button>
+        <button id="expandAllBtn" class="btn" type="button">Expand All</button>
+      </div>
+    </div>
     <div class="panel-body">
       <!-- Slides -->
-      <section class="group" aria-label="Slides">
-        <div class="group-title">Slides</div>
+      <section class="group" data-group="slides" aria-label="Slides">
+        <div class="group-title"><span class="chevron" aria-hidden="true">▾</span> Slides</div>
         <div class="row">
           <label>All slides</label>
           <div id="slidesStrip" class="slides-strip" role="tablist" aria-label="Slides"></div>
@@ -106,8 +112,8 @@
       </section>
 
       <!-- Text -->
-      <section class="group" aria-label="Text">
-        <div class="group-title">Text</div>
+      <section class="group" data-group="text" aria-label="Text">
+        <div class="group-title"><span class="chevron" aria-hidden="true">▾</span> Text</div>
         <div class="row">
           <label for="addText">Add Text</label>
           <div style="display:flex;gap:8px;width:100%;min-width:0">
@@ -164,8 +170,8 @@
       </section>
 
       <!-- Style -->
-      <section class="group" aria-label="Style">
-        <div class="group-title">Style</div>
+      <section class="group" data-group="style" aria-label="Style">
+        <div class="group-title"><span class="chevron" aria-hidden="true">▾</span> Style</div>
         <div class="row">
           <label for="fontSize">Font size</label>
           <input id="fontSize" type="range" min="10" max="96" value="28">
@@ -202,8 +208,8 @@
       </section>
 
       <!-- Image -->
-      <section class="group" aria-label="Image">
-        <div class="group-title">Image</div>
+      <section class="group" data-group="image" aria-label="Image">
+        <div class="group-title"><span class="chevron" aria-hidden="true">▾</span> Image</div>
         <div class="row">
           <label for="imgScale">Scale <small id="imgScaleVal" aria-live="polite">100%</small></label>
           <input id="imgScale" type="range" min="10" max="300" value="100">
@@ -255,8 +261,8 @@
       </section>
 
       <!-- Presets -->
-      <section class="group" aria-label="Presets">
-        <div class="group-title">Presets</div>
+      <section class="group" data-group="presets" aria-label="Presets">
+        <div class="group-title"><span class="chevron" aria-hidden="true">▾</span> Presets</div>
         <div class="row">
           <label>Choose</label>
           <div class="preset-grid" id="presetGrid" role="group" aria-label="Image filter presets">
@@ -271,8 +277,8 @@
       </section>
 
       <!-- Event -->
-      <section class="group" aria-label="Event" id="mapGroup">
-        <div class="group-title">Event</div>
+      <section class="group" data-group="event" aria-label="Event" id="mapGroup">
+        <div class="group-title"><span class="chevron" aria-hidden="true">▾</span> Event</div>
         <div class="row">
           <label for="mapInput">Venue / Map</label>
           <div style="display:flex; gap:8px; width:100%; min-width:0; flex-wrap:wrap;">

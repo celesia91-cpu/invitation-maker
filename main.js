@@ -772,15 +772,24 @@ window.invitationApp = invitationApp;
 window.collapseAllGroups = collapseAllGroups;
 window.expandAllGroups = expandAllGroups;
 
+function setupPanelControls() {
+  const collapseBtn = document.getElementById('collapseAllBtn');
+  const expandBtn = document.getElementById('expandAllBtn');
+  if (collapseBtn) collapseBtn.addEventListener('click', collapseAllGroups);
+  if (expandBtn) expandBtn.addEventListener('click', expandAllGroups);
+}
+
 // Start initialization when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     invitationApp.initialize();
     initializeCollapsibleGroups();
+    setupPanelControls();
   });
 } else {
   invitationApp.initialize();
   initializeCollapsibleGroups();
+  setupPanelControls();
 }
 
 export { invitationApp };
