@@ -47,17 +47,25 @@ global.window = {
   removeEventListener() {},
   innerWidth: 100,
   innerHeight: 100,
+  matchMedia(query) {
+    return {
+      matches: query.includes('landscape'),
+      addEventListener() {},
+      removeEventListener() {}
+    };
+  },
   visualViewport: {
     width: 100,
     height: 100,
     offsetLeft: 0,
-    offsetTop: 0
+    offsetTop: 0,
+    addEventListener() {},
+    removeEventListener() {}
   },
   location: { hostname: 'localhost' }
 };
 
 global.CSS = { supports() { return false; } };
-global.screen = { orientation: { angle: 0, addEventListener() {}, lock: async () => {} } };
 
 global.requestAnimationFrame = (cb) => cb();
 
