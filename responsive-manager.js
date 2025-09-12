@@ -19,6 +19,7 @@ export class ResponsiveManager {
     this.handleWindowResize = this.handleWindowResize.bind(this);
     this.applySafeAreaInsets = this.applySafeAreaInsets.bind(this);
     this.fullscreenHandler = this.fullscreenHandler.bind(this);
+    this.syncImageFromSlide = this.syncImageFromSlide.bind(this);
   }
 
   /**
@@ -87,13 +88,15 @@ export class ResponsiveManager {
   /**
    * Handle fullscreen changes
    */
-  fullscreenHandler() {
+  async fullscreenHandler() {
     // Adjust work area scaling when entering or exiting fullscreen
-    this.handleWorkResize();
+    await this.handleWorkResize();
     // Viewer mode may need additional image rescaling
     if (typeof window.rescaleViewerContent === 'function') {
       window.rescaleViewerContent();
     }
+    // Reapply image position from slide percentages and sync state
+    await this.syncImageFromSlide();
   }
 
   /**
@@ -192,6 +195,9 @@ export class ResponsiveManager {
       } catch (error) {
         console.warn('Failed to update work dimensions:', error);
       }
+
+      // Ensure image positioning is recalculated after significant resizes
+      await this.syncImageFromSlide();
     }
   }
 
@@ -221,6 +227,29 @@ export class ResponsiveManager {
     this.scaleTextLayers(factor);
     await this.scaleImageElements(factor);
     await this.syncToolbarAfterScaling();
+  }
+
+  /**
+   * Reapply image position from slide's stored percentages and sync state
+   */
+  async syncImageFromSlide() {
+    try {
+      const [imageManager, stateManager] = await Promise.all([
+        import('./image-manager.js'),
+        import('./state-manager.js')
+      ]);
+      const { setImagePositionFromPercentage, syncImageCoordinates } = imageManager;
+      const { getSlides, getActiveIndex } = stateManager;
+      const slides = getSlides();
+      const slide = slides?.[getActiveIndex()];
+      const img = slide?.image;
+      if (img?.cxPercent !== undefined && img?.cyPercent !== undefined) {
+        setImagePositionFromPercentage(img, false);
+        syncImageCoordinates();
+      }
+    } catch (error) {
+      console.warn('Failed to sync image from slide:', error);
+    }
   }
 
   /**
