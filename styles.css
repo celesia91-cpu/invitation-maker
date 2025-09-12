@@ -5,6 +5,7 @@
   /* Sizing */
   --radius: 14px;
   --panel-w: 360px;
+  --panel-h: 45vh;
   --topbar-h: 40px;
   --rsvp-height: 48px;
   
@@ -1656,7 +1657,7 @@ body.preview .handle {
     top: auto;
     bottom: 0;
     width: 100%;
-    height: 45vh;
+    height: var(--panel-h);
     transform: translateY(100%);
   }
 
@@ -1682,7 +1683,7 @@ body.preview .handle {
 
   body.panel-open {
     padding-left: 0;
-    padding-bottom: 45vh;
+    padding-bottom: var(--panel-h);
   }
 
   .backdrop {
