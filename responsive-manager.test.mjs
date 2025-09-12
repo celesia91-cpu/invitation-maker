@@ -73,7 +73,7 @@ const { ResponsiveManager } = await import('./responsive-manager.js');
 const rm = new ResponsiveManager();
 rm.isInitialized = true;
 rm.setLastWorkWidth(workWidth);
-rm.forceLandscape = () => {};
+rm.updateRotateOverlay = () => {};
 rm.scheduleSave = () => {};
 rm.syncToolbarAfterScaling = () => {};
 
