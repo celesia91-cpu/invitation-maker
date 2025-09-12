@@ -23,18 +23,14 @@ npx http-server
 ```
 Then navigate to the provided local URL to explore the app.
 
-## Orientation Lock
-The app tries to lock mobile and tablet screens to landscape using the
-[`screen.orientation.lock`](https://developer.mozilla.org/en-US/docs/Web/API/ScreenOrientation/lock)
-API. Support and requirements vary across browsers:
+## Orientation Guidance
+Mobile and tablet screens are no longer forced into landscape orientation.
+Instead, when the device is held in portrait, a rotate prompt overlay guides
+users to manually rotate their device. The overlay hides automatically once
+the device is in landscape.
 
-- **Chrome for Android** – requires a user interaction and the page to be in
-  full-screen mode before locking the orientation.
-- **Safari on iOS** – does not support programmatic orientation locking.
-
-If locking fails or isn’t supported, a rotate prompt overlay guides users to
-manually rotate their device. The overlay hides automatically once the device
-is in landscape.
+By removing forced orientation locking, the app improves compatibility and
+accessibility across browsers and devices.
 
 ## Contribution Guidelines
 - Fork the repository and create pull requests for enhancements.
