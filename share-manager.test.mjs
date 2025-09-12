@@ -48,11 +48,23 @@ const elements = {
   '#fxVideo': { videoWidth: 400, videoHeight: 200 }
 };
 
+let isViewer = false;
+const fullscreenListeners = [];
 global.document = {
   querySelector(sel) { return elements[sel] || makeEl(); },
   getElementById(id) { return elements['#' + id] || makeEl(); },
-  body: { classList: { contains: () => false, add() {}, remove() {}, toggle() {} } },
-  createElement() { return makeEl(); }
+  body: {
+    classList: {
+      contains(cls) { return cls === 'viewer' ? isViewer : false; },
+      add(cls) { if (cls === 'viewer') isViewer = true; },
+      remove(cls) { if (cls === 'viewer') isViewer = false; },
+      toggle() {}
+    }
+  },
+  createElement() { return makeEl(); },
+  addEventListener(type, cb) { if (type === 'fullscreenchange') fullscreenListeners.push(cb); },
+  removeEventListener() {},
+  dispatchFullscreen() { fullscreenListeners.forEach(cb => cb()); }
 };
 
 global.window = { addEventListener() {}, removeEventListener() {}, location: { hostname: 'localhost' } };
@@ -60,6 +72,8 @@ global.fetch = async () => ({ ok: true, json: async () => ({}) });
 
 await import('./share-manager.js');
 const { setTransforms, imgState } = await import('./image-manager.js');
+const { setSlides, setActiveIndex } = await import('./state-manager.js');
+assert.ok(fullscreenListeners.length > 0);
 
 // Test default centering
 const slide1 = { image: { src: 'foo.jpg' } };
@@ -143,3 +157,27 @@ assert.strictEqual(parseFloat(layer.style.left), imgState.cx);
 assert.strictEqual(parseFloat(layer.style.top), imgState.cy);
 
 console.log('text and image layers align across viewport ratios');
+
+// Test rescaling on fullscreen change
+const fsSlide = {
+  image: {
+    src: 'foo.jpg',
+    cxPercent: 50,
+    cyPercent: 50,
+    scale: 1,
+    originalWidth: 100,
+    originalHeight: 100
+  }
+};
+workEl._rect = { width: 100, height: 100 };
+setSlides([fsSlide]);
+setActiveIndex(0);
+global.document.body.classList.add('viewer');
+await window.loadSlideImage(fsSlide);
+assert.strictEqual(imgState.scale, 1);
+workEl._rect = { width: 200, height: 100 };
+global.document.dispatchFullscreen();
+assert.strictEqual(imgState.cx, 100);
+assert.strictEqual(imgState.cy, 50);
+assert.strictEqual(imgState.scale, 2);
+console.log('rescaleViewerContent updates image on fullscreen change');
