@@ -1660,6 +1660,15 @@ body.preview .handle {
     transform: translateY(100%);
   }
 
+  .panel-body {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+
   body.panel-open .sidepanel {
     transform: translateY(0);
   }
