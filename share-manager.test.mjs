@@ -213,7 +213,7 @@ applyViewerFromUrl();
 // Allow async initialization to complete
 await new Promise(r => setTimeout(r, 0));
 
-assert.strictEqual(resizeObserverCount, 1);
+assert.strictEqual(resizeObserverCount, 2);
 assert.strictEqual(workEl.style.left, '5px');
 assert.strictEqual(workEl.style.top, '10px');
 

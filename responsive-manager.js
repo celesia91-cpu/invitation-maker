@@ -12,11 +12,13 @@ export class ResponsiveManager {
     this.lastWorkWidth = null;
     this.resizeSaveTimer = null;
     this.resizeObserver = null;
-    
+    this.viewportObserver = null;
+
     // Bind methods to preserve context
     this.handleWorkResize = this.handleWorkResize.bind(this);
     this.handleWindowResize = this.handleWindowResize.bind(this);
     this.applySafeAreaInsets = this.applySafeAreaInsets.bind(this);
+    this.fullscreenHandler = this.fullscreenHandler.bind(this);
   }
 
   /**
@@ -31,9 +33,11 @@ export class ResponsiveManager {
     try {
       this.setupResizeObserver();
       this.setupWindowResizeHandler();
+      this.setupFullscreenHandler();
       this.initializeWorkWidth();
       this.setupOrientationHandling();
       this.applySafeAreaInsets();
+      this.setupViewportObserver();
 
       this.isInitialized = true;
       console.log('✅ ResponsiveManager initialized');
@@ -71,6 +75,38 @@ export class ResponsiveManager {
    */
   setupWindowResizeHandler() {
     window.addEventListener('resize', this.handleWindowResize);
+  }
+
+  /**
+   * Setup fullscreen change handler
+   */
+  setupFullscreenHandler() {
+    document.addEventListener('fullscreenchange', this.fullscreenHandler);
+  }
+
+  /**
+   * Handle fullscreen changes
+   */
+  fullscreenHandler() {
+    // Adjust work area scaling when entering or exiting fullscreen
+    this.handleWorkResize();
+    // Viewer mode may need additional image rescaling
+    if (typeof window.rescaleViewerContent === 'function') {
+      window.rescaleViewerContent();
+    }
+  }
+
+  /**
+   * Observe viewport/root element for size changes
+   */
+  setupViewportObserver() {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    this.viewportObserver = new ResizeObserver(() => {
+      this.handleWorkResize();
+    });
+
+    this.viewportObserver.observe(document.documentElement);
   }
 
   /**
@@ -470,7 +506,16 @@ export class ResponsiveManager {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
-    
+
+    // Disconnect viewport observer
+    if (this.viewportObserver) {
+      this.viewportObserver.disconnect();
+      this.viewportObserver = null;
+    }
+
+    // Remove fullscreen handler
+    document.removeEventListener('fullscreenchange', this.fullscreenHandler);
+
     // Remove window resize handler
     window.removeEventListener('resize', this.handleWindowResize);
     
