@@ -34,6 +34,7 @@
   --transition-fast: 0.15s ease;
   --transition-base: 0.25s ease;
   --transition-slow: 0.35s ease;
+  --collapse-duration: 0.25s;
   
   /* Background gradient */
   --bg-grad: 
@@ -421,8 +422,16 @@ body.panel-open .sidepanel {
   position: relative;
 }
 
-.group.collapsed > :not(.group-title) {
-  display: none;
+.group-content {
+  max-height: 1000px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height var(--collapse-duration) ease, opacity var(--collapse-duration) ease;
+}
+
+.group.collapsed .group-content {
+  max-height: 0;
+  opacity: 0;
 }
 
 .group:hover {
@@ -443,7 +452,7 @@ body.panel-open .sidepanel {
 }
 
 .group-title .chevron {
-  transition: transform var(--transition-fast);
+  transition: transform var(--collapse-duration);
 }
 
 .group.collapsed .group-title .chevron {
@@ -454,8 +463,16 @@ body.panel-open .sidepanel {
   content: '';
   width: 3px;
   height: 12px;
-  background: var(--accent);
+  background: var(--group-accent, var(--accent));
   border-radius: 2px;
+}
+
+.group[data-group="slides"] {
+  --group-accent: var(--accent-2);
+}
+
+.group[data-group="text"] {
+  --group-accent: var(--success);
 }
 
 .row {
