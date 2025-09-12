@@ -1364,6 +1364,17 @@ body.viewer .wrap {
   }
 }
 
+@media (orientation: portrait) {
+  #work {
+    max-height: 60vh;
+  }
+
+  body.viewer .wrap {
+    width: 100%;
+    height: auto;
+  }
+}
+
 /* ENHANCED: Work area positioning fixes for viewer */
 body.viewer #work {
   position: absolute !important;
