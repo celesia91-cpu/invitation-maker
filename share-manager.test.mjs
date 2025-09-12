@@ -27,6 +27,7 @@ const userBgEl = {
 };
 
 const workEl = {
+  style: {},
   children: [],
   _rect: { width: 200, height: 100 },
   getBoundingClientRect() { return this._rect; },
@@ -52,6 +53,7 @@ let isViewer = false;
 const fullscreenListeners = [];
 global.document = {
   querySelector(sel) { return elements[sel] || makeEl(); },
+  querySelectorAll() { return []; },
   getElementById(id) { return elements['#' + id] || makeEl(); },
   body: {
     classList: {
@@ -181,3 +183,38 @@ assert.strictEqual(imgState.cx, 100);
 assert.strictEqual(imgState.cy, 50);
 assert.strictEqual(imgState.scale, 2);
 console.log('rescaleViewerContent updates image on fullscreen change');
+
+// --- ResponsiveManager initialization in viewer mode ---
+let resizeObserverCount = 0;
+global.ResizeObserver = class {
+  constructor(cb) {
+    resizeObserverCount++;
+    this.cb = cb;
+  }
+  observe() {}
+};
+
+global.CSS = { supports: () => false };
+
+window.visualViewport = { width: 200, height: 100, offsetLeft: 5, offsetTop: 10, addEventListener() {}, removeEventListener() {} };
+window.innerWidth = 200;
+window.innerHeight = 100;
+window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+
+global.location = { search: '?view', hash: '', origin: 'http://localhost' };
+window.location = global.location;
+
+isViewer = false;
+global.document.body.classList.remove('viewer');
+
+const { applyViewerFromUrl } = await import('./share-manager.js');
+applyViewerFromUrl();
+
+// Allow async initialization to complete
+await new Promise(r => setTimeout(r, 0));
+
+assert.strictEqual(resizeObserverCount, 1);
+assert.strictEqual(workEl.style.left, '5px');
+assert.strictEqual(workEl.style.top, '10px');
+
+console.log('applyViewerFromUrl initializes ResponsiveManager in viewer mode');

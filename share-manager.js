@@ -11,6 +11,7 @@ import {
   getActiveIndex
 } from './state-manager.js';
 import { setImagePositionFromPercentage, setTransforms, imgState, syncImageCoordinates, getFxScale } from './image-manager.js';
+import { ResponsiveManager } from './responsive-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -543,6 +544,15 @@ export function applyViewerFromUrl() {
     setIsViewer(true);
     setCurrentProjectId(null); // hard reset; prevents any backend saves with stale ids
     document.body.classList.add('viewer');
+
+    // Initialize responsive behavior in viewer mode so resize observers and
+    // safe-area handling remain active
+    try {
+      const rm = new ResponsiveManager();
+      rm.initialize();
+    } catch (err) {
+      console.error('ResponsiveManager failed to initialize in viewer mode:', err);
+    }
 
     // Disable editor-centric shortcuts in viewer
     window.addEventListener('keydown', (e) => {
