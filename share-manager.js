@@ -6,7 +6,9 @@ import {
   applyProject,
   setIsViewer,
   setCurrentProjectId,
-  historyState
+  historyState,
+  getSlides,
+  getActiveIndex
 } from './state-manager.js';
 import { setImagePositionFromPercentage, setTransforms, imgState, syncImageCoordinates, getFxScale } from './image-manager.js';
 
@@ -23,6 +25,31 @@ function getViewerOrigin() {
   } catch {
     return CANONICAL_VIEWER_ORIGIN;
   }
+}
+
+function rescaleViewerContent() {
+  try {
+    if (typeof document === 'undefined' || !document.body.classList.contains('viewer')) return;
+
+    const work = document.getElementById('work');
+    if (!work) return;
+
+    // Force layout reflow and get current viewport dimensions
+    work.getBoundingClientRect();
+
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    const slide = slides?.[activeIndex];
+    if (!slide?.image) return;
+
+    setImagePositionFromPercentage(slide.image, false, 'cover');
+    setTransforms(false);
+  } catch (err) {
+    console.error('Error rescaling viewer content:', err);
+  }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('fullscreenchange', rescaleViewerContent);
 }
 
 async function loadSlideImage(slide) {
@@ -651,4 +678,5 @@ if (typeof window !== 'undefined') {
   window.loadTextLayers = loadTextLayers;
   window.showViewerUI = showViewerUI;
   window.showFullscreenPrompt = showFullscreenPrompt;
+  window.rescaleViewerContent = rescaleViewerContent;
 }
