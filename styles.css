@@ -1667,6 +1667,13 @@ body.preview .handle {
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
+    gap: 0;
+  }
+
+  .panel-body .group {
+    flex: 0 0 85vw;
+    scroll-snap-align: start;
+    margin-right: 12px;
   }
 
   body.panel-open .sidepanel {
