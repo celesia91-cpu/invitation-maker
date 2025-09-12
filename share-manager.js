@@ -28,20 +28,59 @@ function getViewerOrigin() {
   }
 }
 
-function rescaleViewerContent() {
+let lastViewportWidth = null;
+let lastViewportHeight = null;
+let viewerResponsiveManager = null;
+
+export async function rescaleViewerContent() {
   try {
     if (typeof document === 'undefined' || !document.body.classList.contains('viewer')) return;
 
     const work = document.getElementById('work');
     if (!work) return;
 
-    // Force layout reflow and get current viewport dimensions
-    work.getBoundingClientRect();
+    const rect = work.getBoundingClientRect();
+    const viewportW = rect.width;
+    const viewportH = rect.height;
 
     const slides = getSlides();
     const activeIndex = getActiveIndex();
     const slide = slides?.[activeIndex];
-    if (!slide?.image) return;
+    if (!slide?.image) {
+      lastViewportWidth = viewportW;
+      lastViewportHeight = viewportH;
+      return;
+    }
+
+    if (lastViewportWidth == null || lastViewportHeight == null) {
+      lastViewportWidth = slide.image.originalWidth || viewportW;
+      lastViewportHeight = slide.image.originalHeight || viewportH;
+    }
+
+    const { scaleX } = calculateViewportScale(
+      viewportW,
+      viewportH,
+      lastViewportWidth,
+      lastViewportHeight
+    );
+
+    if (Math.abs(scaleX - 1) > 0.001) {
+      if (!viewerResponsiveManager) {
+        viewerResponsiveManager = new ResponsiveManager();
+        // Viewer mode doesn't need toolbar sync
+        viewerResponsiveManager.syncToolbarAfterScaling = async () => {};
+      }
+      const prevCx = imgState.cx;
+      const prevCy = imgState.cy;
+      const prevScale = imgState.scale;
+      await viewerResponsiveManager.scaleAllElements(scaleX);
+      imgState.cx = prevCx;
+      imgState.cy = prevCy;
+      imgState.scale = prevScale;
+    }
+
+    lastViewportWidth = viewportW;
+    lastViewportHeight = viewportH;
 
     setImagePositionFromPercentage(slide.image, false, 'cover');
     setTransforms(false);
@@ -49,8 +88,9 @@ function rescaleViewerContent() {
     console.error('Error rescaling viewer content:', err);
   }
 }
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
   document.addEventListener('fullscreenchange', rescaleViewerContent);
+  window.addEventListener('resize', rescaleViewerContent);
 }
 
 async function loadSlideImage(slide) {
