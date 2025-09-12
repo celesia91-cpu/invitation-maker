@@ -423,9 +423,22 @@ export class ResponsiveManager {
    * Setup orientation change handling
    */
   setupOrientationHandling() {
-    if ('orientation' in screen) {
-      screen.orientation.addEventListener('change', () => {
-        this.updateRotateOverlay();
+    const handleChange = () => {
+      this.updateRotateOverlay();
+      this.waitForViewportStability(() => {
+        this.applySafeAreaInsets();
+        this.forceResizeCheck();
+      });
+    };
+
+    const portrait = window.matchMedia('(orientation: portrait)');
+    const landscape = window.matchMedia('(orientation: landscape)');
+
+    portrait.addEventListener('change', handleChange);
+    landscape.addEventListener('change', handleChange);
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
         this.waitForViewportStability(() => {
           this.applySafeAreaInsets();
           this.forceResizeCheck();
