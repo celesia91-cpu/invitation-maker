@@ -48,6 +48,7 @@ export function initializeCollapsibleGroups() {
   const titles = document.querySelectorAll('.group-title');
   titles.forEach((title, index) => {
     title.setAttribute('tabindex', '0');
+    title.setAttribute('role', 'button');
     const group = title.closest('.group');
     if (!group) return;
     group.dataset.cgId = index;
