@@ -3,6 +3,8 @@ import { createContext, useContext, useMemo, useState } from 'react';
 import AuthModal from './components/AuthModal.jsx';
 import SlidesPanel from './components/SlidesPanel.jsx';
 import TextLayer from './components/TextLayer.jsx';
+import DragHandler from './components/DragHandler.jsx';
+import CollapsibleGroup from './components/CollapsibleGroup.jsx';
 import { AppStateProvider, useAppState } from './context/AppStateContext.jsx';
 import './App.css';
 
@@ -49,8 +51,11 @@ function Editor() {
       <div>Token Balance: {tokenBalance}</div>
       <button onClick={() => setShowAuth(true)}>Login</button>
       <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
-      <SlidesPanel slides={slides} />
+      <CollapsibleGroup title="Slides">
+        <SlidesPanel slides={slides} />
+      </CollapsibleGroup>
       <TextLayer initialText={slides[selectedSlide]?.text} />
+      <DragHandler />
     </div>
   );
 }
