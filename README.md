@@ -86,3 +86,16 @@ cookie.
   }
 }
 ```
+
+## Database Maintenance
+A foreign key now links `rsvps.customer_id` to `customers.id`. Before applying the migration, use the helper scripts to ensure data integrity:
+
+```bash
+# Report orphan RSVPs (use --purge to delete them)
+node scripts/check-orphan-rsvps.js
+
+# One-time cleanup deleting orphaned RSVPs
+node scripts/cleanup-orphan-rsvps.js
+```
+
+Apply the SQL in `migrations/202405241200_add_rsvps_customer_fk.sql` with your migration tool of choice.
