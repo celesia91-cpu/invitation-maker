@@ -3,7 +3,7 @@
 
 import http from 'node:http';
 import { authenticate } from './auth.js';
-import { getDesignsByUser } from './designs-store.js';
+import { getDesignsByUser, getDesignById } from './designs-store.js';
 import { userTokens, userPurchases } from './database.js';
 
 const port = process.env.PORT || 3000;
@@ -70,9 +70,14 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && req.url === '/auth/register') {
       const body = await readBody(req);
-      const username = body.username;
-      const role = body.role;
-      if (isPrivileged(username) || isPrivileged(role)) {
+      const username = typeof body.username === 'string' ? body.username.trim() : '';
+      const role = typeof body.role === 'string' ? body.role.trim() : '';
+      if (!username) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Username required' }));
+        return;
+      }
+      if (isPrivileged(username) || (role && isPrivileged(role))) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Forbidden username or role' }));
         return;
@@ -97,7 +102,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/purchase') {
       const authUser = authenticate(req);
       const body = await readBody(req);
-      const delta = Number(body.tokens) || 0;
+      const delta = Number(body.tokens);
+      if (!Number.isInteger(delta) || delta === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid token amount' }));
+        return;
+      }
       const current = userTokens.get(authUser.id) || 0;
       const newBalance = current + delta;
       if (newBalance < 0) {
@@ -113,6 +123,33 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ tokens: newBalance }));
+      return;
+    }
+
+    if (req.method === 'GET' && req.url.startsWith('/api/designs/')) {
+      const user = authenticate(req);
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const param = decodeURIComponent(urlObj.pathname.slice('/api/designs/'.length));
+      if (/^\d+$/.test(param)) {
+        const design = await getDesignById(user.id, param);
+        if (!design) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Design not found' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(design));
+        return;
+      }
+      if (!/^[\w-]+$/.test(param)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid category' }));
+        return;
+      }
+      const search = urlObj.searchParams.get('search') || undefined;
+      const designs = await getDesignsByUser(user.id, { category: param, search });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(designs));
       return;
     }
 
