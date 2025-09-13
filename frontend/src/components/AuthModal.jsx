@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useAppState } from '../context/AppStateContext.jsx';
+import useApiClient from '../services/useApiClient.js';
 
 export default function AuthModal({ isOpen, onClose }) {
   const { setTokenBalance } = useAppState();
+  const apiClient = useApiClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -12,11 +16,16 @@ export default function AuthModal({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Placeholder for real API call
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    setTokenBalance(100); // simulate received balance
-    setIsSubmitting(false);
-    onClose?.();
+    setError(null);
+    try {
+      const response = await apiClient.login({ email, password, remember });
+      setTokenBalance(response.balance || 0);
+      onClose?.();
+    } catch (err) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -40,6 +49,15 @@ export default function AuthModal({ isOpen, onClose }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            Remember me
+          </label>
+          {error && <div className="error">{error}</div>}
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Logging in…' : 'Login'}
           </button>
