@@ -48,7 +48,19 @@
   <div id="marketplacePage" class="page hidden">
     <h2>Marketplace</h2>
     <a href="#" id="skipToEditor" class="btn" style="margin:16px 0;display:inline-block">Skip to blank editor</a>
-    <div id="designGrid" class="marketplace-grid"></div>
+    <div class="marketplace-layout">
+      <aside class="category-sidebar">
+        <input type="text" id="designSearch" placeholder="Search designs" />
+        <ul id="categoryTabs" class="category-tabs">
+          <li data-category="" class="active">All</li>
+          <li data-category="popular">Popular</li>
+          <li data-category="recent">Recently Added</li>
+          <li data-category="Birthday">Birthday</li>
+          <li data-category="Wedding">Wedding</li>
+        </ul>
+      </aside>
+      <div id="designGrid" class="marketplace-grid"></div>
+    </div>
   </div>
   <div id="editorPage" class="page hidden">
   <header class="topbar" id="topbar">

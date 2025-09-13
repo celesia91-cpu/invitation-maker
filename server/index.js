@@ -85,7 +85,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/designs') {
       const user = authenticate(req);
-      const designs = await getDesignsByUser(user.id);
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const category = urlObj.searchParams.get('category') || undefined;
+      const search = urlObj.searchParams.get('search') || undefined;
+      const designs = await getDesignsByUser(user.id, { category, search });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(designs));
       return;

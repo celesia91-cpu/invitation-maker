@@ -801,9 +801,32 @@ const previewModal = document.getElementById('previewModal');
 const previewSlides = document.getElementById('previewSlides');
 const useDesignBtn = document.getElementById('useDesignBtn');
 const previewClose = document.getElementById('previewClose');
+const categoryTabs = document.getElementById('categoryTabs');
+const designSearch = document.getElementById('designSearch');
 let currentPage = 'login';
 let designsLoaded = false;
 let currentPreviewDesign = null;
+let selectedCategory = '';
+let searchTerm = '';
+
+if (categoryTabs) {
+  categoryTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('li[data-category]');
+    if (!tab) return;
+    selectedCategory = tab.dataset.category || '';
+    Array.from(categoryTabs.querySelectorAll('li')).forEach((el) => {
+      el.classList.toggle('active', el === tab);
+    });
+    loadMarketplaceDesigns();
+  });
+}
+
+if (designSearch) {
+  designSearch.addEventListener('input', (e) => {
+    searchTerm = e.target.value.trim();
+    loadMarketplaceDesigns();
+  });
+}
 
 function renderBreadcrumbs() {
   const crumbs = [];
@@ -836,7 +859,11 @@ function navigate(page, replace = false) {
 
 async function loadMarketplaceDesigns() {
   try {
-    const res = await fetch('/api/designs');
+    const params = new URLSearchParams();
+    if (selectedCategory) params.set('category', selectedCategory);
+    if (searchTerm) params.set('search', searchTerm);
+    const query = params.toString();
+    const res = await fetch(`/api/designs${query ? `?${query}` : ''}`);
     if (!res.ok) throw new Error('Failed to fetch designs');
     const designs = await res.json();
     renderDesignGrid(designs);
@@ -852,12 +879,17 @@ function renderDesignGrid(designs) {
   designs.forEach((design) => {
     const card = document.createElement('div');
     card.className = 'design-card';
+    const badgeLabel = selectedCategory === 'popular'
+      ? 'Popular'
+      : selectedCategory === 'recent'
+        ? 'New'
+        : design.category || 'General';
     card.innerHTML = `
       <img src="${design.thumbnailUrl}" alt="${design.title}" class="design-thumb">
       <div class="design-info">
         <div class="design-title">${design.title}</div>
         <div class="design-meta">
-          <span class="badge">${design.category || 'General'}</span>
+          <span class="badge">${badgeLabel}</span>
           <span class="price-label">${design.premium ? 'Premium' : 'Free'}</span>
         </div>
       </div>
