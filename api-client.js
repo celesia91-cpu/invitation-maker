@@ -1,5 +1,7 @@
 // api-client.js - Fixed version without localStorage (Claude-compatible)
 
+import { logError, logWarning } from './error-handler.js';
+
 class APIClient {
   constructor(baseURL, fetchImpl) {
     // Auto-detect environment if no baseURL provided
@@ -57,14 +59,14 @@ class APIClient {
   // Internal: safely parse JSON with context
   _safeParse(json, context, fallback = null) {
     if (typeof json !== 'string') {
-      console.warn(`${context}: expected string but received`, typeof json);
+      logWarning(`${context}: expected string but received ${typeof json}`);
       return fallback;
     }
     try {
       return JSON.parse(json);
     } catch (err) {
       const snippet = json.slice(0, 100);
-      console.warn(`Failed to parse ${context}: ${err.message}`, { snippet });
+      logWarning(err, `Failed to parse ${context}`, { snippet });
       return fallback;
     }
   }
@@ -74,16 +76,16 @@ class APIClient {
     try {
       const raw = sessionStorage.getItem(this._storageKey);
       if (!raw) return null;
-      if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
-        console.warn('Malformed session storage data');
+        if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
+          logWarning('Malformed session storage data');
+          return null;
+        }
+        const parsed = this._safeParse(raw, 'session storage');
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch (err) {
+        logWarning(err, 'Failed to access session storage');
         return null;
       }
-      const parsed = this._safeParse(raw, 'session storage');
-      return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch (err) {
-      console.warn('Failed to access session storage:', err);
-      return null;
-    }
   }
 
   // FIXED: Load token from sessionStorage (persists across refreshes)
@@ -95,13 +97,13 @@ class APIClient {
           this._log('Token restored from sessionStorage');
           return parsed.token;
         }
-        console.warn('Session token expired or missing lastActivity');
+        logWarning('Session token expired or missing lastActivity');
       } else if (parsed) {
-        console.warn('Session data missing token');
+        logWarning('Session data missing token');
       }
       return null;
     } catch (error) {
-      console.warn('Failed to load token from sessionStorage:', error);
+      logWarning(error, 'Failed to load token from sessionStorage');
       return null;
     }
   }
@@ -121,8 +123,8 @@ class APIClient {
     } else {
       this.clearToken();
     }
-  } catch (error) {
-    console.warn('Failed to save token to sessionStorage:', error);
+    } catch (error) {
+    logWarning(error, 'Failed to save token to sessionStorage');
     // Still set token even if storage fails
     this.token = token;
   }
@@ -134,7 +136,7 @@ class APIClient {
     sessionStorage.removeItem(this._storageKey);
     this._log('Token cleared from sessionStorage');
   } catch (error) {
-    console.warn('Failed to clear token from sessionStorage:', error);
+    logWarning(error, 'Failed to clear token from sessionStorage');
   }
   this.token = null;
   }
@@ -148,9 +150,9 @@ class APIClient {
         sessionData.lastActivity = Date.now();
         sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
       }
-    } catch (error) {
-      console.warn('Failed to save user to sessionStorage:', error);
-    }
+      } catch (error) {
+        logWarning(error, 'Failed to save user to sessionStorage');
+      }
   }
 
   // NEW: Get user data from sessionStorage
@@ -161,11 +163,11 @@ class APIClient {
         return parsed.user;
       }
       if (parsed) {
-        console.warn('Session user missing or invalid');
+        logWarning('Session user missing or invalid');
       }
       return null;
     } catch (error) {
-      console.warn('Failed to get user from sessionStorage:', error);
+      logWarning(error, 'Failed to get user from sessionStorage');
       return null;
     }
   }
@@ -175,7 +177,7 @@ class APIClient {
     try {
       const parsed = this._getSession();
       if (!parsed || typeof parsed.token !== 'string' || typeof parsed.lastActivity !== 'number') {
-        if (parsed) console.warn('Session missing required fields');
+        if (parsed) logWarning('Session missing required fields');
         return false;
       }
       const sessionAge = Date.now() - parsed.lastActivity;
@@ -192,102 +194,104 @@ class APIClient {
         parsed.lastActivity = Date.now();
         sessionStorage.setItem(this._storageKey, JSON.stringify(parsed));
       } else {
-        console.warn('No valid session to refresh');
+        logWarning('No valid session to refresh');
       }
     } catch (error) {
-      console.warn('Failed to refresh session:', error);
+      logWarning(error, 'Failed to refresh session');
     }
   }
 
-  // Enhanced request method with session refresh
+  // Enhanced request method with session refresh and retry
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    // Refresh session activity on each request
-    this.refreshSession();
-    
-    const headers = { ...(options.headers || {}) };
+    return this.retryRequest(async () => {
+      const url = `${this.baseURL}${endpoint}`;
 
-    // Apply default Content-Type only when not sending FormData and no header provided
-    const hasContentType = Object.keys(headers).some(
-      h => h.toLowerCase() === 'content-type'
-    );
-    const isFormData =
-      typeof FormData !== 'undefined' && options.body instanceof FormData;
-    if (!hasContentType && !isFormData) {
-      headers['Content-Type'] = 'application/json';
-    }
+      // Refresh session activity on each request
+      this.refreshSession();
 
-    const config = {
-      headers,
-      ...options
-    };
+      const headers = { ...(options.headers || {}) };
 
-    // Add authorization header if token exists and session is valid
-    if (
-      this.token &&
-      this.isSessionValid() &&
-      !Object.keys(headers).some(h => h.toLowerCase() === 'authorization')
-    ) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
-
-    this._log('Making request:', config.method || 'GET', url);
-
-    try {
-      const response = await this.fetch(url, config);
-      
-      // Handle different response types
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      
-      if (contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (parseError) {
-          console.warn('Failed to parse JSON response:', parseError);
-          data = { error: 'Invalid server response' };
-        }
-      } else {
-        data = await response.text();
+      // Apply default Content-Type only when not sending FormData and no header provided
+      const hasContentType = Object.keys(headers).some(
+        h => h.toLowerCase() === 'content-type'
+      );
+      const isFormData =
+        typeof FormData !== 'undefined' && options.body instanceof FormData;
+      if (!hasContentType && !isFormData) {
+        headers['Content-Type'] = 'application/json';
       }
 
-      if (!response.ok) {
-        this._log('Request failed:', response.status, data);
-        
-        // Handle authentication errors
-        if (response.status === 401 && !this.isRetrying) {
-          this.clearToken();
-          // Don't auto-retry for login/register endpoints
-          if (!endpoint.includes('/auth/')) {
-            throw new Error('Authentication required - please log in again');
+      const config = {
+        headers,
+        ...options
+      };
+
+      // Add authorization header if token exists and session is valid
+      if (
+        this.token &&
+        this.isSessionValid() &&
+        !Object.keys(headers).some(h => h.toLowerCase() === 'authorization')
+      ) {
+        headers.Authorization = `Bearer ${this.token}`;
+      }
+
+      this._log('Making request:', config.method || 'GET', url);
+
+      try {
+        const response = await this.fetch(url, config);
+
+        // Handle different response types
+        const contentType = response.headers.get('content-type') || '';
+        let data;
+
+        if (contentType.includes('application/json')) {
+          try {
+            data = await response.json();
+          } catch (parseError) {
+            logWarning(parseError, 'Failed to parse JSON response');
+            data = { error: 'Invalid server response' };
           }
+        } else {
+          data = await response.text();
         }
-        
-        // Handle specific error cases
-        if (response.status === 429) {
-          throw new Error('Too many requests - please wait a moment');
-        }
-        
-        if (response.status >= 500) {
-          throw new Error('Server error - please try again later');
-        }
-        
-        const errorMessage = typeof data === 'object' ? data.error : data;
-        throw new Error(errorMessage || `HTTP ${response.status}: ${response.statusText}`);
-      }
 
-      this._log('Request successful:', data);
-      return data;
-    } catch (error) {
-      // Network or other errors
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Network error - please check your connection');
+        if (!response.ok) {
+          this._log('Request failed:', response.status, data);
+
+          // Handle authentication errors
+          if (response.status === 401 && !this.isRetrying) {
+            this.clearToken();
+            // Don't auto-retry for login/register endpoints
+            if (!endpoint.includes('/auth/')) {
+              throw new Error('Authentication required - please log in again');
+            }
+          }
+
+          // Handle specific error cases
+          if (response.status === 429) {
+            throw new Error('Too many requests - please wait a moment');
+          }
+
+          if (response.status >= 500) {
+            throw new Error('Server error - please try again later');
+          }
+
+          const errorMessage = typeof data === 'object' ? data.error : data;
+          throw new Error(errorMessage || `HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        this._log('Request successful:', data);
+        return data;
+      } catch (error) {
+        // Network or other errors
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          throw new Error('Network error - please check your connection');
+        }
+
+        // Re-throw our custom errors
+        throw error;
       }
-      
-      // Re-throw our custom errors
-      throw error;
-    }
+    });
   }
 
   // HTTP method helpers (unchanged)
@@ -353,10 +357,10 @@ class APIClient {
     } else {
       throw new Error('No token received from server');
     }
-  } catch (error) {
-    console.error('Login failed:', error);
-    throw error;
-  }
+    } catch (error) {
+      logError(error, 'Login failed');
+      throw error;
+    }
 }
 
   async logout() {
@@ -365,10 +369,10 @@ class APIClient {
     if (this.isAuthenticated()) {
       try {
         await this.request('/auth/logout', { method: 'POST' });
-      } catch (error) {
-        console.warn('Logout endpoint failed:', error);
-        // Continue with local logout even if server call fails
-      }
+        } catch (error) {
+          logWarning(error, 'Logout endpoint failed');
+          // Continue with local logout even if server call fails
+        }
     }
   } finally {
     // Always clear local session
@@ -477,8 +481,8 @@ class APIClient {
   }
 
   // Enhanced error handling helper (unchanged)
-  handleError(error) {
-    console.error('API Error:', error);
+    handleError(error) {
+      logError(error, 'API Error');
     
     // Common error messages for user display
     const errorMessage = error.message || 'An unexpected error occurred.';

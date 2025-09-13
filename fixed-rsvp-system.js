@@ -1,6 +1,7 @@
 // Fixed RSVP System - Complete RSVP functionality with guest form
 
 import { apiClient } from './api-client.js';
+import { logError, logWarning } from './error-handler.js';
 
 // RSVP State Management
 let currentRsvpChoice = null;
@@ -14,7 +15,7 @@ export function setupRsvpHandlers() {
   const rsvpMap = document.getElementById('rsvpMap');
   
   if (!rsvpYes || !rsvpMaybe || !rsvpNo || !rsvpMap) {
-    console.warn('RSVP elements not found');
+    logWarning('RSVP elements not found');
     return;
   }
 
@@ -52,8 +53,8 @@ async function handleMapClick() {
     
     // Open map in new tab
     window.open(getMapUrl(), '_blank', 'noopener,noreferrer');
-  } catch (error) {
-    console.error('Map click failed:', error);
+    } catch (error) {
+    logError(error, 'Map click failed');
   }
 }
 
@@ -207,10 +208,10 @@ async function handleRsvpSubmit(e) {
     
     console.log('Submitting RSVP:', rsvpData);
     
-    // Submit to backend
-    try {
-      const response = await apiClient.submitRSVP(rsvpData);
-      console.log('RSVP submitted successfully:', response);
+      // Submit to backend with retry
+      try {
+        const response = await apiClient.retryRequest(() => apiClient.submitRSVP(rsvpData));
+        console.log('RSVP submitted successfully:', response);
       
       // Show success message
       showRsvpSuccess(rsvpData);
@@ -218,8 +219,8 @@ async function handleRsvpSubmit(e) {
       // Update UI to show confirmed state
       updateRsvpButtons(currentRsvpChoice);
       
-    } catch (apiError) {
-      console.warn('Backend submission failed:', apiError);
+      } catch (apiError) {
+        logWarning(apiError, 'Backend submission failed');
       
       // For demo purposes, still show success if it's a network issue
       // In production, you'd want to handle this differently
@@ -235,15 +236,15 @@ async function handleRsvpSubmit(e) {
     const modal = form.closest('.rsvp-modal');
     modal?.remove();
     
-  } catch (error) {
-    console.error('RSVP submission failed:', error);
-    console.error('RSVP submission failed: ' + (error.message || 'Unknown error'));
-    
-    submitBtn.textContent = originalText;
-    submitBtn.disabled = false;
-  } finally {
-    isSubmittingRsvp = false;
-  }
+    } catch (error) {
+      logError(error, 'RSVP submission failed');
+      alert(apiClient.handleError(error));
+
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
+    } finally {
+      isSubmittingRsvp = false;
+    }
 }
 
 // Show RSVP success message
