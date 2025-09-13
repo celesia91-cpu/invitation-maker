@@ -5,13 +5,19 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-function parseCookies(cookieHeader = '') {
-  return Object.fromEntries(
-    cookieHeader
-      .split(';')
-      .map((c) => c.trim().split('='))
-      .filter(([k]) => k)
-  );
+function constantTimeEqual(a = '', b = '') {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+function getCookie(cookieHeader = '', name) {
+  for (const part of cookieHeader.split(';')) {
+    const [k, v] = part.trim().split('=');
+    if (k && constantTimeEqual(k, name)) return v;
+  }
+  return '';
 }
 
 function verifyJwt(token) {
@@ -26,7 +32,10 @@ function verifyJwt(token) {
     throw new Error('Invalid signature');
   }
   const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
-  return JSON.parse(payloadJson);
+  const payload = JSON.parse(payloadJson);
+  if (typeof payload.exp !== 'number') throw new Error('Missing exp');
+  if (Date.now() >= payload.exp * 1000) throw new Error('Token expired');
+  return payload;
 }
 
 /**
@@ -37,12 +46,13 @@ function verifyJwt(token) {
  */
 export function authenticate(req) {
   const auth = req.headers['authorization'];
-  let token;
-  if (auth && auth.startsWith('Bearer ')) {
-    token = auth.slice(7);
+  let token = '';
+  const bearer = 'Bearer ';
+  if (auth && auth.length > bearer.length && constantTimeEqual(auth.slice(0, bearer.length), bearer)) {
+    token = auth.slice(bearer.length);
   } else {
-    const cookies = parseCookies(req.headers['cookie']);
-    if (cookies.session) token = cookies.session;
+    const session = getCookie(req.headers['cookie'], 'session');
+    if (session) token = session;
   }
   if (!token) throw new Error('Missing token');
   const payload = verifyJwt(token);
