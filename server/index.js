@@ -77,9 +77,36 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const id = String(nextUserId++);
-      users.set(id, { id, username, role });
+      users.set(id, { id, username, role, tokens: 5 });
       res.writeHead(201, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ id }));
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/user/tokens') {
+      const authUser = authenticate(req);
+      const user = users.get(authUser.id);
+      const tokens = user?.tokens ?? 0;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ tokens }));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/purchase') {
+      const authUser = authenticate(req);
+      const body = await readBody(req);
+      const delta = Number(body.tokens) || 0;
+      const user = users.get(authUser.id) || { id: authUser.id, tokens: 0 };
+      const newBalance = (user.tokens || 0) + delta;
+      if (newBalance < 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Insufficient tokens' }));
+        return;
+      }
+      user.tokens = newBalance;
+      users.set(authUser.id, user);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ tokens: user.tokens }));
       return;
     }
 

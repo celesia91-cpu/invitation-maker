@@ -358,6 +358,15 @@ class APIClient {
     return this.request(endpoint, { method: 'DELETE' });
   }
 
+  // Token management
+  async getUserTokens() {
+    return this.get('/user/tokens');
+  }
+
+  async updateTokens(amount) {
+    return this.post('/purchase', { tokens: amount });
+  }
+
   // Enhanced authentication methods with session management
   async register(userData) {
     this.isRetrying = true;

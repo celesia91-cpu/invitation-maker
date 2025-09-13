@@ -80,6 +80,7 @@
     <button id="togglePanelBtn" class="iconbtn edit-only mb-hide-when-collapsed" aria-expanded="false">Panel</button>
 
     <!-- Share stays (we hide whole topbar in viewer anyway for fullscreen) -->
+    <span id="tokenBalance" class="token-balance">Tokens: 0</span>
     <button id="shareBtn" class="iconbtn">Share</button>
   </header>
 
@@ -368,6 +369,16 @@
       <div id="previewSlides" class="preview-slides"></div>
       <div class="preview-actions">
         <button id="useDesignBtn" class="btn primary">Use This Design</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="purchaseModal" class="purchase-modal hidden" role="dialog" aria-modal="true">
+    <div class="purchase-content">
+      <p id="purchaseMessage">You need tokens to edit this design.</p>
+      <div class="purchase-actions">
+        <button id="purchaseConfirm" class="btn primary">Confirm</button>
+        <button id="purchaseCancel" class="btn">Cancel</button>
       </div>
     </div>
   </div>
