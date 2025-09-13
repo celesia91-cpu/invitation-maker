@@ -792,4 +792,63 @@ if (document.readyState === 'loading') {
   setupPanelControls();
 }
 
+const breadcrumbNav = document.getElementById('breadcrumbs');
+const marketplacePage = document.getElementById('marketplacePage');
+const editorPage = document.getElementById('editorPage');
+const authModalEl = document.getElementById('authModal');
+let currentPage = 'login';
+
+function renderBreadcrumbs() {
+  const crumbs = [];
+  if (currentPage === 'login') {
+    crumbs.push('<span>Login</span>');
+  } else if (currentPage === 'marketplace') {
+    crumbs.push('<a href="#" data-nav="login">Login</a>', '<span>Marketplace</span>');
+  } else if (currentPage === 'editor') {
+    crumbs.push('<a href="#" data-nav="login">Login</a>', '<a href="#" data-nav="marketplace">Marketplace</a>', '<span>Editor</span>');
+  }
+  if (breadcrumbNav) {
+    breadcrumbNav.innerHTML = crumbs.join(' &gt; ');
+  }
+}
+
+function showPage(page) {
+  currentPage = page;
+  if (authModalEl) authModalEl.style.display = page === 'login' ? 'flex' : 'none';
+  if (marketplacePage) marketplacePage.classList.toggle('hidden', page !== 'marketplace');
+  if (editorPage) editorPage.classList.toggle('hidden', page !== 'editor');
+  renderBreadcrumbs();
+}
+
+function navigate(page, replace = false) {
+  showPage(page);
+  const method = replace ? 'replaceState' : 'pushState';
+  history[method]({ page }, '', `#${page}`);
+}
+
+window.addEventListener('popstate', (e) => {
+  const page = e.state?.page || 'login';
+  showPage(page);
+});
+
+document.getElementById('loginForm')?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  navigate('marketplace');
+});
+
+document.getElementById('skipToEditor')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  navigate('editor');
+});
+
+breadcrumbNav?.addEventListener('click', (e) => {
+  const link = e.target.closest('a[data-nav]');
+  if (link) {
+    e.preventDefault();
+    navigate(link.getAttribute('data-nav'));
+  }
+});
+
+navigate('login', true);
+
 export { invitationApp };
