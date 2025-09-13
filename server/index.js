@@ -4,7 +4,13 @@
 import http from 'node:http';
 import { authenticate } from './auth.js';
 import { getDesignsByUser, getDesignById } from './designs-store.js';
-import { userTokens, userPurchases } from './database.js';
+import { userTokens, userPurchases, categories, designs } from './database.js';
+import {
+  recordView,
+  recordConversion,
+  getPopularDesigns,
+  getConversionRates
+} from './analytics-store.js';
 
 const port = process.env.PORT || 3000;
 
@@ -121,8 +127,113 @@ const server = http.createServer(async (req, res) => {
         list.push({ amount: delta, purchasedAt: new Date().toISOString() });
         userPurchases.set(authUser.id, list);
       }
+      if (body.designId) {
+        recordConversion(String(body.designId));
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ tokens: newBalance }));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/analytics/view') {
+      const body = await readBody(req);
+      if (body.designId) {
+        recordView(String(body.designId));
+        const d = designs.get(String(body.designId));
+        if (d) d.views = (d.views || 0) + 1;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/analytics/convert') {
+      const body = await readBody(req);
+      if (body.designId) recordConversion(String(body.designId));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/analytics/popular') {
+      const list = getPopularDesigns();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/analytics/conversions') {
+      const list = getConversionRates();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/admin/categories') {
+      const list = Array.from(categories.values());
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/admin/categories') {
+      const body = await readBody(req);
+      const id = String(body.id || '').trim();
+      const name = String(body.name || '').trim();
+      if (!id || !name) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid category' }));
+        return;
+      }
+      categories.set(id, { id, name });
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ id, name }));
+      return;
+    }
+
+    if (req.method === 'DELETE' && req.url.startsWith('/api/admin/categories/')) {
+      const id = decodeURIComponent(req.url.split('/').pop());
+      categories.delete(id);
+      res.writeHead(204).end();
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/admin/designs') {
+      const body = await readBody(req);
+      const id = body.id ? String(body.id) : String(designs.size + 1);
+      const design = {
+        id,
+        userId: body.userId ? String(body.userId) : 'demo',
+        title: body.title || 'Untitled',
+        category: body.category || '',
+        views: 0,
+        thumbnailUrl: body.thumbnailUrl || '',
+        updatedAt: new Date().toISOString(),
+        price: Number(body.price) || 0,
+        premium: Number(body.price) > 0
+      };
+      designs.set(id, design);
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(design));
+      return;
+    }
+
+    if (req.method === 'PUT' && req.url.startsWith('/api/admin/designs/') && req.url.endsWith('/price')) {
+      const parts = req.url.split('/');
+      const id = parts[parts.length - 2];
+      const body = await readBody(req);
+      const price = Number(body.price);
+      const design = designs.get(id);
+      if (!design || Number.isNaN(price)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid design or price' }));
+        return;
+      }
+      design.price = price;
+      design.premium = price > 0;
+      design.updatedAt = new Date().toISOString();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(design));
       return;
     }
 
