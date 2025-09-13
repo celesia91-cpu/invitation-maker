@@ -569,16 +569,15 @@ export class DragHandlersManager {
    * FIXED: Enhanced pointer up handler
    */
   async handlePointerUp(e) {
-    // Clear potential drag if it never activated
-    if (this.potentialDrag) {
-      console.log('👆 Cleared potential drag - allowing click/double-click');
-      this.potentialDrag = null;
-      return; // Let the natural click events proceed
-    }
-    
-    if (!this.dragState) return;
-
     try {
+      // Clear potential drag if it never activated
+      if (this.potentialDrag) {
+        console.log('👆 Cleared potential drag - allowing click/double-click');
+        return; // Let the natural click events proceed
+      }
+
+      if (!this.dragState) return;
+
       const ctx = this.ctx || {};
       const wasMoving = this.dragState.hasMoved;
       const dragType = this.dragState.type;
@@ -586,7 +585,7 @@ export class DragHandlersManager {
 
       // Clean up UI classes
       document.body?.classList?.remove?.('dragging');
-      
+
       if (element) {
         element.classList.remove('dragging');
       }
@@ -611,28 +610,13 @@ export class DragHandlersManager {
         }, 10);
       }
 
-      // Clear drag state
-      this.dragState = null;
-
-      // FIXED: Release pointer capture properly
-      if (this.capturedPointerId !== null) {
-        const work = ctx.work;
-        if (work && work.releasePointerCapture) {
-          try {
-            work.releasePointerCapture(this.capturedPointerId);
-          } catch (error) {
-            // Ignore errors - pointer might already be released
-            console.warn('Could not release pointer capture:', error);
-          }
-        }
-        this.capturedPointerId = null;
-      }
-
       console.log(`✅ Ended ${dragType} drag operation`);
-      
+
     } catch (error) {
       console.error('Failed to handle pointer up:', error);
       this.forceEndDrag();
+    } finally {
+      this.resetDragState();
     }
   }
 
@@ -738,27 +722,36 @@ export class DragHandlersManager {
       if (this.ctx.endDragText) {
         this.ctx.endDragText();
       }
-      
-      // CRITICAL FIX: Release pointer capture before clearing the ID
-      if (this.capturedPointerId !== null) {
-        const work = this.ctx.work;
-        if (work && work.releasePointerCapture) {
-          try {
-            work.releasePointerCapture(this.capturedPointerId);
-          } catch (error) {
-            console.warn('Could not force release pointer capture:', error);
-          }
-        }
-      }
-      
-      this.dragState = null;
-      this.potentialDrag = null;
-      this.capturedPointerId = null;
-      
+
       console.log('🛑 Forced end drag - with pointer capture release');
     } catch (error) {
       console.error('Failed to force end drag:', error);
+    } finally {
+      this.resetDragState();
     }
+  }
+
+  /**
+   * Utility: Release pointer capture and reset drag state
+   */
+  resetDragState() {
+    const work = this.ctx?.work;
+    if (this.capturedPointerId !== null && work) {
+      try {
+        if (work.releasePointerCapture) {
+          work.releasePointerCapture(this.capturedPointerId);
+        }
+        if (work.hasPointerCapture && work.hasPointerCapture(this.capturedPointerId)) {
+          console.warn('Pointer capture still active after release attempt');
+        }
+      } catch (error) {
+        console.warn('Could not release pointer capture:', error);
+      }
+    }
+
+    this.capturedPointerId = null;
+    this.dragState = null;
+    this.potentialDrag = null;
   }
 
   /**
