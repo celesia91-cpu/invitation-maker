@@ -22,6 +22,8 @@
   --text-primary: #e5e7eb;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
+  --card-bg: #1e293b;
+  --card-border: #334155;
   
   /* Effects */
   --ring: 0 0 0 4px rgba(37, 99, 235, 0.25);
@@ -2284,18 +2286,24 @@ body.resizing {
 }
 
 .design-card {
-  background: #0b1630;
-  border: 1px solid #26334f;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
 }
 
-.design-card:hover {
+.design-card:hover,
+.design-card:focus {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
+}
+
+.design-card:focus {
+  box-shadow: var(--shadow-lg), var(--ring);
 }
 
 .design-thumb {
@@ -2303,6 +2311,12 @@ body.resizing {
   aspect-ratio: 16 / 9;
   object-fit: cover;
   display: block;
+  transition: transform var(--transition-base);
+}
+
+.design-card:hover .design-thumb,
+.design-card:focus .design-thumb {
+  transform: scale(1.05);
 }
 
 .design-info {
