@@ -439,11 +439,19 @@ class ApplicationStateManager {
   loadFromLocalStorage() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const project = JSON.parse(stored);
-        this.applyProject(project);
-        console.log('Project loaded from local storage');
-        return project;
+      if (stored && stored.trim().startsWith('{')) {
+        const project = this._safeParse(stored, 'local project data');
+        if (project && typeof project === 'object' && Array.isArray(project.slides)) {
+          this.applyProject(project);
+          console.log('Project loaded from local storage');
+          return project;
+        }
+        console.warn('Local project data missing required fields; using empty project');
+        const fallback = { v: 1, slides: [], activeIndex: 0 };
+        this.applyProject(fallback);
+        return fallback;
+      } else if (stored) {
+        console.warn('Unexpected local project format');
       }
     } catch (error) {
       console.error('Failed to load from local storage:', error);
@@ -581,9 +589,21 @@ class ApplicationStateManager {
   applyHistorySnapshot(snapshot) {
     try {
       this.history.isLocked = true;
-      const project = JSON.parse(snapshot);
+      if (typeof snapshot !== 'string' || !snapshot.trim().startsWith('{')) {
+        console.warn('Invalid history snapshot format');
+        const fallback = { v: 1, slides: [], activeIndex: 0 };
+        this.applyProject(fallback);
+        return;
+      }
+      const project = this._safeParse(snapshot, 'history snapshot');
+      if (!project || typeof project !== 'object' || !Array.isArray(project.slides)) {
+        console.warn('History snapshot missing required fields; using empty project');
+        const fallback = { v: 1, slides: [], activeIndex: 0 };
+        this.applyProject(fallback);
+        return;
+      }
       this.applyProject(project);
-      
+
       // Update slide display with enhanced positioning
       if (this.slides.length > 0 && this.activeIndex >= 0) {
         this.loadSlideIntoDOM(this.slides[this.activeIndex], this.activeIndex);
@@ -790,6 +810,20 @@ class ApplicationStateManager {
       this.setState({ workDimensions: newDimensions }, { skipHistory: true });
       this.recordHistoryAfterResize?.();
       console.log('📐 Work dimensions updated:', newDimensions);
+    }
+  }
+
+  _safeParse(json, context, fallback = null) {
+    if (typeof json !== 'string') {
+      console.warn(`${context}: expected string but received`, typeof json);
+      return fallback;
+    }
+    try {
+      return JSON.parse(json);
+    } catch (err) {
+      const snippet = json.slice(0, 100);
+      console.warn(`Failed to parse ${context}: ${err.message}`, { snippet });
+      return fallback;
     }
   }
 

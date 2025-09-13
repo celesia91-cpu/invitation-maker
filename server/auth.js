@@ -32,7 +32,17 @@ function verifyJwt(token) {
     throw new Error('Invalid signature');
   }
   const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
-  const payload = JSON.parse(payloadJson);
+  let payload;
+  try {
+    payload = JSON.parse(payloadJson);
+  } catch (err) {
+    console.warn('Failed to parse JWT payload:', err.message, payloadJson.slice(0, 100));
+    throw new Error('Invalid token payload');
+  }
+  if (typeof payload !== 'object' || payload === null) {
+    console.warn('JWT payload is not an object');
+    throw new Error('Invalid token payload');
+  }
   if (typeof payload.exp !== 'number') throw new Error('Missing exp');
   if (Date.now() >= payload.exp * 1000) throw new Error('Token expired');
   return payload;
@@ -60,3 +70,4 @@ export function authenticate(req) {
   if (!userId) throw new Error('Invalid token payload');
   return { id: String(userId) };
 }
+

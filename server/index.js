@@ -43,9 +43,20 @@ function readBody(req) {
       data += chunk;
     });
     req.on('end', () => {
+      if (!data) return resolve({});
+      if (typeof data !== 'string' || !data.trim().startsWith('{')) {
+        console.warn('Received non-JSON body:', data.slice(0, 100));
+        return resolve({});
+      }
       try {
-        resolve(data ? JSON.parse(data) : {});
+        const parsed = JSON.parse(data);
+        if (typeof parsed !== 'object' || parsed === null) {
+          console.warn('Parsed body is not an object');
+          return resolve({});
+        }
+        resolve(parsed);
       } catch (err) {
+        console.warn('JSON parse error for request body:', err.message, data.slice(0, 100));
         reject(err);
       }
     });
