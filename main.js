@@ -802,6 +802,7 @@ const previewModal = document.getElementById('previewModal');
 const previewSlides = document.getElementById('previewSlides');
 const useDesignBtn = document.getElementById('useDesignBtn');
 const previewClose = document.getElementById('previewClose');
+const favoriteDesignBtn = document.getElementById('favoriteDesignBtn');
 const tokenBalanceEl = document.getElementById('tokenBalance');
 const purchaseModal = document.getElementById('purchaseModal');
 const purchaseMessage = document.getElementById('purchaseMessage');
@@ -815,6 +816,64 @@ let currentPreviewDesign = null;
 let selectedCategory = '';
 let searchTerm = '';
 let tokenBalance = 0;
+
+function readList(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveList(key, list) {
+  localStorage.setItem(key, JSON.stringify(list));
+}
+
+function getFavorites() {
+  return readList('favorites');
+}
+
+function saveFavorites(list) {
+  saveList('favorites', list);
+}
+
+function isFavorite(design) {
+  return getFavorites().some((d) => d.id === design.id);
+}
+
+function toggleFavorite(design) {
+  const favs = getFavorites();
+  const idx = favs.findIndex((d) => d.id === design.id);
+  if (idx >= 0) {
+    favs.splice(idx, 1);
+  } else {
+    favs.push(design);
+  }
+  saveFavorites(favs);
+  if (favoriteDesignBtn) {
+    favoriteDesignBtn.textContent = isFavorite(design) ? 'Unfavorite' : 'Favorite';
+  }
+  if (selectedCategory === 'favorites') {
+    renderDesignGrid(favs);
+  }
+}
+
+function getRecent() {
+  return readList('recent');
+}
+
+function saveRecent(list) {
+  saveList('recent', list);
+}
+
+function addRecent(design) {
+  const recents = getRecent();
+  const idx = recents.findIndex((d) => d.id === design.id);
+  if (idx >= 0) recents.splice(idx, 1);
+  recents.unshift(design);
+  if (recents.length > 10) recents.pop();
+  saveRecent(recents);
+}
 
 if (categoryTabs) {
   categoryTabs.addEventListener('click', (e) => {
@@ -921,6 +980,18 @@ function navigate(page, replace = false) {
 
 async function loadMarketplaceDesigns() {
   try {
+    if (selectedCategory === 'favorites') {
+      const designs = getFavorites();
+      renderDesignGrid(designs);
+      designsLoaded = true;
+      return;
+    }
+    if (selectedCategory === 'recently-viewed') {
+      const designs = getRecent();
+      renderDesignGrid(designs);
+      designsLoaded = true;
+      return;
+    }
     const params = new URLSearchParams();
     if (selectedCategory) params.set('category', selectedCategory);
     if (searchTerm) params.set('search', searchTerm);
@@ -949,7 +1020,9 @@ function renderDesignGrid(designs) {
       : selectedCategory === 'recent'
         ? 'New'
         : design.category || 'General';
+    const fav = isFavorite(design);
     card.innerHTML = `
+      <button class="fav-btn" aria-label="Toggle favorite">${fav ? '★' : '☆'}</button>
       <img src="${design.thumbnailUrl}" alt="${design.title}" class="design-thumb" loading="lazy">
       <div class="design-info">
         <div class="design-title">${design.title}</div>
@@ -964,6 +1037,12 @@ function renderDesignGrid(designs) {
         e.preventDefault();
         openPreview(design);
       }
+    });
+    const favBtn = card.querySelector('.fav-btn');
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(design);
+      favBtn.textContent = isFavorite(design) ? '★' : '☆';
     });
     designGrid.appendChild(card);
   });
@@ -982,6 +1061,15 @@ function openPreview(design) {
     previewSlides.appendChild(img);
   });
   previewModal.classList.remove('hidden');
+  addRecent(design);
+  fetch('/api/analytics/view', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ designId: design.id })
+  }).catch(() => {});
+  if (favoriteDesignBtn) {
+    favoriteDesignBtn.textContent = isFavorite(design) ? 'Unfavorite' : 'Favorite';
+  }
 }
 
 function closePreview() {
@@ -1019,8 +1107,19 @@ previewModal?.addEventListener('click', (e) => {
 
 useDesignBtn?.addEventListener('click', () => {
   if (currentPreviewDesign) {
+    fetch('/api/analytics/convert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ designId: currentPreviewDesign.id })
+    }).catch(() => {});
     navigate('editor');
     closePreview();
+  }
+});
+
+favoriteDesignBtn?.addEventListener('click', () => {
+  if (currentPreviewDesign) {
+    toggleFavorite(currentPreviewDesign);
   }
 });
 
