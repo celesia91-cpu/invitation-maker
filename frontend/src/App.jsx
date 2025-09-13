@@ -1,5 +1,9 @@
 import { BrowserRouter, Routes, Route, useLocation, useParams } from 'react-router-dom';
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
+import AuthModal from './components/AuthModal.jsx';
+import SlidesPanel from './components/SlidesPanel.jsx';
+import TextLayer from './components/TextLayer.jsx';
+import { AppStateProvider, useAppState } from './context/AppStateContext.jsx';
 import './App.css';
 
 // Context to expose query-string parameters across the app
@@ -27,14 +31,26 @@ function Marketplace() {
 function Editor() {
   const { token: tokenParam } = useParams();
   const query = useQueryParams();
-  // Token can come from either the route param or query string
   const token = tokenParam || query.get('token');
   const view = query.get('view');
+  const { selectedSlide, tokenBalance } = useAppState();
+  const [showAuth, setShowAuth] = useState(false);
+
+  const slides = [
+    { id: 1, text: 'First Slide' },
+    { id: 2, text: 'Second Slide' },
+  ];
+
   return (
     <div>
       Editor
       {token && <span> Token: {token}</span>}
       {view && <span> View: {view}</span>}
+      <div>Token Balance: {tokenBalance}</div>
+      <button onClick={() => setShowAuth(true)}>Login</button>
+      <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
+      <SlidesPanel slides={slides} />
+      <TextLayer initialText={slides[selectedSlide]?.text} />
     </div>
   );
 }
@@ -42,12 +58,14 @@ function Editor() {
 export default function App() {
   return (
     <BrowserRouter>
-      <QueryParamsProvider>
-        <Routes>
-          <Route path="/" element={<Marketplace />} />
-          <Route path="/editor/:token?" element={<Editor />} />
-        </Routes>
-      </QueryParamsProvider>
+      <AppStateProvider>
+        <QueryParamsProvider>
+          <Routes>
+            <Route path="/" element={<Marketplace />} />
+            <Route path="/editor/:token?" element={<Editor />} />
+          </Routes>
+        </QueryParamsProvider>
+      </AppStateProvider>
     </BrowserRouter>
   );
 }
