@@ -38,16 +38,19 @@ export class PurchasedDesignManager {
       const data = await this.loadCustomerDesign();
       this.customer = data.customer;
       this.customization = data.customization;
-      
+
+      // Verify access based on ownership or token requirements
+      this.verifyAccess();
+
       // Update UI for purchased design mode
       this.updateUIForPurchasedDesign();
-      
+
       // Load the purchased design content
       await this.loadPurchasedDesignContent();
-      
+
       // Setup auto-save system
       this.setupAutoSave();
-      
+
       // Show access status warning if needed
       this.showAccessStatusIfNeeded();
 
@@ -76,6 +79,74 @@ export class PurchasedDesignManager {
     }
     
     return data;
+  }
+
+  /**
+   * Determine whether the design can be edited based on ownership or token status.
+   * Sets up UI actions for owned designs or blocks editing when locked.
+   */
+  verifyAccess() {
+    if (!this.customer) return;
+    const locked = this.customer.locked ||
+      (typeof this.customer.tokensRequired === 'number' &&
+        (this.customer.tokens || 0) < this.customer.tokensRequired);
+    if (locked) {
+      this.blockEditing();
+      return;
+    }
+    if (this.customer.owned) {
+      this.addOwnershipActions();
+    }
+    this.checkUsageLimits();
+  }
+
+  /**
+   * Prevent editing the design.
+   */
+  blockEditing() {
+    this.editingLocked = true;
+  }
+
+  /**
+   * Add Download and Edit actions for owned designs.
+   */
+  addOwnershipActions() {
+    if (typeof document === 'undefined') return;
+    const container = document.createElement('div');
+    container.id = 'ownershipActions';
+    const download = document.createElement('button');
+    download.textContent = 'Download';
+    const edit = document.createElement('button');
+    edit.textContent = 'Edit';
+    container.appendChild(download);
+    container.appendChild(edit);
+    if (document.body && document.body.appendChild) {
+      document.body.appendChild(container);
+    }
+    this.downloadButton = download;
+    this.editButton = edit;
+  }
+
+  /**
+   * Record a usage of the design and enforce limits/expiration.
+   */
+  recordUsage() {
+    if (!this.customer) return;
+    this.customer.usageCount = (this.customer.usageCount || 0) + 1;
+    this.checkUsageLimits();
+  }
+
+  /**
+   * Check usage count and expiration to determine editing status.
+   */
+  checkUsageLimits() {
+    if (!this.customer) return;
+    const { usageLimit, usageCount = 0, expiresAt } = this.customer;
+    if ((usageLimit && usageCount >= usageLimit) || (expiresAt && Date.now() >= Date.parse(expiresAt))) {
+      this.blockEditing();
+    } else {
+      this.editingLocked = false;
+    }
   }
 
   /**

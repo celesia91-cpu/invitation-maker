@@ -4,6 +4,7 @@
 import http from 'node:http';
 import { authenticate } from './auth.js';
 import { getDesignsByUser } from './designs-store.js';
+import { userTokens, userPurchases } from './database.js';
 
 const port = process.env.PORT || 3000;
 
@@ -77,7 +78,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const id = String(nextUserId++);
-      users.set(id, { id, username, role, tokens: 5 });
+      users.set(id, { id, username, role });
+      userTokens.set(id, 5);
+      userPurchases.set(id, []);
       res.writeHead(201, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ id }));
       return;
@@ -85,8 +88,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url === '/api/user/tokens') {
       const authUser = authenticate(req);
-      const user = users.get(authUser.id);
-      const tokens = user?.tokens ?? 0;
+      const tokens = userTokens.get(authUser.id) ?? 0;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ tokens }));
       return;
@@ -96,17 +98,21 @@ const server = http.createServer(async (req, res) => {
       const authUser = authenticate(req);
       const body = await readBody(req);
       const delta = Number(body.tokens) || 0;
-      const user = users.get(authUser.id) || { id: authUser.id, tokens: 0 };
-      const newBalance = (user.tokens || 0) + delta;
+      const current = userTokens.get(authUser.id) || 0;
+      const newBalance = current + delta;
       if (newBalance < 0) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Insufficient tokens' }));
         return;
       }
-      user.tokens = newBalance;
-      users.set(authUser.id, user);
+      userTokens.set(authUser.id, newBalance);
+      if (delta > 0) {
+        const list = userPurchases.get(authUser.id) || [];
+        list.push({ amount: delta, purchasedAt: new Date().toISOString() });
+        userPurchases.set(authUser.id, list);
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ tokens: user.tokens }));
+      res.end(JSON.stringify({ tokens: newBalance }));
       return;
     }
 
