@@ -133,7 +133,21 @@ export function decodeState(encoded) {
 
     // Recover the JSON string from bytes
     const json = new TextDecoder().decode(bytes);
-    const decoded = JSON.parse(json);
+    if (typeof json !== 'string' || !json.trim().startsWith('{')) {
+      console.warn('Decoded data is not valid JSON');
+      return { v: 1, slides: [] };
+    }
+    let decoded;
+    try {
+      decoded = JSON.parse(json);
+    } catch (parseErr) {
+      console.warn('JSON parse error for decoded state:', parseErr.message, json.slice(0, 100));
+      throw new Error('Invalid or corrupted share link');
+    }
+    if (!decoded || typeof decoded !== 'object' || !Array.isArray(decoded.slides)) {
+      console.warn('Decoded project missing required fields; returning empty project');
+      return { v: decoded?.v || 1, slides: [] };
+    }
     console.log('Successfully decoded project data');
     return decoded;
   } catch (error) {

@@ -54,29 +54,60 @@ class APIClient {
     }
   }
 
-  // FIXED: Load token from sessionStorage (persists across refreshes)
-loadToken() {
-  try {
-    const sessionData = sessionStorage.getItem(this._storageKey);
-    if (sessionData) {
-      const parsed = JSON.parse(sessionData);
-      
-      // Check if session is still valid (24 hour limit)
-      if (parsed.lastActivity && (Date.now() - parsed.lastActivity) < 24 * 60 * 60 * 1000) {
-        this._log('Token restored from sessionStorage');
-        return parsed.token;
-      }
+  // Internal: safely parse JSON with context
+  _safeParse(json, context, fallback = null) {
+    if (typeof json !== 'string') {
+      console.warn(`${context}: expected string but received`, typeof json);
+      return fallback;
     }
-    
-    return null;
-  } catch (error) {
-    console.warn('Failed to load token from sessionStorage:', error);
-    return null;
+    try {
+      return JSON.parse(json);
+    } catch (err) {
+      const snippet = json.slice(0, 100);
+      console.warn(`Failed to parse ${context}: ${err.message}`, { snippet });
+      return fallback;
+    }
   }
-}
 
-// FIXED: Save token to sessionStorage (persists across refreshes) 
-saveToken(token) {
+  // Internal: get parsed session object
+  _getSession() {
+    try {
+      const raw = sessionStorage.getItem(this._storageKey);
+      if (!raw) return null;
+      if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
+        console.warn('Malformed session storage data');
+        return null;
+      }
+      const parsed = this._safeParse(raw, 'session storage');
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (err) {
+      console.warn('Failed to access session storage:', err);
+      return null;
+    }
+  }
+
+  // FIXED: Load token from sessionStorage (persists across refreshes)
+  loadToken() {
+    try {
+      const parsed = this._getSession();
+      if (parsed && typeof parsed.token === 'string') {
+        if (typeof parsed.lastActivity === 'number' && (Date.now() - parsed.lastActivity) < 24 * 60 * 60 * 1000) {
+          this._log('Token restored from sessionStorage');
+          return parsed.token;
+        }
+        console.warn('Session token expired or missing lastActivity');
+      } else if (parsed) {
+        console.warn('Session data missing token');
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to load token from sessionStorage:', error);
+      return null;
+    }
+  }
+
+  // FIXED: Save token to sessionStorage (persists across refreshes)
+  saveToken(token) {
   try {
     if (token && typeof token === 'string') {
       const sessionData = {
@@ -95,10 +126,10 @@ saveToken(token) {
     // Still set token even if storage fails
     this.token = token;
   }
-}
+  }
 
-// FIXED: Clear token from sessionStorage
-clearToken() {
+  // FIXED: Clear token from sessionStorage
+  clearToken() {
   try {
     sessionStorage.removeItem(this._storageKey);
     this._log('Token cleared from sessionStorage');
@@ -106,69 +137,67 @@ clearToken() {
     console.warn('Failed to clear token from sessionStorage:', error);
   }
   this.token = null;
-}
+  }
 
-// NEW: Save user data to sessionStorage
-saveUser(user) {
-  try {
-    if (user && typeof user === 'object') {
-      const existingData = sessionStorage.getItem(this._storageKey);
-      const sessionData = existingData ? JSON.parse(existingData) : {};
-      
-      sessionData.user = user;
-      sessionData.lastActivity = Date.now();
-      
-      sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
+  // NEW: Save user data to sessionStorage
+  saveUser(user) {
+    try {
+      if (user && typeof user === 'object') {
+        const sessionData = this._getSession() || {};
+        sessionData.user = user;
+        sessionData.lastActivity = Date.now();
+        sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
+      }
+    } catch (error) {
+      console.warn('Failed to save user to sessionStorage:', error);
     }
-  } catch (error) {
-    console.warn('Failed to save user to sessionStorage:', error);
   }
-}
 
-// NEW: Get user data from sessionStorage
-getUser() {
-  try {
-    const sessionData = sessionStorage.getItem(this._storageKey);
-    if (sessionData) {
-      const parsed = JSON.parse(sessionData);
-      return parsed.user || null;
+  // NEW: Get user data from sessionStorage
+  getUser() {
+    try {
+      const parsed = this._getSession();
+      if (parsed && typeof parsed.user === 'object') {
+        return parsed.user;
+      }
+      if (parsed) {
+        console.warn('Session user missing or invalid');
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to get user from sessionStorage:', error);
+      return null;
     }
-    return null;
-  } catch (error) {
-    console.warn('Failed to get user from sessionStorage:', error);
-    return null;
   }
-}
 
-// ENHANCED: Session management methods
-isSessionValid() {
-  try {
-    const sessionData = sessionStorage.getItem(this._storageKey);
-    if (!sessionData) return false;
-    
-    const parsed = JSON.parse(sessionData);
-    if (!parsed.token || !parsed.lastActivity) return false;
-    
-    // Session expires after 24 hours of inactivity
-    const sessionAge = Date.now() - parsed.lastActivity;
-    return sessionAge < 24 * 60 * 60 * 1000;
-  } catch (error) {
-    return false;
-  }
-}
-
-refreshSession() {
-  try {
-    const sessionData = sessionStorage.getItem(this._storageKey);
-    if (sessionData) {
-      const parsed = JSON.parse(sessionData);
-      parsed.lastActivity = Date.now();
-      sessionStorage.setItem(this._storageKey, JSON.stringify(parsed));
+  // ENHANCED: Session management methods
+  isSessionValid() {
+    try {
+      const parsed = this._getSession();
+      if (!parsed || typeof parsed.token !== 'string' || typeof parsed.lastActivity !== 'number') {
+        if (parsed) console.warn('Session missing required fields');
+        return false;
+      }
+      const sessionAge = Date.now() - parsed.lastActivity;
+      return sessionAge < 24 * 60 * 60 * 1000;
+    } catch (error) {
+      return false;
     }
-  } catch (error) {
-    console.warn('Failed to refresh session:', error);
   }
-}
+
+  refreshSession() {
+    try {
+      const parsed = this._getSession();
+      if (parsed) {
+        parsed.lastActivity = Date.now();
+        sessionStorage.setItem(this._storageKey, JSON.stringify(parsed));
+      } else {
+        console.warn('No valid session to refresh');
+      }
+    } catch (error) {
+      console.warn('Failed to refresh session:', error);
+    }
+  }
 
   // Enhanced request method with session refresh
   async request(endpoint, options = {}) {
