@@ -13,6 +13,11 @@ export class ResponsiveManager {
     this.resizeSaveTimer = null;
     this.resizeObserver = null;
     this.viewportObserver = null;
+    this.portraitMql = null;
+    this.landscapeMql = null;
+    this.orientationChangeHandler = null;
+    this.visualViewportHandler = null;
+    this.viewportStabilityRaf = null;
 
     // Bind methods to preserve context
     this.handleWorkResize = this.handleWorkResize.bind(this);
@@ -481,20 +486,21 @@ export class ResponsiveManager {
       }
 
       if (performance.now() - lastChange >= delay) {
+        this.viewportStabilityRaf = null;
         callback();
       } else {
-        requestAnimationFrame(check);
+        this.viewportStabilityRaf = requestAnimationFrame(check);
       }
     };
 
-    requestAnimationFrame(check);
+    this.viewportStabilityRaf = requestAnimationFrame(check);
   }
 
   /**
    * Setup orientation change handling
    */
   setupOrientationHandling() {
-    const handleChange = () => {
+    this.orientationChangeHandler = () => {
       this.updateRotateOverlay();
       this.waitForViewportStability(() => {
         this.applySafeAreaInsets();
@@ -502,19 +508,20 @@ export class ResponsiveManager {
       });
     };
 
-    const portrait = window.matchMedia('(orientation: portrait)');
-    const landscape = window.matchMedia('(orientation: landscape)');
+    this.portraitMql = window.matchMedia('(orientation: portrait)');
+    this.landscapeMql = window.matchMedia('(orientation: landscape)');
 
-    portrait.addEventListener('change', handleChange);
-    landscape.addEventListener('change', handleChange);
+    this.portraitMql.addEventListener('change', this.orientationChangeHandler);
+    this.landscapeMql.addEventListener('change', this.orientationChangeHandler);
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => {
+      this.visualViewportHandler = () => {
         this.waitForViewportStability(() => {
           this.applySafeAreaInsets();
           this.forceResizeCheck();
         });
-      });
+      };
+      window.visualViewport.addEventListener('resize', this.visualViewportHandler);
     }
   }
 
@@ -540,6 +547,27 @@ export class ResponsiveManager {
     if (this.viewportObserver) {
       this.viewportObserver.disconnect();
       this.viewportObserver = null;
+    }
+
+    // Remove orientation listeners
+    if (this.portraitMql && this.orientationChangeHandler) {
+      this.portraitMql.removeEventListener('change', this.orientationChangeHandler);
+      this.portraitMql = null;
+    }
+    if (this.landscapeMql && this.orientationChangeHandler) {
+      this.landscapeMql.removeEventListener('change', this.orientationChangeHandler);
+      this.landscapeMql = null;
+    }
+    if (this.visualViewportHandler && window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this.visualViewportHandler);
+      this.visualViewportHandler = null;
+    }
+    this.orientationChangeHandler = null;
+
+    // Cancel pending animation frame
+    if (typeof cancelAnimationFrame === 'function' && this.viewportStabilityRaf !== null) {
+      cancelAnimationFrame(this.viewportStabilityRaf);
+      this.viewportStabilityRaf = null;
     }
 
     // Remove fullscreen handler

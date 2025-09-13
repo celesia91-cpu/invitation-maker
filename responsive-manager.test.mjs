@@ -55,8 +55,9 @@ global.window = {
   matchMedia(query) {
     return {
       matches: query.includes('landscape'),
-      addEventListener() {},
-      removeEventListener() {}
+      listeners: [],
+      addEventListener(type, cb) { this.listeners.push(cb); },
+      removeEventListener(type, cb) { this.listeners = this.listeners.filter(l => l !== cb); }
     };
   },
   visualViewport: {
@@ -64,15 +65,18 @@ global.window = {
     height: 100,
     offsetLeft: 0,
     offsetTop: 0,
-    addEventListener() {},
-    removeEventListener() {}
+    listeners: [],
+    addEventListener(type, cb) { this.listeners.push(cb); },
+    removeEventListener(type, cb) { this.listeners = this.listeners.filter(l => l !== cb); }
   },
   location: { hostname: 'localhost' }
 };
 
 global.CSS = { supports() { return false; } };
 
-global.requestAnimationFrame = (cb) => cb();
+let rafId = 0;
+global.requestAnimationFrame = (cb) => { rafId++; cb(); return rafId; };
+global.cancelAnimationFrame = () => {};
 
 global.performance = { now: () => Date.now() };
 
@@ -178,3 +182,34 @@ await new Promise(r => setTimeout(r, 0));
 assert.strictEqual(fsTextEl.style.left, '20px');
 assert.strictEqual(fsTextEl.style.width, '40px');
 console.log('fullscreenchange triggers handleWorkResize');
+
+rmFullscreen.cleanup();
+
+// --- cleanup removes orientation listeners and resets state ---
+const rmCleanup = new ResponsiveManager();
+rmCleanup.updateRotateOverlay = () => {};
+rmCleanup.scheduleSave = () => {};
+await rmCleanup.initialize();
+
+const portraitMql = rmCleanup.portraitMql;
+const landscapeMql = rmCleanup.landscapeMql;
+
+assert.strictEqual(portraitMql.listeners.length, 1);
+assert.strictEqual(landscapeMql.listeners.length, 1);
+assert.strictEqual(window.visualViewport.listeners.length, 1);
+
+rmCleanup.cleanup();
+
+assert.strictEqual(portraitMql.listeners.length, 0);
+assert.strictEqual(landscapeMql.listeners.length, 0);
+assert.strictEqual(window.visualViewport.listeners.length, 0);
+assert.strictEqual(rmCleanup.portraitMql, null);
+assert.strictEqual(rmCleanup.landscapeMql, null);
+assert.strictEqual(rmCleanup.visualViewportHandler, null);
+assert.strictEqual(rmCleanup.viewportStabilityRaf, null);
+assert.strictEqual(rmCleanup.resizeObserver, null);
+assert.strictEqual(rmCleanup.viewportObserver, null);
+assert.strictEqual(rmCleanup.resizeSaveTimer, null);
+assert.strictEqual(rmCleanup.lastWorkWidth, null);
+
+console.log('cleanup removes orientation listeners and resets state');
