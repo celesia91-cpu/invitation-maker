@@ -1085,6 +1085,21 @@ input[type="color"]:hover {
   display: block;
 }
 
+/* Base user background wrapper */
+#userBgWrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+  width: 0;
+  height: 0;
+}
+
+#userBg {
+  width: 100%;
+  height: 100%;
+}
+
 /* ===== ENHANCED TRANSFORM BOX STYLES ===== */
 #bgBox {
   position: absolute;
