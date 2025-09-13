@@ -796,7 +796,14 @@ const breadcrumbNav = document.getElementById('breadcrumbs');
 const marketplacePage = document.getElementById('marketplacePage');
 const editorPage = document.getElementById('editorPage');
 const authModalEl = document.getElementById('authModal');
+const designGrid = document.getElementById('designGrid');
+const previewModal = document.getElementById('previewModal');
+const previewSlides = document.getElementById('previewSlides');
+const useDesignBtn = document.getElementById('useDesignBtn');
+const previewClose = document.getElementById('previewClose');
 let currentPage = 'login';
+let designsLoaded = false;
+let currentPreviewDesign = null;
 
 function renderBreadcrumbs() {
   const crumbs = [];
@@ -817,6 +824,7 @@ function showPage(page) {
   if (authModalEl) authModalEl.style.display = page === 'login' ? 'flex' : 'none';
   if (marketplacePage) marketplacePage.classList.toggle('hidden', page !== 'marketplace');
   if (editorPage) editorPage.classList.toggle('hidden', page !== 'editor');
+  if (page === 'marketplace' && !designsLoaded) loadMarketplaceDesigns();
   renderBreadcrumbs();
 }
 
@@ -824,6 +832,60 @@ function navigate(page, replace = false) {
   showPage(page);
   const method = replace ? 'replaceState' : 'pushState';
   history[method]({ page }, '', `#${page}`);
+}
+
+async function loadMarketplaceDesigns() {
+  try {
+    const res = await fetch('/api/designs');
+    if (!res.ok) throw new Error('Failed to fetch designs');
+    const designs = await res.json();
+    renderDesignGrid(designs);
+    designsLoaded = true;
+  } catch (err) {
+    console.error('Error loading designs', err);
+  }
+}
+
+function renderDesignGrid(designs) {
+  if (!designGrid) return;
+  designGrid.innerHTML = '';
+  designs.forEach((design) => {
+    const card = document.createElement('div');
+    card.className = 'design-card';
+    card.innerHTML = `
+      <img src="${design.thumbnailUrl}" alt="${design.title}" class="design-thumb">
+      <div class="design-info">
+        <div class="design-title">${design.title}</div>
+        <div class="design-meta">
+          <span class="badge">${design.category || 'General'}</span>
+          <span class="price-label">${design.premium ? 'Premium' : 'Free'}</span>
+        </div>
+      </div>
+      <div class="design-actions">
+        <button class="btn preview-btn">Preview</button>
+      </div>`;
+    card.querySelector('.preview-btn')?.addEventListener('click', () => openPreview(design));
+    designGrid.appendChild(card);
+  });
+}
+
+function openPreview(design) {
+  currentPreviewDesign = design;
+  if (!previewModal || !previewSlides) return;
+  previewSlides.innerHTML = '';
+  const slides = design.slides && design.slides.length ? design.slides : [design.thumbnailUrl];
+  slides.forEach((src) => {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = design.title;
+    previewSlides.appendChild(img);
+  });
+  previewModal.classList.remove('hidden');
+}
+
+function closePreview() {
+  previewModal?.classList.add('hidden');
+  currentPreviewDesign = null;
 }
 
 window.addEventListener('popstate', (e) => {
@@ -846,6 +908,18 @@ breadcrumbNav?.addEventListener('click', (e) => {
   if (link) {
     e.preventDefault();
     navigate(link.getAttribute('data-nav'));
+  }
+});
+
+previewClose?.addEventListener('click', closePreview);
+previewModal?.addEventListener('click', (e) => {
+  if (e.target === previewModal) closePreview();
+});
+
+useDesignBtn?.addEventListener('click', () => {
+  if (currentPreviewDesign) {
+    navigate('editor');
+    closePreview();
   }
 });
 

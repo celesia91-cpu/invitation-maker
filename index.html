@@ -48,6 +48,7 @@
   <div id="marketplacePage" class="page hidden">
     <h2>Marketplace</h2>
     <a href="#" id="skipToEditor" class="btn" style="margin:16px 0;display:inline-block">Skip to blank editor</a>
+    <div id="designGrid" class="marketplace-grid"></div>
   </div>
   <div id="editorPage" class="page hidden">
   <header class="topbar" id="topbar">
@@ -347,6 +348,16 @@
       </div>
     </div>
   </main>
+  </div>
+
+  <div id="previewModal" class="preview-modal hidden" role="dialog" aria-modal="true">
+    <div class="preview-content">
+      <button id="previewClose" class="iconbtn preview-close" aria-label="Close preview">✕</button>
+      <div id="previewSlides" class="preview-slides"></div>
+      <div class="preview-actions">
+        <button id="useDesignBtn" class="btn primary">Use This Design</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/main.js"></script>
