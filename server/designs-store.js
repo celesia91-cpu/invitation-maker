@@ -2,26 +2,7 @@
 // Simple in-memory storage for user designs.
 // In a real application this would interface with a database.
 
-const designsByUser = {
-  demo: [
-    {
-      id: '1',
-      title: 'Sample Birthday Invite',
-      category: 'Birthday',
-      views: 150,
-      thumbnailUrl: '/images/birthday-thumb.png',
-      updatedAt: new Date('2024-01-01T12:00:00Z').toISOString()
-    },
-    {
-      id: '2',
-      title: 'Wedding Announcement',
-      category: 'Wedding',
-      views: 300,
-      thumbnailUrl: '/images/wedding-thumb.png',
-      updatedAt: new Date('2024-02-15T08:30:00Z').toISOString()
-    }
-  ]
-};
+import { designs } from './database.js';
 
 /**
  * Retrieve designs for the provided user id.
@@ -30,7 +11,7 @@ const designsByUser = {
  * @returns {Promise<Array<{id:string,title:string,thumbnailUrl:string,updatedAt:string,category?:string,views?:number}>>}
  */
 export async function getDesignsByUser(userId, filters = {}) {
-  let results = designsByUser[userId] ?? [];
+  let results = Array.from(designs.values()).filter((d) => d.userId === userId);
   const { category, search } = filters;
 
   if (category && category !== 'popular' && category !== 'recent') {
@@ -52,4 +33,16 @@ export async function getDesignsByUser(userId, filters = {}) {
   }
 
   return results;
+}
+
+/**
+ * Retrieve a single design by id for the provided user id.
+ * @param {string} userId
+ * @param {string} id
+ * @returns {Promise<{id:string,title:string,thumbnailUrl:string,updatedAt:string,category?:string,views?:number}|null>}
+ */
+export async function getDesignById(userId, id) {
+  const design = designs.get(String(id));
+  if (!design || design.userId !== userId) return null;
+  return design;
 }
