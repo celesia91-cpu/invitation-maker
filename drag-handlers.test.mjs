@@ -71,6 +71,78 @@ await manager2.handlePointerUp();
 assert.strictEqual(manager2.dragState, null);
 console.log('handlePointerUp clears drag state for transform handles');
 
+// handlePointerUp should always reset state even on early exit
+const managerEarly = new DragHandlersManager();
+const workEarly = {
+  captured: 99,
+  releasePointerCapture(id) {
+    this.captured = null;
+    this.releasedId = id;
+  },
+  hasPointerCapture(id) {
+    return this.captured === id;
+  }
+};
+managerEarly.ctx = { work: workEarly };
+managerEarly.potentialDrag = {};
+managerEarly.capturedPointerId = 99;
+await managerEarly.handlePointerUp({});
+assert.strictEqual(managerEarly.potentialDrag, null);
+assert.strictEqual(managerEarly.capturedPointerId, null);
+assert.strictEqual(workEarly.releasedId, 99);
+console.log('handlePointerUp cleans up potential drag and pointer capture');
+
+// handlePointerUp should cleanup after errors
+const managerError = new DragHandlersManager();
+let first = true;
+const failingHideGuides = () => {
+  if (first) {
+    first = false;
+    throw new Error('fail');
+  }
+};
+const workError = {
+  captured: 5,
+  releasePointerCapture(id) {
+    this.captured = null;
+    this.released = id;
+  },
+  hasPointerCapture(id) {
+    return this.captured === id;
+  }
+};
+managerError.ctx = { work: workError, hideGuides: failingHideGuides, endDragText: () => {} };
+managerError.dragState = { type: 'text', element: { classList: { remove() {} } }, hasMoved: false };
+managerError.capturedPointerId = 5;
+await managerError.handlePointerUp({});
+assert.strictEqual(managerError.dragState, null);
+assert.strictEqual(managerError.capturedPointerId, null);
+assert.strictEqual(workError.released, 5);
+console.log('handlePointerUp cleans up after errors');
+
+// forceEndDrag should also reset and release capture
+const managerForce = new DragHandlersManager();
+const workForce = {
+  captured: 7,
+  releasePointerCapture(id) {
+    this.captured = null;
+    this.released = id;
+  },
+  hasPointerCapture(id) {
+    return this.captured === id;
+  }
+};
+managerForce.ctx = { work: workForce, hideGuides: () => {}, endDragText: () => {} };
+managerForce.dragState = { element: { classList: { remove() {} } } };
+managerForce.potentialDrag = {};
+managerForce.capturedPointerId = 7;
+managerForce.forceEndDrag();
+assert.strictEqual(managerForce.dragState, null);
+assert.strictEqual(managerForce.potentialDrag, null);
+assert.strictEqual(managerForce.capturedPointerId, null);
+assert.strictEqual(workForce.released, 7);
+console.log('forceEndDrag releases pointer capture and resets state');
+
 // ----- Transform handle scaling tests -----
 
 // Stub out DOM for image-manager
