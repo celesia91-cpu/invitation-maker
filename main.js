@@ -941,24 +941,30 @@ function renderDesignGrid(designs) {
   designs.forEach((design) => {
     const card = document.createElement('div');
     card.className = 'design-card';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Preview design ${design.title}`);
     const badgeLabel = selectedCategory === 'popular'
       ? 'Popular'
       : selectedCategory === 'recent'
         ? 'New'
         : design.category || 'General';
     card.innerHTML = `
-      <img src="${design.thumbnailUrl}" alt="${design.title}" class="design-thumb">
+      <img src="${design.thumbnailUrl}" alt="${design.title}" class="design-thumb" loading="lazy">
       <div class="design-info">
         <div class="design-title">${design.title}</div>
         <div class="design-meta">
           <span class="badge">${badgeLabel}</span>
           <span class="price-label">${design.premium ? 'Premium' : 'Free'}</span>
         </div>
-      </div>
-      <div class="design-actions">
-        <button class="btn preview-btn">Preview</button>
       </div>`;
-    card.querySelector('.preview-btn')?.addEventListener('click', () => openPreview(design));
+    card.addEventListener('click', () => openPreview(design));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openPreview(design);
+      }
+    });
     designGrid.appendChild(card);
   });
 }
@@ -972,6 +978,7 @@ function openPreview(design) {
     const img = document.createElement('img');
     img.src = src;
     img.alt = design.title;
+    img.loading = 'lazy';
     previewSlides.appendChild(img);
   });
   previewModal.classList.remove('hidden');
