@@ -537,12 +537,12 @@ export function initializeRsvpSystem() {
   console.log('Initializing RSVP system...');
   setupRsvpHandlers();
   
-  // Ensure RSVP bar is visible in viewer mode
+  // Ensure RSVP bar has viewer styling when in viewer mode
   const body = document.body;
   if (body.classList.contains('viewer')) {
     const rsvpBar = document.getElementById('rsvpBar');
     if (rsvpBar) {
-      rsvpBar.style.display = 'flex';
+      rsvpBar.classList.add('viewer-mode');
       console.log('RSVP bar made visible in viewer mode');
     }
   }

@@ -213,26 +213,14 @@ function setupViewerRsvp() {
     return;
   }
 
-  // Remove any existing inline styles that might interfere
-  rsvpBar.removeAttribute('style');
-  
-  // Apply viewer mode styles
-  Object.assign(rsvpBar.style, {
-    display: 'flex',
-    position: 'fixed',
-    bottom: 'max(12px, env(safe-area-inset-bottom))',
-    left: 'max(12px, env(safe-area-inset-left))', 
-    right: 'max(12px, env(safe-area-inset-right))',
-    zIndex: '1200',
-    pointerEvents: 'auto',
-    visibility: 'visible',
-    opacity: '1',
-    transform: 'none' // Reset any transforms
-  });
-  
+  // Ensure basic visibility then rely on CSS for positioning
+  rsvpBar.style.display = 'flex';
+  rsvpBar.style.visibility = 'visible';
+  rsvpBar.style.opacity = '1';
+
   // Add viewer class for CSS targeting
   rsvpBar.classList.add('viewer-mode');
-  
+
   console.log('RSVP bar configured for viewer mode');
 }
 

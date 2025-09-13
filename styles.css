@@ -1330,24 +1330,24 @@ input[type="color"]:hover {
 /* ===== CRITICAL VIEWER MODE POSITIONING FIXES ===== */
 
 /* ENHANCED: Viewer mode RSVP styling with positioning fixes */
-body.viewer .rsvp,
-body.preview .rsvp,
-.rsvp.viewer-mode {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  position: fixed !important;
-  bottom: max(12px, var(--safe-bottom)) !important;
-  left: max(12px, var(--safe-left)) !important;
-  right: max(12px, var(--safe-right)) !important;
-  z-index: 1200 !important;
-  pointer-events: auto !important;
-  transform: none !important;
-  background: rgba(11, 22, 32, 0.95) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+body.viewer #rsvpBar,
+body.preview #rsvpBar,
+#rsvpBar.viewer-mode {
+  display: flex;
+  visibility: visible;
+  opacity: 1;
+  position: fixed;
+  bottom: max(12px, var(--safe-bottom));
+  left: max(12px, var(--safe-left));
+  right: max(12px, var(--safe-right));
+  z-index: 1200;
+  pointer-events: auto;
+  transform: none;
+  background: rgba(11, 22, 32, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 /* CRITICAL: Enhanced fullscreen viewer overrides with positioning fixes */
@@ -1582,7 +1582,9 @@ body.preview .handle {
     border-radius: 0;
   }
 
-  body.viewer.mobile .rsvp {
+  body.viewer #rsvpBar,
+  body.preview #rsvpBar,
+  #rsvpBar.viewer-mode {
     left: max(8px, var(--safe-left));
     right: max(8px, var(--safe-right));
     bottom: max(8px, var(--safe-bottom));
