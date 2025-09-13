@@ -1,7 +1,7 @@
 // text-manager.js - Complete implementation with editable text support
 
 import { saveProjectDebounced, recordHistory } from './state-manager.js';
-import { generateId, clamp } from './utils.js';
+import { generateId, clamp, rgbToHex } from './utils.js';
 
 // Active layer management
 let activeLayer = null;
@@ -428,9 +428,10 @@ export function applyFontSize(fontSize) {
 export function applyColor(color) {
   if (!activeLayer) return;
 
-  activeLayer.style.color = color;
+  const hex = rgbToHex(color);
+  activeLayer.style.color = hex;
   updateToolbarState();
-  console.log('Color applied:', color);
+  console.log('Color applied:', hex);
 }
 
 /**
@@ -515,7 +516,7 @@ export function syncToolbarFromActive() {
     if (fontSizeVal) fontSizeVal.textContent = fontSize + 'px';
 
     // Color
-    const color = activeLayer.style.color || '#ffffff';
+    const color = rgbToHex(activeLayer.style.color || '#ffffff');
     const colorInput = document.getElementById('fontColor');
     if (colorInput) colorInput.value = color;
 
@@ -689,7 +690,10 @@ export function handleFontSize(value) {
 }
 
 export function handleFontColor(value) {
-  applyColor(value);
+  const hex = rgbToHex(value);
+  applyColor(hex);
+  const colorInput = document.getElementById('fontColor');
+  if (colorInput) colorInput.value = hex;
   saveProjectDebounced();
 }
 

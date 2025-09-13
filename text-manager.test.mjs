@@ -230,6 +230,11 @@ assert.strictEqual(document.getElementById('fontSizeVal').textContent, '30px');
 
 handleFontColor('#ff0000');
 assert.strictEqual(layer.style.color, '#ff0000');
+assert.strictEqual(document.getElementById('fontColor').value, '#ff0000');
+
+handleFontColor('rgb(255,0,0)');
+assert.strictEqual(layer.style.color, '#ff0000');
+assert.strictEqual(document.getElementById('fontColor').value, '#ff0000');
 
 handleBold();
 assert.strictEqual(layer.style.fontWeight, 'bold');
