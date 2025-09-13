@@ -16,10 +16,11 @@ import {
 import { applyViewerFromUrl, setupShareHandler } from './share-manager.js';
 import { loadProject, initializeHistory } from './state-manager.js';
 import { updateSlidesUI, loadSlideIntoDOM } from './slide-manager.js';
-import { addTextLayer } from './text-manager.js';
+import { addTextLayer, setLocked } from './text-manager.js';
 import { preloadSlideImageAt } from './image-manager.js';
 import { workSize } from './utils.js';
 import { initializeCollapsibleGroups, collapseAllGroups, expandAllGroups } from './collapsible-groups.js';
+import apiClient from './api-client.js';
 
 /**
  * Main Application Class with Enhanced Text Editing Support
@@ -801,6 +802,11 @@ const previewModal = document.getElementById('previewModal');
 const previewSlides = document.getElementById('previewSlides');
 const useDesignBtn = document.getElementById('useDesignBtn');
 const previewClose = document.getElementById('previewClose');
+const tokenBalanceEl = document.getElementById('tokenBalance');
+const purchaseModal = document.getElementById('purchaseModal');
+const purchaseMessage = document.getElementById('purchaseMessage');
+const purchaseConfirm = document.getElementById('purchaseConfirm');
+const purchaseCancel = document.getElementById('purchaseCancel');
 const categoryTabs = document.getElementById('categoryTabs');
 const designSearch = document.getElementById('designSearch');
 let currentPage = 'login';
@@ -808,6 +814,7 @@ let designsLoaded = false;
 let currentPreviewDesign = null;
 let selectedCategory = '';
 let searchTerm = '';
+let tokenBalance = 0;
 
 if (categoryTabs) {
   categoryTabs.addEventListener('click', (e) => {
@@ -826,6 +833,58 @@ if (designSearch) {
     searchTerm = e.target.value.trim();
     loadMarketplaceDesigns();
   });
+}
+
+async function refreshTokenBalance() {
+  try {
+    const res = await apiClient.getUserTokens();
+    tokenBalance = res.tokens || 0;
+    if (tokenBalanceEl) tokenBalanceEl.textContent = `Tokens: ${tokenBalance}`;
+  } catch (err) {
+    tokenBalance = 0;
+    if (tokenBalanceEl) tokenBalanceEl.textContent = 'Tokens: 0';
+  }
+}
+
+function showPurchaseModal(mode) {
+  if (!purchaseModal) return;
+  purchaseModal.classList.remove('hidden');
+  if (mode === 'buy') {
+    purchaseMessage.textContent = 'You have no tokens. Purchase 5 tokens?';
+    purchaseConfirm.textContent = 'Purchase';
+    purchaseConfirm.onclick = async () => {
+      await apiClient.updateTokens(5);
+      await refreshTokenBalance();
+      purchaseModal.classList.add('hidden');
+      unlockDesignFlow();
+    };
+  } else {
+    purchaseMessage.textContent = 'Spend 1 token to unlock this design?';
+    purchaseConfirm.textContent = 'Unlock';
+    purchaseConfirm.onclick = async () => {
+      await apiClient.updateTokens(-1);
+      await refreshTokenBalance();
+      setLocked(false);
+      purchaseModal.classList.add('hidden');
+    };
+  }
+}
+
+if (purchaseCancel) {
+  purchaseCancel.onclick = () => {
+    purchaseModal.classList.add('hidden');
+    navigate('marketplace');
+  };
+}
+
+async function unlockDesignFlow() {
+  setLocked(true);
+  await refreshTokenBalance();
+  if (tokenBalance <= 0) {
+    showPurchaseModal('buy');
+  } else {
+    showPurchaseModal('spend');
+  }
 }
 
 function renderBreadcrumbs() {
@@ -855,6 +914,9 @@ function navigate(page, replace = false) {
   showPage(page);
   const method = replace ? 'replaceState' : 'pushState';
   history[method]({ page }, '', `#${page}`);
+  if (page === 'editor') {
+    unlockDesignFlow();
+  }
 }
 
 async function loadMarketplaceDesigns() {
@@ -955,6 +1017,7 @@ useDesignBtn?.addEventListener('click', () => {
   }
 });
 
+refreshTokenBalance();
 navigate('login', true);
 
 export { invitationApp };
