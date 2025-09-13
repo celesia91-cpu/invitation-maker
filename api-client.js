@@ -1,4 +1,4 @@
-// api-client.js - Fixed version without localStorage (Claude-compatible)
+// api-client.js - API client with configurable storage
 
 import { logError, logWarning } from './error-handler.js';
 
@@ -32,10 +32,12 @@ class APIClient {
 
     this.baseURL = baseURL;
 
-    // FIXED: session storage for tokens
     this._storageKey = 'app_auth_session';
+    this._sessionDuration = 24 * 60 * 60 * 1000; // 24h default
+    this._persistentDuration = 7 * 24 * 60 * 60 * 1000; // 7 days
+    this._storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+    this._currentDuration = this._sessionDuration;
 
-    // Initialize token after session data is ready
     this.token = this.loadToken();
     this.setupInterceptors();
     this.isRetrying = false;
@@ -72,90 +74,123 @@ class APIClient {
   }
 
   // Internal: get parsed session object
-  _getSession() {
+  _getSession(storage = this._storage) {
     try {
-      const raw = sessionStorage.getItem(this._storageKey);
+      if (!storage || typeof storage.getItem !== 'function') return null;
+      const raw = storage.getItem(this._storageKey);
       if (!raw) return null;
-        if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
-          logWarning('Malformed session storage data');
-          return null;
-        }
-        const parsed = this._safeParse(raw, 'session storage');
-        return parsed && typeof parsed === 'object' ? parsed : null;
-      } catch (err) {
-        logWarning(err, 'Failed to access session storage');
+      if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
+        logWarning('Malformed session storage data');
         return null;
       }
+      const parsed = this._safeParse(raw, 'session storage');
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (err) {
+      logWarning(err, 'Failed to access session storage');
+      return null;
+    }
   }
 
-  // FIXED: Load token from sessionStorage (persists across refreshes)
+  // Load token from storage
   loadToken() {
     try {
-      const parsed = this._getSession();
-      if (parsed && typeof parsed.token === 'string') {
-        if (typeof parsed.lastActivity === 'number' && (Date.now() - parsed.lastActivity) < 24 * 60 * 60 * 1000) {
-          this._log('Token restored from sessionStorage');
-          return parsed.token;
-        }
-        logWarning('Session token expired or missing lastActivity');
-      } else if (parsed) {
-        logWarning('Session data missing token');
+      const persistent = this._loadFromStorage(typeof localStorage !== 'undefined' ? localStorage : null, this._persistentDuration);
+      if (persistent) {
+        this._storage = localStorage;
+        this._currentDuration = this._persistentDuration;
+        this.token = persistent.token;
+        this._log('Token restored from localStorage');
+        return persistent.token;
       }
+
+      const session = this._loadFromStorage(typeof sessionStorage !== 'undefined' ? sessionStorage : null, this._sessionDuration);
+      if (session) {
+        this._storage = sessionStorage;
+        this._currentDuration = this._sessionDuration;
+        this.token = session.token;
+        this._log('Token restored from sessionStorage');
+        return session.token;
+      }
+
+      this.token = null;
+      this._storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+      this._currentDuration = this._sessionDuration;
       return null;
     } catch (error) {
-      logWarning(error, 'Failed to load token from sessionStorage');
+      logWarning(error, 'Failed to load token from storage');
       return null;
     }
   }
 
-  // FIXED: Save token to sessionStorage (persists across refreshes)
-  saveToken(token) {
-  try {
-    if (token && typeof token === 'string') {
-      const sessionData = {
-        token: token,
-        lastActivity: Date.now()
-      };
-      
-      sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
-      this.token = token;
-      this._log('Token saved to sessionStorage successfully');
+  _loadFromStorage(storage, duration) {
+    if (!storage) return null;
+    const parsed = this._getSession(storage);
+    if (parsed && typeof parsed.token === 'string' && typeof parsed.lastActivity === 'number') {
+      if ((Date.now() - parsed.lastActivity) < duration) {
+        return parsed;
+      }
+      try { storage.removeItem(this._storageKey); } catch (_) { }
+    }
+    return null;
+  }
+
+  _selectStorage(remember) {
+    if (remember && typeof localStorage !== 'undefined') {
+      this._storage = localStorage;
+      this._currentDuration = this._persistentDuration;
     } else {
-      this.clearToken();
+      this._storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+      this._currentDuration = this._sessionDuration;
     }
+  }
+
+  // Save token to active storage
+  saveToken(token) {
+    try {
+      if (token && typeof token === 'string' && this._storage) {
+        const sessionData = { token, lastActivity: Date.now() };
+        this._storage.setItem(this._storageKey, JSON.stringify(sessionData));
+        const other = this._storage === localStorage ? sessionStorage : localStorage;
+        try { other && other.removeItem(this._storageKey); } catch (_) {}
+        this.token = token;
+        this._log('Token saved to storage successfully');
+      } else {
+        this.clearToken();
+      }
     } catch (error) {
-    logWarning(error, 'Failed to save token to sessionStorage');
-    // Still set token even if storage fails
-    this.token = token;
-  }
+      logWarning(error, 'Failed to save token to storage');
+      this.token = token;
+    }
   }
 
-  // FIXED: Clear token from sessionStorage
+  // Clear token from both storages
   clearToken() {
-  try {
-    sessionStorage.removeItem(this._storageKey);
-    this._log('Token cleared from sessionStorage');
-  } catch (error) {
-    logWarning(error, 'Failed to clear token from sessionStorage');
-  }
-  this.token = null;
+    try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(this._storageKey); } catch (error) {
+      logWarning(error, 'Failed to clear token from sessionStorage');
+    }
+    try { if (typeof localStorage !== 'undefined') localStorage.removeItem(this._storageKey); } catch (error) {
+      logWarning(error, 'Failed to clear token from localStorage');
+    }
+    this.token = null;
+    this._storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+    this._currentDuration = this._sessionDuration;
   }
 
-  // NEW: Save user data to sessionStorage
+  // Save user data to active storage
   saveUser(user) {
     try {
-      if (user && typeof user === 'object') {
+      if (user && typeof user === 'object' && this._storage) {
         const sessionData = this._getSession() || {};
         sessionData.user = user;
         sessionData.lastActivity = Date.now();
-        sessionStorage.setItem(this._storageKey, JSON.stringify(sessionData));
+        this._storage.setItem(this._storageKey, JSON.stringify(sessionData));
       }
-      } catch (error) {
-        logWarning(error, 'Failed to save user to sessionStorage');
-      }
+    } catch (error) {
+      logWarning(error, 'Failed to save user to storage');
+    }
   }
 
-  // NEW: Get user data from sessionStorage
+  // Get user data from active storage
   getUser() {
     try {
       const parsed = this._getSession();
@@ -167,7 +202,7 @@ class APIClient {
       }
       return null;
     } catch (error) {
-      logWarning(error, 'Failed to get user from sessionStorage');
+      logWarning(error, 'Failed to get user from storage');
       return null;
     }
   }
@@ -181,7 +216,7 @@ class APIClient {
         return false;
       }
       const sessionAge = Date.now() - parsed.lastActivity;
-      return sessionAge < 24 * 60 * 60 * 1000;
+      return sessionAge < this._currentDuration;
     } catch (error) {
       return false;
     }
@@ -189,10 +224,13 @@ class APIClient {
 
   refreshSession() {
     try {
+      if (!this.token || !this.isSessionValid() || !this._storage) {
+        return;
+      }
       const parsed = this._getSession();
       if (parsed) {
         parsed.lastActivity = Date.now();
-        sessionStorage.setItem(this._storageKey, JSON.stringify(parsed));
+        this._storage.setItem(this._storageKey, JSON.stringify(parsed));
       } else {
         logWarning('No valid session to refresh');
       }
@@ -338,30 +376,31 @@ class APIClient {
   }
 
   async login(credentials) {
-  try {
-    const response = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials)
-    });
+    const { remember = false, ...loginData } = credentials;
+    try {
+      const response = await this.request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(loginData)
+      });
 
-    if (response.access_token || response.token) {
-      const token = response.access_token || response.token;
-      this.saveToken(token);
-      
-      // IMPORTANT: Also save user data
-      if (response.user) {
-        this.saveUser(response.user);
+      if (response.access_token || response.token) {
+        const token = response.access_token || response.token;
+        this._selectStorage(remember);
+        this.saveToken(token);
+
+        if (response.user) {
+          this.saveUser(response.user);
+        }
+
+        return response;
+      } else {
+        throw new Error('No token received from server');
       }
-      
-      return response;
-    } else {
-      throw new Error('No token received from server');
-    }
     } catch (error) {
       logError(error, 'Login failed');
       throw error;
     }
-}
+  }
 
   async logout() {
   try {

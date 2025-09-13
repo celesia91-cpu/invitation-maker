@@ -143,6 +143,7 @@ export class AuthUIManager {
     const formData = new FormData(event.target);
     const email = formData.get('loginEmail')?.trim();
     const password = formData.get('loginPassword');
+    const remember = formData.get('rememberMe') === 'on';
     
     // Validate inputs
     if (!email || !password) {
@@ -155,13 +156,13 @@ export class AuthUIManager {
       return;
     }
     
-    await this.performLogin(email, password);
+    await this.performLogin(email, password, remember);
   }
 
   /**
    * Perform login with loading state
    */
-  async performLogin(email, password) {
+  async performLogin(email, password, remember = false) {
     const submitBtn = this.formElement.querySelector('button[type="submit"]');
     if (!submitBtn) return;
     
@@ -170,7 +171,7 @@ export class AuthUIManager {
     
     try {
       // Attempt login
-      const response = await apiClient.login({ email, password });
+      const response = await apiClient.login({ email, password, remember });
       
       // Success
       this.handleLoginSuccess(response);
@@ -240,10 +241,10 @@ export class AuthUIManager {
    * Show modal if user needs to authenticate
    */
   showModalIfNeeded() {
-    if (!apiClient.isAuthenticated()) {
+    if (!apiClient.isSessionValid()) {
       setTimeout(() => {
         this.showModal();
-      }, 500); // Small delay to let app initialize first
+      }, 500);
     }
   }
 
@@ -372,17 +373,16 @@ export class AuthUIManager {
    */
   async checkSession() {
     try {
-      if (!apiClient.isAuthenticated()) {
+      if (!apiClient.isSessionValid()) {
+        this.showModal();
         return false;
       }
-      
-      // Try to get current user to validate session
+
       await apiClient.getCurrentUser();
       return true;
-      
+
     } catch (error) {
       console.warn('Session validation failed:', error);
-      // Session invalid, show modal
       this.showModal();
       return false;
     }
