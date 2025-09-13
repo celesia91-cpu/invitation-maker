@@ -1,15 +1,17 @@
-{
-  "name": "invitation-maker",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "start": "node server/index.js",
-    "test": "node drag-handlers.test.mjs && node purchased-design-manager.test.mjs && node ui-manager.test.mjs && node utils.test.mjs && node state-manager.test.mjs && node slide-manager.test.mjs && node text-manager.test.mjs && node event-handlers.test.mjs && node share-manager.test.mjs && node image-manager.test.mjs && node responsive-manager.test.mjs && node collapsible-groups.test.mjs && node api-client.test.mjs && node server/designs-store.test.mjs && node preview-modal.test.mjs && node purchase-flow.test.mjs && node server/integration.test.mjs",
-    "rsvps:check": "node scripts/check-orphan-rsvps.js",
-    "rsvps:cleanup": "node scripts/cleanup-orphan-rsvps.js",
-    "build": "npm --prefix frontend run build"
-  },
-  "dependencies": {
-    "pg": "^8.11.0"
-  }
+﻿{
+    "version":  "1.0.0",
+    "name":  "invitation-maker",
+    "scripts":  {
+                    "build":  "npm --prefix frontend run build",
+                    "deploy:staging":  "wrangler deploy",
+                    "deploy":  "wrangler deploy --env=production",
+                    "start":  "node server/index.js"
+                },
+    "type":  "module",
+    "dependencies":  {
+                         "pg":  "^8.11.0"
+                     },
+    "devDependencies":  {
+                            "wrangler":  "^4.33.1"
+                        }
 }
