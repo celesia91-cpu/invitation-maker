@@ -779,48 +779,24 @@ input[type="color"]:hover {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
-    env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  border-radius: inherit;
+  overflow: hidden;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
+}
+
+#work {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: inherit;
   overflow: hidden;
-}
-
-#userBgWrap {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform-origin: center;
-  z-index: 10;
-  pointer-events: none;
-  transition: opacity 0.28s ease;
-}
-
-#userBg {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-#fxVideo {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  z-index: 18;
-  pointer-events: none;
-  opacity: 1;
-  mix-blend-mode: normal;
-  border-radius: inherit;
-  transition: opacity var(--transition-base);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
 /* ===== ENHANCED TEXT LAYER STYLES WITH EDITING SUPPORT ===== */
@@ -1423,23 +1399,18 @@ body.viewer #work {
 
 /* ENHANCED: FX Video positioning for viewer mode */
 body.viewer #fxVideo {
-  z-index: 18;
   border-radius: inherit;
   pointer-events: none;
-  object-fit: contain;
 }
 
 /* ENHANCED: User background positioning fixes for viewer */
 body.viewer #userBgWrap {
-  z-index: 15; /* Below fx video but above background */
   pointer-events: none;
-  transform-origin: center;
 }
 
 body.viewer #userBg {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   pointer-events: none;
   border-radius: inherit;
 }
@@ -1461,7 +1432,7 @@ body.viewer .layer:hover {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  z-index: 40;
+  z-index: 40;  /* Above FX video */
   background: rgba(2, 6, 23, 0.8);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1469,7 +1440,6 @@ body.viewer .layer:hover {
   padding: 12px 20px;
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.2px;
   cursor: pointer;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1508,6 +1478,7 @@ body.preview #bgBox {
 body.preview .layer {
   outline: none !important;
   cursor: default !important;
+  pointer-events: none !important;
 }
 
 body.preview .layer:hover {
@@ -2230,19 +2201,15 @@ body.resizing {
 
 /* ===== DEBUG OVERLAY STYLES ===== */
 .debug-positioning {
-  position: fixed !important;
-  top: 10px !important;
-  right: 10px !important;
-  background: rgba(0, 0, 0, 0.9) !important;
-  color: #00ff00 !important;
-  padding: 12px !important;
-  border-radius: 8px !important;
-  font-family: 'Courier New', monospace !important;
-  font-size: 11px !important;
-  line-height: 1.4 !important;
-  z-index: 9999 !important;
-  pointer-events: none !important;
-  max-width: 300px !important;
-  border: 1px solid #333 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 9999;
+  pointer-events: none;
 }
