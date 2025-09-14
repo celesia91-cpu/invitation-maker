@@ -29,40 +29,61 @@ export default function AuthModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal">
-        <form onSubmit={handleSubmit}>
-          <h2>Login</h2>
-          <label>
-            Email
+    <div id="authModal" className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div className="auth-card">
+        <h2 id="authTitle">Welcome to Invitation Maker</h2>
+        <p>Sign in to save your projects to the cloud, or continue working offline.</p>
+
+        <form id="loginForm" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="loginEmail">Email address</label>
             <input
               type="email"
+              id="loginEmail"
+              name="loginEmail"
+              placeholder="Email address"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-          </label>
-          <label>
-            Password
+          </div>
+          <div className="form-group">
+            <label htmlFor="loginPassword">Password</label>
             <input
               type="password"
+              id="loginPassword"
+              name="loginPassword"
+              placeholder="Password"
+              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-          </label>
-          <label>
+          </div>
+          <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
             <input
               type="checkbox"
+              id="rememberMe"
+              name="rememberMe"
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
             />
-            Remember me
-          </label>
-          {error && <div className="error">{error}</div>}
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in…' : 'Login'}
+            <label htmlFor="rememberMe" style={{ margin: 0 }}>Remember me</label>
+          </div>
+
+          {error && <div className="error" role="alert">{error}</div>}
+
+          <button type="submit" className="btn primary" style={{ width: '100%', margin: '16px 0 8px' }} disabled={isSubmitting}>
+            {isSubmitting ? 'Signing in…' : 'Sign In'}
           </button>
-          <button type="button" onClick={onClose}>Close</button>
         </form>
+
+        <p style={{ marginTop: 16, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+          Don't have an account? Create one in your backend admin panel.
+        </p>
+
+        <button type="button" className="iconbtn" aria-label="Close" onClick={onClose} style={{ position: 'absolute', top: 8, right: 8 }}>
+          ×
+        </button>
       </div>
     </div>
   );

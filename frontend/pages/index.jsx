@@ -2,80 +2,105 @@ import { useState } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import AuthModal from '../components/AuthModal.jsx';
 import SidePanel from '../components/SidePanel.jsx';
+import Breadcrumbs from '../components/Breadcrumbs.jsx';
+import FullscreenOverlay from '../components/FullscreenOverlay.jsx';
+import RotateOverlay from '../components/RotateOverlay.jsx';
+import PreviewModal from '../components/PreviewModal.jsx';
+import PurchaseModal from '../components/PurchaseModal.jsx';
+import Marketplace from '../components/Marketplace.jsx';
 
-export default function Marketplace() {
+export default function MarketplacePage() {
   const [showAuth, setShowAuth] = useState(false);
+  const [view, setView] = useState('marketplace'); // 'marketplace' | 'editor'
+  const [showPreview, setShowPreview] = useState(false);
+  const [showPurchase, setShowPurchase] = useState(false);
 
   return (
     <div>
       {/* Authentication Modal */}
       <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
 
-      <Topbar />
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
 
-      {/* Example button to open Auth modal (not in original HTML) */}
-      <div style={{ padding: 8 }}>
-        <button className="btn" onClick={() => setShowAuth(true)}>Sign In</button>
-      </div>
+      {/* Marketplace page (hidden by default) */}
+      <Marketplace
+        isOpen={view === 'marketplace'}
+        onSkipToEditor={() => setView('editor')}
+      />
 
-      {/* Mobile topbar toggle (hidden in viewer) */}
-      <button id="topbarToggle" className="iconbtn" aria-expanded="true" aria-label="Collapse top bar">
-        �-�
-      </button>
+      {/* Editor page wrapper */}
+      <div id="editorPage" className={`page${view === 'editor' ? '' : ' hidden'}`}>
+        <Topbar
+          onPreviewClick={() => setShowPreview(true)}
+          onShareClick={() => setShowPurchase(true)}
+        />
 
-      {/* Fullscreen prompt overlay */}
-      <div
-        id="fsOverlay"
-        className="fs-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="fsTitle"
-        aria-hidden="true"
-      >
-        <div className="fs-card">
-          <h2 id="fsTitle">Tap to view full-screen</h2>
-          <p>For the best experience, we'll hide the browser bar.</p>
-          <button id="fsEnterBtn" className="fs-btn" type="button">Enter Full-Screen</button>
+        {/* Example button to open Auth modal (not in original HTML) */}
+        <div style={{ padding: 8 }}>
+          <button className="btn" onClick={() => setShowAuth(true)}>Sign In</button>
         </div>
-      </div>
 
-      <div className="backdrop" id="backdrop"></div>
+        {/* Mobile topbar toggle (hidden in viewer) */}
+        <button id="topbarToggle" className="iconbtn" aria-expanded="true" aria-label="Collapse top bar">
+          
+        </button>
 
-      <SidePanel />
+        {/* Fullscreen and rotate overlays */}
+        <FullscreenOverlay />
+        <RotateOverlay />
 
-      <main className="stage">
-        <div className="wrap">
-          <div id="work" aria-label="Invitation stage (16:9)">
-            <div id="vGuide" className="guide v" aria-hidden="true"></div>
-            <div id="hGuide" className="guide h" aria-hidden="true"></div>
+        {/* Optional backdrop */}
+        <div className="backdrop" id="backdrop"></div>
 
-            <div id="userBgWrap">
-              <img id="userBg" alt="" />
+        <SidePanel />
+
+        <main className="stage">
+          <div className="wrap">
+            <div id="work" aria-label="Invitation stage (16:9)">
+              <div id="vGuide" className="guide v" aria-hidden="true"></div>
+              <div id="hGuide" className="guide h" aria-hidden="true"></div>
+
+              <div id="userBgWrap">
+                <img id="userBg" alt="" />
+              </div>
+              <video id="fxVideo" autoPlay muted loop playsInline>
+                <source src="/Comp 1.webm" type="video/webm" />
+              </video>
+
+              <div id="bgBox" className="hidden" aria-label="Background image transform box">
+                <div className="handle nw" data-handle="nw"></div>
+                <div className="handle ne" data-handle="ne"></div>
+                <div className="handle se" data-handle="se"></div>
+                <div className="handle sw" data-handle="sw"></div>
+                <div className="handle rotate" data-handle="rotate" title="Rotate"></div>
+              </div>
+
+              <div id="rsvpBar" className="rsvp" role="group" aria-label="RSVP">
+                <button id="rsvpYes" className="rsvp-btn">Yes</button>
+                <button id="rsvpMaybe" className="rsvp-btn">Maybe</button>
+                <button id="rsvpNo" className="rsvp-btn">No</button>
+                <button id="rsvpMap" className="rsvp-btn primary">View Map</button>
+              </div>
+
+              <button id="uploadBgBtn">Upload Background</button>
+              <input type="file" id="bgFileInput" accept="image/*" />
             </div>
-            <video id="fxVideo" autoPlay muted loop playsInline>
-              <source src="./Comp 1.webm" type="video/webm" />
-            </video>
-
-            <div id="bgBox" className="hidden" aria-label="Background image transform box">
-              <div className="handle nw" data-handle="nw"></div>
-              <div className="handle ne" data-handle="ne"></div>
-              <div className="handle se" data-handle="se"></div>
-              <div className="handle sw" data-handle="sw"></div>
-              <div className="handle rotate" data-handle="rotate" title="Rotate"></div>
-            </div>
-
-            <div id="rsvpBar" className="rsvp" role="group" aria-label="RSVP">
-              <button id="rsvpYes" className="rsvp-btn">Yes</button>
-              <button id="rsvpMaybe" className="rsvp-btn">Maybe</button>
-              <button id="rsvpNo" className="rsvp-btn">No</button>
-              <button id="rsvpMap" className="rsvp-btn primary">View Map</button>
-            </div>
-
-            <button id="uploadBgBtn">Upload Background</button>
-            <input type="file" id="bgFileInput" accept="image/*" />
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
+
+      {/* Global modals */}
+      <PreviewModal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        onUseDesign={() => { setShowPreview(false); setShowPurchase(true); }}
+      />
+      <PurchaseModal
+        isOpen={showPurchase}
+        onConfirm={() => setShowPurchase(false)}
+        onCancel={() => setShowPurchase(false)}
+      />
     </div>
   );
 }

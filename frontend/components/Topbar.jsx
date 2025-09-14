@@ -1,4 +1,4 @@
-export default function Topbar() {
+export default function Topbar({ onPreviewClick, onShareClick }) {
   return (
     <header className="topbar" id="topbar">
       <div className="brand"> Celesia Animated Invitation</div>
@@ -25,7 +25,12 @@ export default function Topbar() {
         Play
       </button>
 
-      <button id="previewBtn" className="iconbtn edit-only mb-hide-when-collapsed" aria-pressed="false">
+      <button
+        id="previewBtn"
+        className="iconbtn edit-only mb-hide-when-collapsed"
+        aria-pressed="false"
+        onClick={onPreviewClick}
+      >
         Preview
       </button>
       <button id="togglePanelBtn" className="iconbtn edit-only mb-hide-when-collapsed" aria-expanded="false">
@@ -33,9 +38,8 @@ export default function Topbar() {
       </button>
 
       {/* Share stays (we hide whole topbar in viewer anyway for fullscreen) */}
-      <button id="shareBtn" className="iconbtn">Share</button>
-      <span id="statusText" className="pill edit-only mb-hide-when-collapsed"></span>
+      <span id="tokenBalance" className="token-balance">Tokens: 0</span>
+      <button id="shareBtn" className="iconbtn" onClick={onShareClick}>Share</button>
     </header>
   );
 }
-
