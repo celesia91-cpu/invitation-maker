@@ -9,16 +9,16 @@ import { useAppState } from '../../context/AppStateContext.jsx';
 
 export default function Editor() {
   const router = useRouter();
-  const token = Array.isArray(router.query.token) ? router.query.token[0] : router.query.token;
+  const token = router.query.token;
   const view = router.query.view;
   const { selectedSlide, tokenBalance } = useAppState();
   const [showAuth, setShowAuth] = useState(false);
-
+  
   const slides = [
     { id: 1, text: 'First Slide' },
     { id: 2, text: 'Second Slide' },
   ];
-
+  
   return (
     <div>
       Editor
