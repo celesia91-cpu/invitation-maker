@@ -1,2 +1,2 @@
-export * from './frontend/src/services/api-client.js';
-export { default } from './frontend/src/services/api-client.js';
+export * from './frontend/services/api-client.js';
+export { default } from './frontend/services/api-client.js';
