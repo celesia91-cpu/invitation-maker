@@ -5,18 +5,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  async rewrites() {
-    // Dev proxy to local API to avoid CORS in development
-    if (process.env.NODE_ENV === 'development') {
-      return [
-        {
-          source: '/api/:path*',
-          destination: 'http://localhost:3001/api/:path*',
-        },
-      ];
-    }
-    return [];
-  },
+  // Note: rewrites don't work with static export, API calls will need to be handled differently
 };
 
 module.exports = nextConfig

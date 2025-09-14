@@ -9,8 +9,9 @@ import TextControls from '../../components/TextControls.jsx';
 import PlaybackControls from '../../components/PlaybackControls.jsx';
 import { useResponsive } from '../../hooks/useResponsive.js';
 import { useAppState } from '../../context/AppStateContext.jsx';
+import { EditorProvider, useEditorState } from '../../context/EditorContext.jsx';
 
-export default function Editor() {
+function EditorContent() {
   const router = useRouter();
   const token = router.query.token;
   const view = router.query.view;
@@ -23,6 +24,7 @@ export default function Editor() {
     setSelectedSlide,
     tokenBalance,
   } = useAppState();
+  const editorState = useEditorState();
   const [showAuth, setShowAuth] = useState(false);
   useResponsive();
 
@@ -92,5 +94,13 @@ export default function Editor() {
         <DragHandler />
       </div>
     </div>
+  );
+}
+
+export default function Editor() {
+  return (
+    <EditorProvider>
+      <EditorContent />
+    </EditorProvider>
   );
 }
