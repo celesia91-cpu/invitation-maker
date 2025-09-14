@@ -17,12 +17,12 @@ class APIClient {
         const isDev = host === 'localhost' || host === '127.0.0.1';
         if (isDev) {
           // Local dev default backend port
-          baseURL = 'http://localhost:3001/api';
+          baseURL = 'http://localhost:3001';
         } else {
-          baseURL = 'https://invitation-maker-api.celesia91.workers.dev/api';
+          baseURL = 'https://invitation-maker-api.celesia91.workers.dev';
         }
       } else {
-        baseURL = 'http://localhost:3001/api';
+        baseURL = 'http://localhost:3001';
       }
     }
 
