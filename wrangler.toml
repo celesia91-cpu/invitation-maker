@@ -1,0 +1,6 @@
+# Deploy the Next.js build output (created by @cloudflare/next-on-pages)
+pages_build_output_dir = "frontend/.vercel/output/static"
+
+# Cloudflare Pages settings
+[build]
+command = "npm run build"
