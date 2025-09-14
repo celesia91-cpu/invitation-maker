@@ -1,6 +1,5 @@
-# Deploy the Next.js build output (created by @cloudflare/next-on-pages)
-pages_build_output_dir = "frontend/.vercel/output/static"
+name = "invitation-maker"
+compatibility_date = "2024-01-15"
 
-# Cloudflare Pages settings
-[build]
-command = "npm run build"
+[env.production]
+name = "invitation-maker-production"
