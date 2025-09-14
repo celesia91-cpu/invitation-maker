@@ -1,3 +1,4 @@
-import nextOnPages from 'next-on-pages';
+/** @type {import('next').NextConfig} */
+const nextConfig = {};
 
-export default nextOnPages();
+export default nextConfig;
