@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import AuthModal from '../components/AuthModal.jsx';
 import SidePanel from '../components/SidePanel.jsx';
@@ -8,12 +8,27 @@ import RotateOverlay from '../components/RotateOverlay.jsx';
 import PreviewModal from '../components/PreviewModal.jsx';
 import PurchaseModal from '../components/PurchaseModal.jsx';
 import Marketplace from '../components/Marketplace.jsx';
+import useAuth from '../hooks/useAuth.js';
 
 export default function MarketplacePage() {
-  const [showAuth, setShowAuth] = useState(false);
+  const auth = useAuth();
+  // Auto-open auth if there is no active session
+  const [showAuth, setShowAuth] = useState(() => !auth.isAuthenticated);
+  const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState('marketplace'); // 'marketplace' | 'editor'
   const [showPreview, setShowPreview] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) setShowAuth(true);
+  }, [auth.isAuthenticated]);
+
+  // Reflect panel state on body for CSS to slide the panel in
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('panel-open', panelOpen && view === 'editor');
+    }
+  }, [panelOpen, view]);
 
   return (
     <div>
@@ -34,6 +49,8 @@ export default function MarketplacePage() {
         <Topbar
           onPreviewClick={() => setShowPreview(true)}
           onShareClick={() => setShowPurchase(true)}
+          onTogglePanel={() => setPanelOpen((v) => !v)}
+          panelOpen={panelOpen}
         />
 
         {/* Example button to open Auth modal (not in original HTML) */}
@@ -42,9 +59,7 @@ export default function MarketplacePage() {
         </div>
 
         {/* Mobile topbar toggle (hidden in viewer) */}
-        <button id="topbarToggle" className="iconbtn" aria-expanded="true" aria-label="Collapse top bar">
-          
-        </button>
+        <button id="topbarToggle" className="iconbtn" aria-expanded="true" aria-label="Collapse top bar">▾</button>
 
         {/* Fullscreen and rotate overlays */}
         <FullscreenOverlay />
@@ -104,3 +119,4 @@ export default function MarketplacePage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-export default function Topbar({ onPreviewClick, onShareClick }) {
+export default function Topbar({ onPreviewClick, onShareClick, onTogglePanel, panelOpen }) {
   return (
     <header className="topbar" id="topbar">
       <div className="brand"> Celesia Animated Invitation</div>
@@ -13,13 +13,13 @@ export default function Topbar({ onPreviewClick, onShareClick }) {
       </button>
 
       <button id="prevSlideBtn" className="iconbtn edit-only mb-hide-when-collapsed" aria-label="Previous slide">
-        �-?
+        ◀
       </button>
       <span id="slideLabel" className="pill edit-only mb-hide-when-collapsed">
         Slide 1/1
       </span>
       <button id="nextSlideBtn" className="iconbtn edit-only mb-hide-when-collapsed" aria-label="Next slide">
-        �-�
+        ▶
       </button>
       <button id="playSlidesBtn" className="iconbtn edit-only mb-hide-when-collapsed" aria-pressed="false">
         Play
@@ -33,7 +33,12 @@ export default function Topbar({ onPreviewClick, onShareClick }) {
       >
         Preview
       </button>
-      <button id="togglePanelBtn" className="iconbtn edit-only mb-hide-when-collapsed" aria-expanded="false">
+      <button
+        id="togglePanelBtn"
+        className="iconbtn edit-only mb-hide-when-collapsed"
+        aria-expanded={!!panelOpen}
+        onClick={onTogglePanel}
+      >
         Panel
       </button>
 

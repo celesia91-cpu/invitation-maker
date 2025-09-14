@@ -2,6 +2,7 @@
 // Minimal HTTP server exposing GET /api/designs
 
 import http from 'node:http';
+import { createHmac } from 'node:crypto';
 import { authenticate } from './auth.js';
 import { getDesignsByUser, getDesignById } from './designs-store.js';
 import { userTokens, userPurchases, categories, designs } from './database.js';
@@ -12,7 +13,7 @@ import {
   getConversionRates
 } from './analytics-store.js';
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 100;
@@ -71,9 +72,64 @@ function readBody(req) {
   });
 }
 
+const SECRET = process.env.JWT_SECRET || 'dev-secret';
+
+function signJwt(payload) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
+  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const data = `${headerB64}.${payloadB64}`;
+  const sigB64 = createHmac('sha256', SECRET).update(data).digest('base64url');
+  return `${data}.${sigB64}`;
+}
+
 const server = http.createServer(async (req, res) => {
   if (rateLimit(req, res)) return;
   try {
+    // Simple auth endpoints for local development
+    if (req.method === 'POST' && req.url === '/auth/login') {
+      const body = await readBody(req);
+      const email = String(body.email || '').trim();
+      const password = String(body.password || '').trim();
+      if (!email || !password) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Email and password required' }));
+        return;
+      }
+      // Create or re-use a demo user id based on email
+      let id = Array.from(users.values()).find(u => u.username === email)?.id;
+      if (!id) {
+        id = String(nextUserId++);
+        users.set(id, { id, username: email, role: 'user' });
+        userTokens.set(id, 5);
+        userPurchases.set(id, []);
+      }
+      const payload = { sub: id, email, exp: Math.floor(Date.now() / 1000) + 60 * 60 };
+      const token = signJwt(payload);
+      const headers = { 'Content-Type': 'application/json', 'Set-Cookie': `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600` };
+      res.writeHead(200, headers);
+      res.end(JSON.stringify({ token, user: { id, email } }));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/auth/logout') {
+      res.writeHead(204, { 'Set-Cookie': 'session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax' });
+      res.end();
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/auth/me') {
+      try {
+        const user = authenticate(req);
+        const profile = users.get(user.id) || { id: user.id, username: 'user' };
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ user: { id: profile.id, email: profile.username } }));
+      } catch (err) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+      }
+      return;
+    }
     if (req.method === 'POST' && req.url === '/auth/register') {
       const body = await readBody(req);
       const username = typeof body.username === 'string' ? body.username.trim() : '';

@@ -78,7 +78,7 @@ export default function SidePanel() {
           </div>
           <div className="row">
             <label htmlFor="imgRotate">
-              Rotate <small id="imgRotateVal" aria-live="polite">0��</small>
+              Rotate <small id="imgRotateVal" aria-live="polite">0°</small>
             </label>
             <input id="imgRotate" type="range" min="-180" max="180" step="1" defaultValue="0" />
           </div>

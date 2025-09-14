@@ -29,7 +29,13 @@ export default function AuthModal({ isOpen, onClose }) {
   };
 
   return (
-    <div id="authModal" className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div
+      id="authModal"
+      className="auth-modal show"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="authTitle"
+    >
       <div className="auth-card">
         <h2 id="authTitle">Welcome to Invitation Maker</h2>
         <p>Sign in to save your projects to the cloud, or continue working offline.</p>
@@ -72,7 +78,12 @@ export default function AuthModal({ isOpen, onClose }) {
 
           {error && <div className="error" role="alert">{error}</div>}
 
-          <button type="submit" className="btn primary" style={{ width: '100%', margin: '16px 0 8px' }} disabled={isSubmitting}>
+          <button
+            type="submit"
+            className="btn primary"
+            style={{ width: '100%', margin: '16px 0 8px' }}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
@@ -81,10 +92,17 @@ export default function AuthModal({ isOpen, onClose }) {
           Don't have an account? Create one in your backend admin panel.
         </p>
 
-        <button type="button" className="iconbtn" aria-label="Close" onClick={onClose} style={{ position: 'absolute', top: 8, right: 8 }}>
+        <button
+          type="button"
+          className="iconbtn"
+          aria-label="Close"
+          onClick={onClose}
+          style={{ position: 'absolute', top: 8, right: 8 }}
+        >
           ×
         </button>
       </div>
     </div>
   );
 }
+

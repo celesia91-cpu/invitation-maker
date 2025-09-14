@@ -4,13 +4,19 @@ import { logError, logWarning } from '../error-handler.js';
 
 class APIClient {
   constructor(baseURL, fetchImpl) {
-    // Auto-detect environment if no baseURL provided
-    if (!baseURL) {
-      if (typeof window !== 'undefined') {
-        const isDev = window.location.hostname === 'localhost' ||
-                     window.location.hostname === '127.0.0.1';
+    // Resolve base URL from env override first, then auto-detect
+    const envBase = (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_BASE_URL)
+      ? process.env.NEXT_PUBLIC_API_BASE_URL
+      : null;
 
+    if (!baseURL) {
+      if (envBase) {
+        baseURL = envBase; // supports absolute (http://...) or relative (/api)
+      } else if (typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        const isDev = host === 'localhost' || host === '127.0.0.1';
         if (isDev) {
+          // Local dev default backend port
           baseURL = 'http://localhost:3001/api';
         } else {
           baseURL = 'https://invitation-maker-api.celesia91.workers.dev/api';

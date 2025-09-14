@@ -17,3 +17,4 @@ export default function PreviewModal({ isOpen, onClose, onUseDesign }) {
     </div>
   );
 }
+
