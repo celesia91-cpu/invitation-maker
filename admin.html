@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <h1>Admin Dashboard</h1>
+  <section>
+    <h2>Upload Design</h2>
+    <form id="designForm">
+      <input type="text" id="designTitle" placeholder="Title" required />
+      <input type="text" id="designCategory" placeholder="Category ID" required />
+      <input type="text" id="designThumb" placeholder="Thumbnail URL" required />
+      <input type="number" id="designPrice" placeholder="Price" value="0" />
+      <button type="submit" class="btn primary">Save Design</button>
+    </form>
+  </section>
+  <section>
+    <h2>Categories</h2>
+    <form id="categoryForm">
+      <input type="text" id="categoryId" placeholder="ID" required />
+      <input type="text" id="categoryName" placeholder="Name" required />
+      <button type="submit" class="btn">Add Category</button>
+    </form>
+    <ul id="categoryList"></ul>
+  </section>
+  <section>
+    <h2>Adjust Pricing</h2>
+    <form id="priceForm">
+      <input type="text" id="priceDesignId" placeholder="Design ID" required />
+      <input type="number" id="newPrice" placeholder="New Price" required />
+      <button type="submit" class="btn">Update Price</button>
+    </form>
+  </section>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
