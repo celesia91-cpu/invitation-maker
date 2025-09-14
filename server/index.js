@@ -84,6 +84,7 @@ function signJwt(payload) {
 }
 
 const server = http.createServer(async (req, res) => {
+  console.log(`${req.method} ${req.url}`);
   if (rateLimit(req, res)) return;
   try {
     // Simple auth endpoints for local development
