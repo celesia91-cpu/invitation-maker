@@ -3,3 +3,8 @@ node_modules/
 *.log
 Thumbs.db
 frontend/.next/
+frontend/out/
+frontend/dist/
+.wrangler/
+.env
+.env.local
