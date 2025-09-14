@@ -1,23 +1,70 @@
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AuthModal from '../../components/AuthModal.jsx';
 import SlidesPanel from '../../components/SlidesPanel.jsx';
-import TextLayer from '../../components/TextLayer.jsx';
 import DragHandler from '../../components/DragHandler.jsx';
 import CollapsibleGroup from '../../components/CollapsibleGroup.jsx';
+import ImageCanvas from '../../components/ImageCanvas.jsx';
+import TextControls from '../../components/TextControls.jsx';
+import PlaybackControls from '../../components/PlaybackControls.jsx';
+import { useResponsive } from '../../hooks/useResponsive.js';
 import { useAppState } from '../../context/AppStateContext.jsx';
 
 export default function Editor() {
   const router = useRouter();
   const token = router.query.token;
   const view = router.query.view;
-  const { selectedSlide, tokenBalance } = useAppState();
+  const {
+    slides,
+    setSlides,
+    activeIndex,
+    setActiveIndex,
+    selectedSlide,
+    setSelectedSlide,
+    tokenBalance,
+  } = useAppState();
   const [showAuth, setShowAuth] = useState(false);
-  
-  const slides = [
-    { id: 1, text: 'First Slide' },
-    { id: 2, text: 'Second Slide' },
-  ];
+  useResponsive();
+
+  // Seed sample slides on first load if none exist
+  useEffect(() => {
+    if (!slides || slides.length === 0) {
+      setSlides([
+        {
+          id: 1,
+          image: null,
+          layers: [
+            { text: 'First Slide', left: 16, top: 16, fontSize: 28, fontFamily: 'system-ui', color: '#ffffff' },
+          ],
+          workSize: { w: 800, h: 450 },
+          durationMs: 3000,
+        },
+        {
+          id: 2,
+          image: null,
+          layers: [
+            { text: 'Second Slide', left: 16, top: 16, fontSize: 28, fontFamily: 'system-ui', color: '#ffffff' },
+          ],
+          workSize: { w: 800, h: 450 },
+          durationMs: 3000,
+        },
+      ]);
+      setActiveIndex(0);
+      setSelectedSlide(0);
+    }
+  }, [slides, setSlides, setActiveIndex, setSelectedSlide]);
+
+  // Keep selectedSlide and activeIndex in sync during migration
+  useEffect(() => {
+    if (selectedSlide !== activeIndex) {
+      setActiveIndex(selectedSlide);
+    }
+  }, [selectedSlide, activeIndex, setActiveIndex]);
+  useEffect(() => {
+    if (activeIndex !== selectedSlide) {
+      setSelectedSlide(activeIndex);
+    }
+  }, [activeIndex, selectedSlide, setSelectedSlide]);
   
   return (
     <div>
@@ -30,8 +77,20 @@ export default function Editor() {
       <CollapsibleGroup title="Slides">
         <SlidesPanel slides={slides} />
       </CollapsibleGroup>
-      <TextLayer initialText={slides[selectedSlide]?.text} />
-      <DragHandler />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, marginTop: 16 }}>
+        <div>
+          <ImageCanvas />
+          <div style={{ marginTop: 8 }}>
+            <PlaybackControls />
+          </div>
+        </div>
+        <div>
+          <TextControls />
+        </div>
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <DragHandler />
+      </div>
     </div>
   );
 }

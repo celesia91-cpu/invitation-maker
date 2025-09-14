@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAppState } from '../context/AppStateContext.jsx';
-import useApiClient from '../services/useApiClient.js';
+import useAuth from '../hooks/useAuth.js';
 
 export default function AuthModal({ isOpen, onClose }) {
   const { setTokenBalance } = useAppState();
-  const apiClient = useApiClient();
+  const auth = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -18,7 +18,7 @@ export default function AuthModal({ isOpen, onClose }) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await apiClient.login({ email, password, remember });
+      const response = await auth.login({ email, password, remember });
       setTokenBalance(response.balance || 0);
       onClose?.();
     } catch (err) {
