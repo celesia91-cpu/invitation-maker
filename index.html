@@ -12,29 +12,59 @@
   <meta name="theme-color" content="#0f1021">
 
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Pacifico&family=Shadows+Into+Light&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+ <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
    <!-- Authentication Modal -->
   <div id="authModal" class="auth-modal">
     <div class="auth-card">
-      <h2>Welcome to Celesia Animated Invitations Editor</h2>
-      <p>Sign in to save your projects to the cloud.</p>
+      <h2>Welcome to Invitation Maker</h2>
+      <p>Sign in to save your projects to the cloud, or continue working offline.</p>
     
       <form id="loginForm">
         <div class="form-group">
-          <input type="email" id="loginEmail" placeholder="Email address" required>
+          <label for="loginEmail">Email address</label>
+          <input type="email" id="loginEmail" name="loginEmail" placeholder="Email address" required>
         </div>
         <div class="form-group">
-          <input type="password" id="loginPassword" placeholder="Password" required>
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" name="loginPassword" placeholder="Password" required>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <input type="checkbox" id="rememberMe" name="rememberMe">
+          <label for="rememberMe" style="margin:0;">Remember me</label>
         </div>
         <button type="submit" class="btn primary" style="width: 100%; margin: 16px 0 8px;">
           Sign In
         </button>
       </form>
     
+      <p style="margin-top: 16px; font-size: 12px; color: #94a3b8; text-align: center;">
+        Don't have an account? Create one in your backend admin panel.
+      </p>
+  </div>
+  </div>
+  <nav id="breadcrumbs" class="breadcrumbs" aria-label="Breadcrumb"></nav>
+  <div id="marketplacePage" class="page hidden">
+    <h2>Marketplace</h2>
+    <a href="#" id="skipToEditor" class="btn" style="margin:16px 0;display:inline-block">Skip to blank editor</a>
+    <div class="marketplace-layout">
+      <aside class="category-sidebar">
+        <input type="text" id="designSearch" placeholder="Search designs" />
+        <ul id="categoryTabs" class="category-tabs">
+          <li data-category="" class="active">All</li>
+          <li data-category="popular">Popular</li>
+          <li data-category="recent">Recently Added</li>
+          <li data-category="favorites">Favorites</li>
+          <li data-category="recently-viewed">Recently Viewed</li>
+          <li data-category="Birthday">Birthday</li>
+          <li data-category="Wedding">Wedding</li>
+        </ul>
+      </aside>
+      <div id="designGrid" class="marketplace-grid"></div>
     </div>
   </div>
+  <div id="editorPage" class="page hidden">
   <header class="topbar" id="topbar">
     <div class="brand"> Celesia Animated Invitation</div>
     <div class="grow"></div>
@@ -52,8 +82,8 @@
     <button id="togglePanelBtn" class="iconbtn edit-only mb-hide-when-collapsed" aria-expanded="false">Panel</button>
 
     <!-- Share stays (we hide whole topbar in viewer anyway for fullscreen) -->
+    <span id="tokenBalance" class="token-balance">Tokens: 0</span>
     <button id="shareBtn" class="iconbtn">Share</button>
-    <span id="statusText" class="pill edit-only mb-hide-when-collapsed"></span>
   </header>
 
   <!-- Mobile topbar toggle (hidden in viewer) -->
@@ -68,108 +98,152 @@
     </div>
   </div>
 
+  <!-- Rotate device prompt -->
+  <div id="rotateOverlay" class="rotate-overlay" aria-hidden="true">
+    <div class="fs-card">
+      <h2>Please rotate your device</h2>
+    </div>
+  </div>
+
   <div class="backdrop" id="backdrop"></div>
 
   <!-- Side Panel -->
   <aside class="sidepanel" id="sidepanel" aria-label="Design panel">
+    <div class="panel-header">
+      <div class="panel-controls">
+        <button id="collapseAllBtn" class="btn" type="button">Collapse All</button>
+        <button id="expandAllBtn" class="btn" type="button">Expand All</button>
+      </div>
+    </div>
     <div class="panel-body">
       <!-- Slides -->
-      <section class="group" aria-label="Slides">
-        <div class="group-title">Slides</div>
-        <div class="row">
-          <label>All slides</label>
-          <div id="slidesStrip" class="slides-strip" role="tablist" aria-label="Slides"></div>
-        </div>
-        <div class="row" style="gap:8px">
-          <label>Actions</label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button id="addSlideBtn" class="btn" type="button">Add</button>
-            <button id="dupSlideBtn" class="btn" type="button">Duplicate</button>
-            <button id="delSlideBtn" class="btn" type="button">Delete</button>
+      <section class="group" data-group="slides" aria-label="Slides">
+        <div class="group-title" role="button" tabindex="0"><span class="chevron" aria-hidden="true">▾</span> Slides</div>
+        <div class="group-content">
+          <div class="row">
+            <label>All slides</label>
+            <div id="slidesStrip" class="slides-strip" role="tablist" aria-label="Slides"></div>
           </div>
-        </div>
-        <div class="row">
-          <label for="slideDur">Duration <small id="slideDurVal">3.0s</small></label>
-          <input id="slideDur" type="range" min="1000" max="10000" step="500" value="3000">
+          <div class="row" style="gap:8px">
+            <label>Actions</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="addSlideBtn" class="btn" type="button">Add</button>
+              <button id="dupSlideBtn" class="btn" type="button">Duplicate</button>
+              <button id="delSlideBtn" class="btn" type="button">Delete</button>
+            </div>
+          </div>
+          <div class="row">
+            <label for="slideDur">Duration <small id="slideDurVal">3.0s</small></label>
+            <input id="slideDur" type="range" min="1000" max="10000" step="500" value="3000">
+          </div>
         </div>
       </section>
 
       <!-- Text -->
-      <section class="group" aria-label="Text">
-        <div class="group-title">Text</div>
-        <div class="row">
-          <label for="addText">Add Text</label>
-          <div style="display:flex;gap:8px;width:100%;min-width:0">
-            <input id="addText" type="text" placeholder="Type and press +">
-            <button id="addTextBtn" class="btn">+</button>
+      <section class="group" data-group="text" aria-label="Text">
+        <div class="group-title" role="button" tabindex="0"><span class="chevron" aria-hidden="true">▾</span> Text</div>
+        <div class="group-content">
+          <div class="row">
+            <label for="addText">Add Text</label>
+            <div style="display:flex;gap:8px;width:100%;min-width:0">
+              <input id="addText" type="text" placeholder="Type and press +">
+              <button id="addTextBtn" class="btn">+</button>
+            </div>
           </div>
-        </div>
-        <div class="row" style="gap:8px">
-          <label>Selected</label>
-          <div style="display:flex;gap:8px;width:100%;flex-wrap:wrap;min-width:0">
-            <button id="textDelete" class="btn" type="button" disabled>Delete text</button>
+          <div class="row" style="gap:8px">
+            <label>Selected</label>
+            <div style="display:flex;gap:8px;width:100%;flex-wrap:wrap;min-width:0">
+              <button id="textDelete" class="btn" type="button" disabled>Delete text</button>
+            </div>
           </div>
-        </div>
-        <div class="row">
-          <label>Fade In</label>
-          <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
-            <button id="textFadeInBtn" class="btn toggle" type="button">Fade In</button>
-            <input id="textFadeInRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
-            <span id="textFadeInVal" class="pill">0.0s</span>
+          <div class="row">
+            <label>Fade In</label>
+            <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+              <button id="textFadeInBtn" class="btn toggle" type="button">Fade In</button>
+              <input id="textFadeInRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
+              <span id="textFadeInVal" class="pill">0.0s</span>
+            </div>
           </div>
-        </div>
-        <div class="row">
-          <label>Fade Out</label>
-          <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
-            <button id="textFadeOutBtn" class="btn toggle" type="button">Fade Out</button>
-            <input id="textFadeOutRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
-            <span id="textFadeOutVal" class="pill">0.0s</span>
+          <div class="row">
+            <label>Fade Out</label>
+            <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+              <button id="textFadeOutBtn" class="btn toggle" type="button">Fade Out</button>
+              <input id="textFadeOutRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
+              <span id="textFadeOutVal" class="pill">0.0s</span>
+            </div>
+          </div>
+          <div class="row">
+            <label>Zoom In</label>
+            <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+              <button id="textZoomInBtn" class="btn toggle" type="button">Zoom In</button>
+              <input id="textZoomInRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
+              <span id="textZoomInVal" class="pill">0.0s</span>
+            </div>
+          </div>
+          <div class="row">
+            <label>Zoom Out</label>
+            <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+              <button id="textZoomOutBtn" class="btn toggle" type="button">Zoom Out</button>
+              <input id="textZoomOutRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
+              <span id="textZoomOutVal" class="pill">0.0s</span>
+            </div>
+          </div>
+          <div class="row">
+            <label for="textScale">Scale <small id="textScaleVal" aria-live="polite">100%</small></label>
+            <input id="textScale" type="range" min="10" max="300" value="100">
+          </div>
+          <div class="row">
+            <label for="textRotate">Rotate <small id="textRotateVal" aria-live="polite">0°</small></label>
+            <input id="textRotate" type="range" min="-180" max="180" step="1" value="0">
           </div>
         </div>
       </section>
 
       <!-- Style -->
-      <section class="group" aria-label="Style">
-        <div class="group-title">Style</div>
-        <div class="row">
-          <label for="fontSize">Font size</label>
-          <input id="fontSize" type="range" min="10" max="96" value="28">
-        </div>
-        <div class="row">
-          <label for="fontColor">Text color</label>
-          <input id="fontColor" type="color" value="#ffffff">
-        </div>
-        <div class="row">
-          <label for="fontFamily">Font family</label>
-          <div class="chevron-select" style="width:100%">
-            <select id="fontFamily">
-              <option value="system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, sans-serif">System UI</option>
-              <option value="Arial, Helvetica, sans-serif">Arial</option>
-              <option value="Helvetica, Arial, sans-serif">Helvetica</option>
-              <option value="Verdana, Geneva, sans-serif">Verdana</option>
-              <option value="'Trebuchet MS', Tahoma, sans-serif">Trebuchet MS</option>
-              <option value="'Times New Roman', Times, serif">Times New Roman</option>
-              <option value="Georgia, 'Times New Roman', serif">Georgia</option>
-              <option value="Garamond, 'Times New Roman', serif">Garamond</option>
-              <option value="'Courier New', Courier, monospace">Courier New</option>
-              <option value="Monaco, Consolas, 'Courier New', monospace">Monaco</option>
-              <option value="'Pacifico', cursive">Pacifico</option>
-              <option value="'Dancing Script', cursive">Dancing Script</option>
-              <option value="'Shadows Into Light', cursive">Shadows Into Light</option>
-            </select>
+      <section class="group" data-group="style" aria-label="Style">
+        <div class="group-title" role="button" tabindex="0"><span class="chevron" aria-hidden="true">▾</span> Style</div>
+        <div class="group-content">
+          <div class="row">
+            <label for="fontSize">Font size</label>
+            <input id="fontSize" type="range" min="10" max="96" value="28">
           </div>
-        </div>
-        <div class="row text-style-btns">
-          <button id="boldBtn" title="Bold">B</button>
-          <button id="italicBtn" title="Italic"><i>I</i></button>
-          <button id="underlineBtn" title="Underline"><u>U</u></button>
+          <div class="row">
+            <label for="fontColor">Text color</label>
+            <input id="fontColor" type="color" value="#ffffff">
+          </div>
+          <div class="row">
+            <label for="fontFamily">Font family</label>
+            <div class="chevron-select" style="width:100%">
+              <select id="fontFamily">
+                <option value="system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, sans-serif">System UI</option>
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', Tahoma, sans-serif">Trebuchet MS</option>
+                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+                <option value="Garamond, 'Times New Roman', serif">Garamond</option>
+                <option value="'Courier New', Courier, monospace">Courier New</option>
+                <option value="Monaco, Consolas, 'Courier New', monospace">Monaco</option>
+                <option value="'Pacifico', cursive">Pacifico</option>
+                <option value="'Dancing Script', cursive">Dancing Script</option>
+                <option value="'Shadows Into Light', cursive">Shadows Into Light</option>
+              </select>
+            </div>
+          </div>
+          <div class="row text-style-btns">
+            <button id="boldBtn" title="Bold">B</button>
+            <button id="italicBtn" title="Italic"><i>I</i></button>
+            <button id="underlineBtn" title="Underline"><u>U</u></button>
+          </div>
         </div>
       </section>
 
       <!-- Image -->
-      <section class="group" aria-label="Image">
-        <div class="group-title">Image</div>
-        <div class="row">
+      <section class="group" data-group="image" aria-label="Image">
+        <div class="group-title" role="button" tabindex="0"><span class="chevron" aria-hidden="true">▾</span> Image</div>
+        <div class="group-content">
+          <div class="row">
           <label for="imgScale">Scale <small id="imgScaleVal" aria-live="polite">100%</small></label>
           <input id="imgScale" type="range" min="10" max="300" value="100">
         </div>
@@ -181,7 +255,7 @@
           <label>Actions</label>
           <div style="display:flex;gap:8px;width:100%;flex-wrap:wrap;min-width:0">
             <button id="imgFlip" class="btn" type="button">Flip</button>
-            <button id="imgDelete" class="btn" type="button">Delete</button>
+            <button id="imgReplace" class="btn" type="button">Replace</button>
           </div>
         </div>
 
@@ -201,14 +275,32 @@
             <span id="imgFadeOutVal" class="pill">0.0s</span>
           </div>
         </div>
+        <div class="row">
+          <label>Zoom In</label>
+          <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+            <button id="imgZoomInBtn" class="btn toggle" type="button">Zoom In</button>
+            <input id="imgZoomInRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
+            <span id="imgZoomInVal" class="pill">0.0s</span>
+          </div>
+        </div>
+        <div class="row">
+          <label>Zoom Out</label>
+          <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+            <button id="imgZoomOutBtn" class="btn toggle" type="button">Zoom Out</button>
+            <input id="imgZoomOutRange" type="range" min="0" max="5000" step="100" value="0" style="flex:1 1 200px">
+            <span id="imgZoomOutVal" class="pill">0.0s</span>
+          </div>
+        </div>
+        </div>
       </section>
 
       <!-- Presets -->
-      <section class="group" aria-label="Presets">
-        <div class="group-title">Presets</div>
-        <div class="row">
-          <label>Choose</label>
-          <div class="preset-grid" id="presetGrid" role="group" aria-label="Image filter presets">
+      <section class="group" data-group="presets" aria-label="Presets">
+        <div class="group-title" role="button" tabindex="0"><span class="chevron" aria-hidden="true">▾</span> Presets</div>
+        <div class="group-content">
+          <div class="row">
+            <label>Choose</label>
+            <div class="preset-grid" id="presetGrid" role="group" aria-label="Image filter presets">
             <button class="preset-btn" data-preset="none" aria-pressed="true"><span class="preset-icon" aria-hidden="true"></span><span class="preset-label">None</span></button>
             <button class="preset-btn" data-preset="warm" aria-pressed="false"><span class="preset-icon" aria-hidden="true"></span><span class="preset-label">Warm</span></button>
             <button class="preset-btn" data-preset="cool" aria-pressed="false"><span class="preset-icon" aria-hidden="true"></span><span class="preset-label">Cool</span></button>
@@ -217,22 +309,25 @@
             <button class="preset-btn" data-preset="dramatic" aria-pressed="false"><span class="preset-icon" aria-hidden="true"></span><span class="preset-label">Dramatic</span></button>
           </div>
         </div>
+        </div>
       </section>
 
       <!-- Event -->
-      <section class="group" aria-label="Event" id="mapGroup">
-        <div class="group-title">Event</div>
-        <div class="row">
-          <label for="mapInput">Venue / Map</label>
-          <div style="display:flex; gap:8px; width:100%; min-width:0; flex-wrap:wrap;">
-            <input id="mapInput" type="text" placeholder="e.g., 123 Main St, Toronto">
-            <div style="display:flex; gap:8px;">
-              <button id="mapOpenBtn" class="btn">Open</button>
-              <button id="mapCopyBtn" class="btn">Copy Link</button>
+      <section class="group" data-group="event" aria-label="Event" id="mapGroup">
+        <div class="group-title" role="button" tabindex="0"><span class="chevron" aria-hidden="true">▾</span> Event</div>
+        <div class="group-content">
+          <div class="row">
+            <label for="mapInput">Venue / Map</label>
+            <div style="display:flex; gap:8px; width:100%; min-width:0; flex-wrap:wrap;">
+              <input id="mapInput" type="text" placeholder="e.g., 123 Main St, Toronto">
+              <div style="display:flex; gap:8px;">
+                <button id="mapOpenBtn" class="btn">Open</button>
+                <button id="mapCopyBtn" class="btn">Copy Link</button>
+              </div>
             </div>
           </div>
+          <p class="hint" style="margin:8px 0 0;color:#94a3b8;font-size:12px">Set the place guests should see when they tap "View Map".</p>
         </div>
-        <p class="hint" style="margin:8px 0 0;color:#94a3b8;font-size:12px">Set the place guests should see when they tap "View Map".</p>
       </section>
     </div>
   </aside>
@@ -243,7 +338,7 @@
         <div id="vGuide" class="guide v" aria-hidden="true"></div>
         <div id="hGuide" class="guide h" aria-hidden="true"></div>
 
-        <div id="userBgWrap"><img id="userBg" alt=""></div>
+        <div id="userBgWrap"><img id="userBg" alt="User background"></div>
         <video id="fxVideo" autoplay muted loop playsinline>
           <source src="./Comp 1.webm" type="video/webm">
         </video>
@@ -268,8 +363,29 @@
       </div>
     </div>
   </main>
+  </div>
 
-  <script type="module" src="/app.js"></script>
+  <div id="previewModal" class="preview-modal hidden" role="dialog" aria-modal="true">
+    <div class="preview-content">
+      <button id="previewClose" class="iconbtn preview-close" aria-label="Close preview">✕</button>
+      <div id="previewSlides" class="preview-slides"></div>
+      <div class="preview-actions">
+        <button id="useDesignBtn" class="btn primary">Use This Design</button>
+        <button id="favoriteDesignBtn" class="btn">Favorite</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="purchaseModal" class="purchase-modal hidden" role="dialog" aria-modal="true">
+    <div class="purchase-content">
+      <p id="purchaseMessage">You need tokens to edit this design.</p>
+      <div class="purchase-actions">
+        <button id="purchaseConfirm" class="btn primary">Confirm</button>
+        <button id="purchaseCancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/main.js"></script>
 </body>
 </html>
-

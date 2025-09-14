@@ -4,7 +4,7 @@
 // `syncImageCoordinates()` rather than mutating `slide.image.*` directly.
 
 import { apiClient } from './api-client.js';
-import { clamp } from './utils.js';
+import { clamp, calculateViewportScale } from './utils.js';
 import { getSlides, getActiveIndex, setSlides, saveProjectDebounced, recordHistory } from './state-manager.js';
 
 // Image state management
@@ -107,7 +107,10 @@ export function getImagePositionAsPercentage() {
 }
 
 // ENHANCED: Apply percentage-based coordinates when loading
-export function setImagePositionFromPercentage(percentageData, sync = true) {
+// fitMode determines how scaling adjusts when viewport size changes:
+// - 'contain' (default): image fits entirely within viewport using Math.min ratio
+// - 'cover': image fills viewport using Math.max ratio
+export function setImagePositionFromPercentage(percentageData, sync = true, fitMode = 'contain') {
   if (!percentageData) return;
 
   const work = document.querySelector('#work');
@@ -115,52 +118,24 @@ export function setImagePositionFromPercentage(percentageData, sync = true) {
 
   const rect = work.getBoundingClientRect();
   
-  // Calculate scale adjustment with improved logic
+  // Calculate scale adjustment if original dimensions are available
   let scaleAdjustment = 1;
-  if (percentageData.originalWidth && percentageData.originalHeight && 
-      percentageData.originalWidth > 0 && percentageData.originalHeight > 0) {
-    
-    const widthRatio = rect.width / percentageData.originalWidth;
-    const heightRatio = rect.height / percentageData.originalHeight;
-    
-    // Use different strategies based on aspect ratio similarity
-    const originalAspect = percentageData.originalWidth / percentageData.originalHeight;
-    const currentAspect = rect.width / rect.height;
-    const aspectDiff = Math.abs(originalAspect - currentAspect) / originalAspect;
-    
-    if (aspectDiff < 0.1) {
-      // Similar aspect ratios - use average scaling
-      scaleAdjustment = (widthRatio + heightRatio) / 2;
-    } else {
-      // Different aspect ratios - use the larger ratio to maintain coverage
-      scaleAdjustment = Math.max(widthRatio, heightRatio);
-    }
-    
-    // Clamp to reasonable bounds to prevent extreme scaling
-    scaleAdjustment = Math.max(0.1, Math.min(5.0, scaleAdjustment));
-    
-    console.log('🔧 Scale adjustment:', {
-      originalSize: { w: percentageData.originalWidth, h: percentageData.originalHeight },
-      currentSize: { w: rect.width, h: rect.height },
-      ratios: { width: widthRatio, height: heightRatio },
-      aspectDiff,
-      finalAdjustment: scaleAdjustment
-    });
+  if (percentageData.originalWidth && percentageData.originalHeight) {
+    const { scale } = calculateViewportScale(
+      rect.width,
+      rect.height,
+      percentageData.originalWidth,
+      percentageData.originalHeight,
+      fitMode
+    );
+    scaleAdjustment = scale;
   }
 
-  // Apply positioning with enhanced scale logic
   imgState.cx = (percentageData.cxPercent / 100) * rect.width;
   imgState.cy = (percentageData.cyPercent / 100) * rect.height;
   
-  // Enhanced scale calculation - preserve original intent while adapting to viewport
-  const baseScale = percentageData.scale || 1;
-  imgState.scale = baseScale * scaleAdjustment;
-  
-  // Ensure minimum scale for visibility
-  if (imgState.scale < 0.05) {
-    imgState.scale = 0.05;
-    console.warn('Scale was too small, adjusted to minimum');
-  }
+  // Adjust scale based on viewport size difference
+  imgState.scale = (percentageData.scale || 1) * scaleAdjustment;
   
   imgState.angle = percentageData.angle || 0;
   imgState.shearX = percentageData.shearX || 0;
@@ -476,9 +451,12 @@ export async function handleImageUpload(file) {
 
           // Initial scale should cover the work area but not exceed the fx video scale
           const { shearX, shearY } = imgState;
-          const containScale = Math.min(
-            workRect.width / imgState.natW,
-            workRect.height / imgState.natH
+          const { scale: containScale } = calculateViewportScale(
+            workRect.width,
+            workRect.height,
+            imgState.natW,
+            imgState.natH,
+            'contain'
           );
           imgState.scale = Math.min(getFxScale(), containScale);
           imgState.angle = 0;
@@ -566,9 +544,12 @@ function fallbackToLocalUpload(file) {
 
       // Initial scale should cover the work area but not exceed the fx video scale
       const { shearX, shearY, signX, signY, flip } = imgState;
-      const containScale = Math.min(
-        workRect.width / imgState.natW,
-        workRect.height / imgState.natH
+      const { scale: containScale } = calculateViewportScale(
+        workRect.width,
+        workRect.height,
+        imgState.natW,
+        imgState.natH,
+        'contain'
       );
       imgState.scale = Math.min(getFxScale(), containScale);
       imgState.angle = 0;
@@ -1017,11 +998,14 @@ export async function centerImageToVideo() {
   
   // Use Math.min for "contain" behavior (fits entirely within bounds)
   // This matches the fx video's object-fit: contain
-  const scaleToContain = Math.min(
-    rect.width / imgState.natW,
-    rect.height / imgState.natH
+  const { scale: scaleToContain } = calculateViewportScale(
+    rect.width,
+    rect.height,
+    imgState.natW,
+    imgState.natH,
+    'contain'
   );
-  
+
   imgState.scale = scaleToContain;
 
   if (!document.body.classList.contains('viewer')) setTransforms();

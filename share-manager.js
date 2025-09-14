@@ -1,14 +1,17 @@
 // share-manager.js - COMPLETE FIXED VERSION WITH PROPER FUNCTION ORDERING
 
-import { encodeState, decodeState } from './utils.js';
+import { encodeState, decodeState, calculateViewportScale } from './utils.js';
 import {
   buildProject,
   applyProject,
   setIsViewer,
   setCurrentProjectId,
-  historyState
+  historyState,
+  getSlides,
+  getActiveIndex
 } from './state-manager.js';
 import { setImagePositionFromPercentage, setTransforms, imgState, syncImageCoordinates, getFxScale } from './image-manager.js';
+import { ResponsiveManager } from './responsive-manager.js';
 
 // Prefer a canonical viewer origin in production so shared links always open the public viewer.
 // Fallback to current origin if you're already on the viewer.
@@ -23,6 +26,71 @@ function getViewerOrigin() {
   } catch {
     return CANONICAL_VIEWER_ORIGIN;
   }
+}
+
+let lastViewportWidth = null;
+let lastViewportHeight = null;
+let viewerResponsiveManager = null;
+
+export async function rescaleViewerContent() {
+  try {
+    if (typeof document === 'undefined' || !document.body.classList.contains('viewer')) return;
+
+    const work = document.getElementById('work');
+    if (!work) return;
+
+    const rect = work.getBoundingClientRect();
+    const viewportW = rect.width;
+    const viewportH = rect.height;
+
+    const slides = getSlides();
+    const activeIndex = getActiveIndex();
+    const slide = slides?.[activeIndex];
+    if (!slide?.image) {
+      lastViewportWidth = viewportW;
+      lastViewportHeight = viewportH;
+      return;
+    }
+
+    if (lastViewportWidth == null || lastViewportHeight == null) {
+      lastViewportWidth = slide.image.originalWidth || viewportW;
+      lastViewportHeight = slide.image.originalHeight || viewportH;
+    }
+
+    const { scaleX } = calculateViewportScale(
+      viewportW,
+      viewportH,
+      lastViewportWidth,
+      lastViewportHeight
+    );
+
+    if (Math.abs(scaleX - 1) > 0.001) {
+      if (!viewerResponsiveManager) {
+        viewerResponsiveManager = new ResponsiveManager();
+        // Viewer mode doesn't need toolbar sync
+        viewerResponsiveManager.syncToolbarAfterScaling = async () => {};
+      }
+      const prevCx = imgState.cx;
+      const prevCy = imgState.cy;
+      const prevScale = imgState.scale;
+      await viewerResponsiveManager.scaleAllElements(scaleX);
+      imgState.cx = prevCx;
+      imgState.cy = prevCy;
+      imgState.scale = prevScale;
+    }
+
+    lastViewportWidth = viewportW;
+    lastViewportHeight = viewportH;
+
+    setImagePositionFromPercentage(slide.image, false, 'cover');
+    setTransforms(false);
+  } catch (err) {
+    console.error('Error rescaling viewer content:', err);
+  }
+}
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  document.addEventListener('fullscreenchange', rescaleViewerContent);
+  window.addEventListener('resize', rescaleViewerContent);
 }
 
 async function loadSlideImage(slide) {
@@ -41,23 +109,35 @@ async function loadSlideImage(slide) {
         imgState.natW = userBgEl.naturalWidth;
         imgState.natH = userBgEl.naturalHeight;
 
-        const coverScale = Math.max(rect.width / imgState.natW, rect.height / imgState.natH);
-        const defaultScale = Math.min(getFxScale(), coverScale);
+        // Check if we have percentage coordinates with viewport dimensions
+        if (slide.image.cxPercent !== undefined &&
+            slide.image.cyPercent !== undefined) {
 
-        if (slide.image.cxPercent !== undefined && slide.image.cyPercent !== undefined) {
-          setImagePositionFromPercentage(slide.image, false);
-          if (typeof slide.image.scale !== 'number') {
-            imgState.scale = defaultScale;
-          }
+          // Use the enhanced function that handles viewport scaling
+          // Viewer defaults to 'cover' so images fill the viewport
+          const baseScale = typeof slide.image.scale === 'number'
+            ? slide.image.scale
+            : getFxScale();
+          setImagePositionFromPercentage({ ...slide.image, scale: baseScale }, false, 'cover');
+
         } else {
+          // Fallback to absolute positioning
+          const { scale: coverScale } = calculateViewportScale(
+            rect.width,
+            rect.height,
+            imgState.natW,
+            imgState.natH,
+            'cover'
+          );
+          const defaultScale = Math.min(getFxScale(), coverScale);
+          
           imgState.scale = typeof slide.image.scale === 'number'
             ? slide.image.scale
             : defaultScale;
-          // Compute the scaled dimensions to center the image identically to fxVideo
-          const scaledW = imgState.natW * imgState.scale;
-          const scaledH = imgState.natH * imgState.scale;
-          imgState.cx = (rect.width - scaledW) / 2 + scaledW / 2;
-          imgState.cy = (rect.height - scaledH) / 2 + scaledH / 2;
+            
+          // Center the image
+          imgState.cx = rect.width / 2;
+          imgState.cy = rect.height / 2;
           imgState.angle = slide.image.angle || 0;
           imgState.shearX = slide.image.shearX || 0;
           imgState.shearY = slide.image.shearY || 0;
@@ -95,31 +175,35 @@ async function loadTextLayers(layers) {
   existingLayers.forEach(layer => layer.remove());
   
   const workRect = work.getBoundingClientRect();
-  
+
   // Add new layers with responsive scaling
   for (const layerData of layers) {
     const element = document.createElement('div');
     element.className = 'layer text-layer';
     element.contentEditable = 'false';
     element.textContent = layerData.text || 'Text';
-    
-    // Apply positioning and styles with viewport scaling
-    const scaleFactorX = workRect.width / (layerData.workWidth || 1280);
-    const scaleFactorY = workRect.height / (layerData.workHeight || 720);
-    const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
-    
-    element.style.left = (layerData.left * scaleFactorX) + 'px';
-    element.style.top = (layerData.top * scaleFactorY) + 'px';
-    element.style.fontSize = (layerData.fontSize * scaleFactor) + 'px';
+
+    // Apply positioning and styles with viewport scaling using shared utility
+    const { scaleX, scaleY, scale } = calculateViewportScale(
+      workRect.width,
+      workRect.height,
+      layerData.workWidth || 1280,
+      layerData.workHeight || 720,
+      'cover'
+    );
+
+    element.style.left = (layerData.left * scaleX) + 'px';
+    element.style.top = (layerData.top * scaleY) + 'px';
+    element.style.fontSize = (layerData.fontSize * scale) + 'px';
     element.style.fontFamily = layerData.fontFamily || 'system-ui';
     element.style.fontWeight = layerData.fontWeight || 'normal';
     element.style.color = layerData.color || '#ffffff';
     element.style.textAlign = layerData.textAlign || 'left';
-    
+
     if (layerData.transform) {
       element.style.transform = layerData.transform;
     }
-    
+
     work.appendChild(element);
   }
   
@@ -501,6 +585,15 @@ export function applyViewerFromUrl() {
     setCurrentProjectId(null); // hard reset; prevents any backend saves with stale ids
     document.body.classList.add('viewer');
 
+    // Initialize responsive behavior in viewer mode so resize observers and
+    // safe-area handling remain active
+    try {
+      const rm = new ResponsiveManager();
+      rm.initialize();
+    } catch (err) {
+      console.error('ResponsiveManager failed to initialize in viewer mode:', err);
+    }
+
     // Disable editor-centric shortcuts in viewer
     window.addEventListener('keydown', (e) => {
       const k = e.key?.toLowerCase();
@@ -632,6 +725,8 @@ if (typeof window !== 'undefined') {
   window.safeProjectForShare = safeProjectForShare;
   window.applySharedProject = applySharedProject;
   window.loadSlideImage = loadSlideImage;
+  window.loadTextLayers = loadTextLayers;
   window.showViewerUI = showViewerUI;
   window.showFullscreenPrompt = showFullscreenPrompt;
+  window.rescaleViewerContent = rescaleViewerContent;
 }

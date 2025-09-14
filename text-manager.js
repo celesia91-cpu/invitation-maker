@@ -1,416 +1,854 @@
-// text-manager.js - Text layer management and styling
+// text-manager.js - Complete implementation with editable text support
 
-import { rgbToHex, isBold, fmtSec } from './utils.js';
-import { saveProjectDebounced, getActiveLayer, setActiveLayer } from './state-manager.js';
-
-// Text layer creation and management
-export function addTextLayer(text) {
-  const fontSizeInput = document.querySelector('#fontSize');
-  const fontFamilySelect = document.querySelector('#fontFamily');
-  const fontColorInput = document.querySelector('#fontColor');
-  const work = document.querySelector('#work');
-  const addTextInput = document.querySelector('#addText');
-  const body = document.body;
-  
-  const t = document.createElement('div');
-  t.className = 'layer';
-  t.contentEditable = !(body.classList.contains('viewer'));
-  t.textContent = text;
-  t.style.left = '16px';
-  t.style.top = '16px';
-  t.style.padding = '4px 6px';
-  t.style.fontWeight = '900';
-  t.style.fontSize = fontSizeInput.value + 'px';
-  t.style.cursor = 'move';
-  t.style.fontFamily = fontFamilySelect.value;
-  t.style.color = fontColorInput.value;
-  t._fadeInMs = 0;
-  t._fadeOutMs = 0;
-  
-  addLayerEventHandlers(t);
-  work.appendChild(t);
-  setActiveLayer(t);
-  addTextInput.value = '';
-  saveProjectDebounced();
-}
-
-// Add event handlers to text layers
-export function addLayerEventHandlers(t) {
-  t.onpointerdown = beginDragText;
-  t._fadeInMs = t._fadeInMs || 0;
-  t._fadeOutMs = t._fadeOutMs || 0;
-  t.addEventListener('input', () => {
-    saveProjectDebounced();
-  });
-}
-
-// Text layer interaction state
-let dragText = null;
-
-// Begin dragging text layer
-export function beginDragText(e) {
-  const body = document.body;
-  if (body.classList.contains('preview') || body.classList.contains('viewer')) return;
-  
-  setActiveLayer(e.currentTarget);
-  dragText = {
-    t: e.currentTarget,
-    x: e.clientX,
-    y: e.clientY,
-    left: parseFloat(e.currentTarget.style.left || '0'),
-    top: parseFloat(e.currentTarget.style.top || '0'),
-    w: e.currentTarget.offsetWidth,
-    h: e.currentTarget.offsetHeight
-  };
-  e.currentTarget.setPointerCapture?.(e.pointerId);
-}
-
-// Handle text drag movement
-export function handleTextDrag(e) {
-  if (!dragText) return;
-  
-  const work = document.querySelector('#work');
-  const vGuide = document.getElementById('vGuide');
-  const hGuide = document.getElementById('hGuide');
-  const r = work.getBoundingClientRect();
-  const centerX = r.width / 2, centerY = r.height / 2;
-
-  if (e.shiftKey) {
-    // Resize mode
-    const deltaX = e.clientX - dragText.x;
-    const s = Math.max(20, dragText.w + deltaX);
-    const left = parseFloat(dragText.t.style.left || '0');
-    const maxW = r.width - left;
-    dragText.t.style.width = Math.max(20, Math.min(s, maxW)) + 'px';
-    hideGuides();
-  } else {
-    // Move mode
-    let newLeft = dragText.left + (e.clientX - dragText.x);
-    let newTop = dragText.top + (e.clientY - dragText.y);
-    const w = dragText.t.offsetWidth;
-    const h = dragText.t.offsetHeight;
-
-    newLeft = Math.min(Math.max(newLeft, 0), Math.max(0, r.width - w));
-    newTop = Math.min(Math.max(newTop, 0), Math.max(0, r.height - h));
-
-    const elCx = newLeft + w / 2;
-    const elCy = newTop + h / 2;
-    let snapV = false, snapH = false;
-    
-    if (Math.abs(elCx - centerX) <= 8) {
-      newLeft = Math.round(centerX - w / 2);
-      snapV = true;
-    }
-    if (Math.abs(elCy - centerY) <= 8) {
-      newTop = Math.round(centerY - h / 2);
-      snapH = true;
-    }
-
-    dragText.t.style.left = newLeft + 'px';
-    dragText.t.style.top = newTop + 'px';
-    showGuides({ v: snapV, h: snapH });
-  }
-}
-
-// End text drag
-export function endTextDrag() {
-  if (dragText) {
-    dragText = null;
-    saveProjectDebounced();
-    hideGuides();
-  }
-}
-
-// Guide visibility helpers
-function showGuides({ v = false, h = false } = {}) {
-  const vGuide = document.getElementById('vGuide');
-  const hGuide = document.getElementById('hGuide');
-  vGuide.style.display = v ? 'block' : 'none';
-  hGuide.style.display = h ? 'block' : 'none';
-}
-
-function hideGuides() {
-  const vGuide = document.getElementById('vGuide');
-  const hGuide = document.getElementById('hGuide');
-  vGuide.style.display = 'none';
-  hGuide.style.display = 'none';
-}
+import { saveProjectDebounced, recordHistory } from './state-manager.js';
+import { generateId, clamp, rgbToHex } from './utils.js';
 
 // Active layer management
-export function updateDeleteButton() {
-  const textDeleteBtn = document.querySelector('#textDelete');
-  const activeLayer = getActiveLayer();
-  textDeleteBtn.disabled = !activeLayer;
+let activeLayer = null;
+let isLocked = false;
+
+// Editing mode management
+let editingMode = false;
+let editingElement = null;
+
+function saveAndRecord() {
+  saveProjectDebounced();
+  recordHistory();
 }
 
-export function syncToolbarFromActive() {
-  updateDeleteButton();
-  const activeLayer = getActiveLayer();
+/**
+ * Enter text editing mode
+ */
+export function enterTextEditMode(element) {
+  if (!element) return false;
   
-  if (!activeLayer) {
-    updateTextFadeUI();
-    return;
+  try {
+    // Exit any existing edit mode
+    exitTextEditMode();
+    
+    editingMode = true;
+    editingElement = element;
+    
+    // Make element editable
+    element.contentEditable = 'true';
+    element.dataset.editing = 'true';
+    
+    // Update styles for editing
+    element.style.userSelect = 'text';
+    element.style.cursor = 'text';
+    element.classList.add('editing');
+    
+    // Focus and select text
+    element.focus();
+    selectAllText(element);
+    
+    console.log('✅ Entered text edit mode');
+    return true;
+  } catch (error) {
+    console.error('Failed to enter edit mode:', error);
+    return false;
+  }
+}
+
+/**
+ * Exit text editing mode
+ */
+export function exitTextEditMode() {
+  if (!editingElement) return;
+  
+  try {
+    // Restore normal mode
+    editingElement.contentEditable = 'false';
+    editingElement.dataset.editing = 'false';
+    
+    // Restore drag functionality
+    editingElement.style.userSelect = 'none';
+    editingElement.style.cursor = 'move';
+    editingElement.classList.remove('editing');
+    
+    // Clear selection
+    window.getSelection()?.removeAllRanges();
+    
+    editingMode = false;
+    editingElement = null;
+    
+    console.log('✅ Exited text edit mode');
+    saveAndRecord();
+  } catch (error) {
+    console.error('Failed to exit edit mode:', error);
+  }
+}
+
+/**
+ * Check if currently in editing mode
+ */
+export function isInEditMode() {
+  return editingMode;
+}
+
+/**
+ * Get the currently editing element
+ */
+export function getEditingElement() {
+  return editingElement;
+}
+
+/**
+ * Add a new text layer to the work area
+ */
+export async function addTextLayer(text = 'New Text', options = {}) {
+  const work = document.getElementById('work');
+  if (!work) {
+    console.error('Work element not found');
+    return null;
+  }
+
+  try {
+    // Create text element
+    const textEl = document.createElement('div');
+    textEl.className = 'layer text-layer';
+    textEl.contentEditable = 'false'; // Start non-editable
+    textEl.dataset.editing = 'false';
+    textEl.textContent = text;
+    textEl.id = generateId('layer');
+
+    // Initial transform data
+    textEl.dataset.scale = '1';
+    textEl.dataset.rotate = '0';
+
+    // Apply default styles
+    const defaultStyles = {
+      position: 'absolute',
+      left: '50px',
+      top: '50px',
+      fontSize: '28px',
+      fontFamily: 'system-ui',
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      color: '#ffffff',
+      textAlign: 'left',
+      textDecoration: 'none',
+      textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
+      letterSpacing: 'normal',
+      lineHeight: 'normal',
+      cursor: 'move',
+      userSelect: 'none', // Start with no selection for dragging
+      outline: 'none',
+      minWidth: '20px',
+      minHeight: '20px',
+      wordWrap: 'break-word',
+      whiteSpace: 'pre-wrap',
+      zIndex: '30',
+      transform: 'scale(1) rotate(0deg)',
+      ...options
+    };
+
+    // Apply styles to element
+    Object.assign(textEl.style, defaultStyles);
+
+    // Add event listeners
+    setupTextLayerEvents(textEl);
+
+    // Add to work area
+    work.appendChild(textEl);
+
+    // Set as active layer and immediately enter edit mode for new text
+    setActiveLayer(textEl);
+    
+    // Auto-enter edit mode for new text layers
+    setTimeout(() => {
+      enterTextEditMode(textEl);
+    }, 50);
+
+    console.log('✅ Text layer added:', text);
+    
+    // Save changes
+    setTimeout(() => {
+      saveAndRecord();
+    }, 100);
+
+    return textEl;
+
+  } catch (error) {
+    console.error('Failed to add text layer:', error);
+    return null;
+  }
+}
+
+/**
+ * Setup event listeners for text layer with proper edit/drag mode handling
+ */
+function setupTextLayerEvents(textEl) {
+  // Single click selects layer without entering edit mode
+  textEl.addEventListener('click', (e) => {
+    if (!isInEditMode()) {
+      e.stopPropagation();
+      setActiveLayer(textEl);
+    }
+  });
+
+  // Double click enters edit mode
+  textEl.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    e.preventDefault?.();
+
+    setActiveLayer(textEl);
+    enterTextEditMode(textEl);
+  });
+  
+  // Mouse down handling for drag vs edit detection
+  textEl.addEventListener('mousedown', (e) => {
+    // If in edit mode, allow text selection
+    if (isInEditMode() && editingElement === textEl) {
+      e.stopPropagation();
+      return;
+    }
+  });
+
+  // Text input changes
+  textEl.addEventListener('input', () => {
+    if (isInEditMode()) {
+      saveAndRecord();
+    }
+  });
+
+  // Blur to exit edit mode
+  textEl.addEventListener('blur', () => {
+    if (isInEditMode() && editingElement === textEl) {
+      exitTextEditMode();
+    }
+  });
+
+  // Enhanced keyboard shortcuts
+  textEl.addEventListener('keydown', (e) => {
+    if (isInEditMode() && editingElement === textEl) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        exitTextEditMode();
+        setActiveLayer(null);
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        exitTextEditMode();
+      }
+      // Allow normal text editing keys
+      return;
+    }
+    
+    // Non-editing mode shortcuts
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (textEl.textContent.trim() === '') {
+        e.preventDefault();
+        deleteTextLayer(textEl);
+      }
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      enterTextEditMode(textEl);
+    }
+  });
+
+  // Prevent default drag behavior when editing
+  textEl.addEventListener('dragstart', (e) => {
+    e.preventDefault();
+  });
+}
+
+/**
+ * Set active text layer with enhanced state management
+ */
+export function setActiveLayer(layer) {
+  // Remove active class from all layers
+  document.querySelectorAll('.layer').forEach(l => {
+    l.classList.remove('active');
+  });
+
+  // Set new active layer
+  activeLayer = layer;
+
+  if (layer) {
+    layer.classList.add('active');
+    
+    // Force repaint to ensure CSS is applied
+    layer.offsetHeight; // Trigger reflow
+    
+    // Double-check the active class is still there
+    setTimeout(() => {
+      if (!layer.classList.contains('active')) {
+        layer.classList.add('active');
+        console.warn('Had to re-add active class to layer');
+      }
+    }, 0);
+    
+    applyTextTransform(layer);
+    syncToolbarFromActive();
+    console.log('Active layer set:', layer.textContent);
   }
   
-  const fontSizeInput = document.querySelector('#fontSize');
-  const fontColorInput = document.querySelector('#fontColor');
-  const fontFamilySelect = document.querySelector('#fontFamily');
-  const boldBtn = document.querySelector('#boldBtn');
-  const italicBtn = document.querySelector('#italicBtn');
-  const underlineBtn = document.querySelector('#underlineBtn');
-  
-  const cs = getComputedStyle(activeLayer);
-  fontSizeInput.value = parseInt(cs.fontSize, 10) || 28;
-  fontColorInput.value = rgbToHex(cs.color);
-  const fam = cs.fontFamily;
-  const opt = [...fontFamilySelect.options].find(o => o.value.toLowerCase() === fam.toLowerCase());
-  if (opt) fontFamilySelect.value = opt.value;
-  
-  boldBtn.classList.toggle('active', (cs.fontWeight === 'bold') || (parseInt(cs.fontWeight, 10) >= 600));
-  italicBtn.classList.toggle('active', cs.fontStyle === 'italic');
-  const deco = cs.textDecorationLine || cs.textDecoration || '';
-  underlineBtn.classList.toggle('active', (deco + '').includes('underline'));
   updateTextFadeUI();
+  updateTextZoomUI();
+  updateToolbarState();
 }
 
-// Preserve element center during style changes
-export function preserveCenterDuring(fn) {
-  const activeLayer = getActiveLayer();
+/**
+ * Get currently active layer
+ */
+export function getActiveLayer() {
+  return activeLayer;
+}
+
+/**
+ * Check if editing is locked
+ */
+export function getLocked() {
+  return isLocked;
+}
+
+/**
+ * Set locked state
+ */
+export function setLocked(locked) {
+  isLocked = locked;
+  console.log('Text editing locked:', locked);
+}
+
+/**
+ * Delete a text layer
+ */
+export function deleteTextLayer(textEl) {
+  if (!textEl) return;
+
+  try {
+    if (textEl === activeLayer) {
+      setActiveLayer(null);
+    }
+
+    if (textEl === editingElement) {
+      exitTextEditMode();
+    }
+
+    textEl.remove();
+    console.log('✅ Text layer deleted');
+    
+    saveAndRecord();
+  } catch (error) {
+    console.error('Failed to delete text layer:', error);
+  }
+}
+
+/**
+ * Delete active text layer
+ */
+export function deleteActiveLayer() {
+  if (activeLayer) {
+    deleteTextLayer(activeLayer);
+  }
+}
+
+// Wrapper for backward compatibility with event handlers
+export function deleteActiveText() {
+  deleteActiveLayer();
+}
+
+/**
+ * Duplicate active text layer
+ */
+export function duplicateActiveLayer() {
+  if (!activeLayer) return;
+
+  try {
+    const newLayer = activeLayer.cloneNode(true);
+    newLayer.id = generateId('layer');
+    
+    // Offset position slightly
+    const left = parseFloat(activeLayer.style.left || '0') + 20;
+    const top = parseFloat(activeLayer.style.top || '0') + 20;
+    newLayer.style.left = left + 'px';
+    newLayer.style.top = top + 'px';
+
+    // Remove active class and ensure not editing
+    newLayer.classList.remove('active');
+    newLayer.contentEditable = 'false';
+    newLayer.dataset.editing = 'false';
+
+    // Setup events for new layer
+    setupTextLayerEvents(newLayer);
+
+    // Add to work area
+    const work = document.getElementById('work');
+    work.appendChild(newLayer);
+
+    // Set as active
+    setActiveLayer(newLayer);
+
+    console.log('✅ Text layer duplicated');
+    saveAndRecord();
+
+  } catch (error) {
+    console.error('Failed to duplicate text layer:', error);
+  }
+}
+
+/**
+ * Select all text in element
+ */
+function selectAllText(element) {
+  if (window.getSelection && document.createRange) {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
+
+/**
+ * Apply font family to active layer
+ */
+export function applyFontFamily(fontFamily) {
+  if (!activeLayer) return;
+
+  activeLayer.style.fontFamily = fontFamily;
+  updateToolbarState();
+  console.log('Font family applied:', fontFamily);
+}
+
+/**
+ * Apply font size to active layer
+ */
+export function applyFontSize(fontSize) {
+  if (!activeLayer) return;
+
+  activeLayer.style.fontSize = fontSize + 'px';
+  updateToolbarState();
+  console.log('Font size applied:', fontSize);
+}
+
+/**
+ * Apply color to active layer
+ */
+export function applyColor(color) {
+  if (!activeLayer) return;
+
+  const hex = rgbToHex(color);
+  activeLayer.style.color = hex;
+  updateToolbarState();
+  console.log('Color applied:', hex);
+}
+
+/**
+ * Toggle font weight (bold)
+ */
+export function toggleBold() {
   if (!activeLayer) return;
   
-  const prevW = activeLayer.offsetWidth, prevH = activeLayer.offsetHeight;
-  const left = parseFloat(activeLayer.style.left || '0');
-  const top = parseFloat(activeLayer.style.top || '0');
-  const cx = left + prevW / 2, cy = top + prevH / 2;
+  const currentWeight = activeLayer.style.fontWeight;
+  const newWeight = (currentWeight === 'bold' || currentWeight === '700') ? 'normal' : 'bold';
   
-  fn();
+  activeLayer.style.fontWeight = newWeight;
+  console.log('Bold toggled:', newWeight);
+}
+
+/**
+ * Toggle font style (italic)
+ */
+export function toggleItalic() {
+  if (!activeLayer) return;
   
-  requestAnimationFrame(() => {
-    const newW = activeLayer.offsetWidth, newH = activeLayer.offsetHeight;
-    activeLayer.style.left = (cx - newW / 2) + 'px';
-    activeLayer.style.top = (cy - newH / 2) + 'px';
+  const currentStyle = activeLayer.style.fontStyle;
+  const newStyle = currentStyle === 'italic' ? 'normal' : 'italic';
+  
+  activeLayer.style.fontStyle = newStyle;
+  console.log('Italic toggled:', newStyle);
+}
+
+/**
+ * Toggle underline decoration
+ */
+export function toggleUnderline() {
+  if (!activeLayer) return;
+
+  const current = activeLayer.style.textDecoration;
+  const newDeco = current === 'underline' ? 'none' : 'underline';
+
+  activeLayer.style.textDecoration = newDeco;
+  console.log('Underline toggled:', newDeco);
+}
+
+/**
+ * Apply text alignment
+ */
+export function applyTextAlign(alignment) {
+  if (!activeLayer) return;
+  
+  activeLayer.style.textAlign = alignment;
+  updateToolbarState();
+  saveAndRecord();
+  console.log('Text alignment applied:', alignment);
+}
+
+// Apply scale/rotation to active text layer
+function applyTextTransform(layer = activeLayer) {
+  if (!layer) return;
+  const scale = parseFloat(layer.dataset.scale || '1');
+  const rotate = parseFloat(layer.dataset.rotate || '0');
+  layer.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
+}
+
+/**
+ * Sync toolbar controls from active layer
+ */
+export function syncToolbarFromActive() {
+  if (!activeLayer) {
+    resetToolbar();
+    return;
+  }
+
+  try {
+    // Font family
+    const fontFamily = activeLayer.style.fontFamily || 'system-ui';
+    const fontFamilySelect = document.getElementById('fontFamily');
+    if (fontFamilySelect) fontFamilySelect.value = fontFamily;
+
+    // Font size
+    const fontSize = parseFloat(activeLayer.style.fontSize) || 28;
+    const fontSizeInput = document.getElementById('fontSize');
+    const fontSizeVal = document.getElementById('fontSizeVal');
+    if (fontSizeInput) fontSizeInput.value = fontSize;
+    if (fontSizeVal) fontSizeVal.textContent = fontSize + 'px';
+
+    // Color
+    const color = rgbToHex(activeLayer.style.color || '#ffffff');
+    const colorInput = document.getElementById('fontColor');
+    if (colorInput) colorInput.value = color;
+
+    // Scale
+    const scaleInput = document.getElementById('textScale');
+    const scaleVal = document.getElementById('textScaleVal');
+    const scale = parseFloat(activeLayer.dataset.scale || '1');
+    if (scaleInput) scaleInput.value = String(Math.round(scale * 100));
+    if (scaleVal) scaleVal.textContent = Math.round(scale * 100) + '%';
+
+    // Rotation
+    const rotateInput = document.getElementById('textRotate');
+    const rotateVal = document.getElementById('textRotateVal');
+    const rotate = parseFloat(activeLayer.dataset.rotate || '0');
+    if (rotateInput) rotateInput.value = String(Math.round(rotate));
+    if (rotateVal) rotateVal.textContent = Math.round(rotate) + '°';
+
+    // Bold
+    const isBold = activeLayer.style.fontWeight === 'bold' || activeLayer.style.fontWeight === '700';
+    const boldBtn = document.getElementById('boldBtn');
+    if (boldBtn) boldBtn.classList.toggle('active', isBold);
+
+    // Italic
+    const isItalic = activeLayer.style.fontStyle === 'italic';
+    const italicBtn = document.getElementById('italicBtn');
+    if (italicBtn) italicBtn.classList.toggle('active', isItalic);
+
+    // Underline
+    const isUnderline = activeLayer.style.textDecoration === 'underline';
+    const underlineBtn = document.getElementById('underlineBtn');
+    if (underlineBtn) underlineBtn.classList.toggle('active', isUnderline);
+
+    // Text alignment
+    const textAlign = activeLayer.style.textAlign || 'left';
+    document.querySelectorAll('[data-align]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.align === textAlign);
+    });
+
+    console.log('✅ Toolbar synced from active layer');
+
+  } catch (error) {
+    console.error('Failed to sync toolbar from active layer:', error);
+  }
+}
+
+/**
+ * Reset toolbar to default state
+ */
+function resetToolbar() {
+  try {
+    const fontFamilySelect = document.getElementById('fontFamily');
+    const fontSizeInput = document.getElementById('fontSize');
+    const fontSizeVal = document.getElementById('fontSizeVal');
+    const colorInput = document.getElementById('fontColor');
+    const boldBtn = document.getElementById('boldBtn');
+    const italicBtn = document.getElementById('italicBtn');
+    const underlineBtn = document.getElementById('underlineBtn');
+    const scaleInput = document.getElementById('textScale');
+    const scaleVal = document.getElementById('textScaleVal');
+    const rotateInput = document.getElementById('textRotate');
+    const rotateVal = document.getElementById('textRotateVal');
+
+    if (fontFamilySelect) fontFamilySelect.value = 'system-ui';
+    if (fontSizeInput) fontSizeInput.value = 28;
+    if (fontSizeVal) fontSizeVal.textContent = '28px';
+    if (colorInput) colorInput.value = '#ffffff';
+    if (boldBtn) boldBtn.classList.remove('active');
+    if (italicBtn) italicBtn.classList.remove('active');
+    if (underlineBtn) underlineBtn.classList.remove('active');
+    if (scaleInput) scaleInput.value = '100';
+    if (scaleVal) scaleVal.textContent = '100%';
+    if (rotateInput) rotateInput.value = '0';
+    if (rotateVal) rotateVal.textContent = '0°';
+
+    document.querySelectorAll('[data-align]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.align === 'left');
+    });
+
+    console.log('✅ Toolbar reset');
+
+  } catch (error) {
+    console.error('Failed to reset toolbar:', error);
+  }
+}
+
+/**
+ * Update toolbar state based on active layer
+ */
+export function updateToolbarState() {
+  const hasActiveLayer = !!activeLayer;
+  
+  // Enable/disable toolbar controls
+  const controls = [
+    'fontFamily', 'fontSize', 'fontColor',
+    'boldBtn', 'italicBtn', 'underlineBtn', 'textDelete',
+    'textScale', 'textRotate'
+  ];
+
+  controls.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.disabled = !hasActiveLayer;
+    }
+  });
+
+  // Update alignment buttons
+  document.querySelectorAll('[data-align]').forEach(btn => {
+    btn.disabled = !hasActiveLayer;
   });
 }
 
-// Text styling functions
-export function handleFontSize(value) {
-  const activeLayer = getActiveLayer();
-  if (!activeLayer) return;
-  
-  preserveCenterDuring(() => {
-    activeLayer.style.fontSize = value + 'px';
-  });
+// Format milliseconds as seconds string
+function fmtSec(ms) {
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+// Update text fade timing UI
+export function updateTextFadeUI() {
+  const fadeInBtn = document.getElementById('textFadeInBtn');
+  const fadeOutBtn = document.getElementById('textFadeOutBtn');
+  const fadeInRange = document.getElementById('textFadeInRange');
+  const fadeOutRange = document.getElementById('textFadeOutRange');
+  const fadeInVal = document.getElementById('textFadeInVal');
+  const fadeOutVal = document.getElementById('textFadeOutVal');
+
+  const fadeIn = activeLayer?._fadeInMs || 0;
+  const fadeOut = activeLayer?._fadeOutMs || 0;
+
+  if (fadeInBtn) fadeInBtn.classList.toggle('active', fadeIn > 0);
+  if (fadeOutBtn) fadeOutBtn.classList.toggle('active', fadeOut > 0);
+  if (fadeInRange) fadeInRange.value = fadeIn;
+  if (fadeOutRange) fadeOutRange.value = fadeOut;
+  if (fadeInVal) fadeInVal.textContent = fmtSec(fadeIn);
+  if (fadeOutVal) fadeOutVal.textContent = fmtSec(fadeOut);
+}
+
+// Update text zoom timing UI
+export function updateTextZoomUI() {
+  const zoomInBtn = document.getElementById('textZoomInBtn');
+  const zoomOutBtn = document.getElementById('textZoomOutBtn');
+  const zoomInRange = document.getElementById('textZoomInRange');
+  const zoomOutRange = document.getElementById('textZoomOutRange');
+  const zoomInVal = document.getElementById('textZoomInVal');
+  const zoomOutVal = document.getElementById('textZoomOutVal');
+
+  const zoomIn = activeLayer?._zoomInMs || 0;
+  const zoomOut = activeLayer?._zoomOutMs || 0;
+
+  if (zoomInBtn) zoomInBtn.classList.toggle('active', zoomIn > 0);
+  if (zoomOutBtn) zoomOutBtn.classList.toggle('active', zoomOut > 0);
+  if (zoomInRange) zoomInRange.value = zoomIn;
+  if (zoomOutRange) zoomOutRange.value = zoomOut;
+  if (zoomInVal) zoomInVal.textContent = fmtSec(zoomIn);
+  if (zoomOutVal) zoomOutVal.textContent = fmtSec(zoomOut);
+}
+
+// Event handlers for UI controls
+export function handleFontFamily(value) {
+  applyFontFamily(value);
   saveProjectDebounced();
+}
+
+export function handleFontSize(value) {
+  const fontSize = parseInt(value, 10);
+  if (fontSize && fontSize > 0) {
+    applyFontSize(fontSize);
+    const fontSizeVal = document.getElementById('fontSizeVal');
+    if (fontSizeVal) fontSizeVal.textContent = fontSize + 'px';
+    saveProjectDebounced();
+  }
 }
 
 export function handleFontColor(value) {
-  const activeLayer = getActiveLayer();
-  if (activeLayer) {
-    activeLayer.style.color = value;
-    saveProjectDebounced();
-  }
+  const hex = rgbToHex(value);
+  applyColor(hex);
+  const colorInput = document.getElementById('fontColor');
+  if (colorInput) colorInput.value = hex;
+  saveProjectDebounced();
 }
 
-export function handleFontFamily(value) {
-  const activeLayer = getActiveLayer();
-  if (activeLayer) {
-    preserveCenterDuring(() => {
-      activeLayer.style.fontFamily = value;
-    });
-    saveProjectDebounced();
-  }
+export function handleTextAlignChange(alignment) {
+  applyTextAlign(alignment);
 }
 
 export function handleBold() {
-  const activeLayer = getActiveLayer();
-  if (!activeLayer) return;
-  
-  preserveCenterDuring(() => {
-    const cs = getComputedStyle(activeLayer);
-    const on = !((cs.fontWeight === 'bold') || (parseInt(cs.fontWeight, 10) >= 600));
-    activeLayer.style.fontWeight = on ? 'bold' : 'normal';
-  });
+  toggleBold();
+  syncToolbarFromActive();
   saveProjectDebounced();
 }
 
 export function handleItalic() {
-  const activeLayer = getActiveLayer();
-  if (!activeLayer) return;
-  
-  preserveCenterDuring(() => {
-    const cs = getComputedStyle(activeLayer);
-    const on = cs.fontStyle !== 'italic';
-    activeLayer.style.fontStyle = on ? 'italic' : 'normal';
-  });
+  toggleItalic();
+  syncToolbarFromActive();
   saveProjectDebounced();
 }
 
 export function handleUnderline() {
-  const activeLayer = getActiveLayer();
-  if (!activeLayer) return;
-  
-  const cs = getComputedStyle(activeLayer);
-  const has = (cs.textDecorationLine || cs.textDecoration || '').includes('underline');
-  activeLayer.style.textDecoration = has ? 'none' : 'underline';
+  toggleUnderline();
+  syncToolbarFromActive();
   saveProjectDebounced();
 }
 
-// Delete active text layer
-export function deleteActiveText() {
-  const activeLayer = getActiveLayer();
+export function handleTextScale(value) {
   if (!activeLayer) return;
-  
-  const work = document.querySelector('#work');
-  const toRemove = activeLayer;
-  const layers = [...work.querySelectorAll('.layer')];
-  const idx = layers.indexOf(toRemove);
-  toRemove.remove();
-  const remaining = [...work.querySelectorAll('.layer')];
-  const next = remaining.length ? (idx > 0 ? remaining[idx - 1] : remaining[0]) : null;
-  setActiveLayer(next);
+  const scale = clamp(parseInt(value, 10) / 100, 0.1, 10);
+  activeLayer.dataset.scale = String(scale);
+  applyTextTransform();
+  const scaleInput = document.getElementById('textScale');
+  const scaleVal = document.getElementById('textScaleVal');
+  if (scaleInput) scaleInput.value = String(Math.round(scale * 100));
+  if (scaleVal) scaleVal.textContent = Math.round(scale * 100) + '%';
   saveProjectDebounced();
 }
 
-// Text fade UI management
-export function updateTextFadeUI() {
-  const textFadeInBtn = document.getElementById('textFadeInBtn');
-  const textFadeOutBtn = document.getElementById('textFadeOutBtn');
-  const textFadeInRange = document.getElementById('textFadeInRange');
-  const textFadeOutRange = document.getElementById('textFadeOutRange');
-  const textFadeInVal = document.getElementById('textFadeInVal');
-  const textFadeOutVal = document.getElementById('textFadeOutVal');
-  
-  const activeLayer = getActiveLayer();
-  const on = !!activeLayer;
-  
-  [textFadeInBtn, textFadeOutBtn, textFadeInRange, textFadeOutRange].forEach(el => {
-    if (el) el.disabled = !on;
-  });
-  
-  if (!on) {
-    textFadeInBtn?.classList.remove('active');
-    textFadeOutBtn?.classList.remove('active');
-    if (textFadeInVal) textFadeInVal.textContent = '0.0s';
-    if (textFadeOutVal) textFadeOutVal.textContent = '0.0s';
-    return;
-  }
-  
-  const fi = activeLayer._fadeInMs || 0, fo = activeLayer._fadeOutMs || 0;
-  textFadeInBtn?.classList.toggle('active', fi > 0);
-  textFadeOutBtn?.classList.toggle('active', fo > 0);
-  if (textFadeInRange) textFadeInRange.value = fi;
-  if (textFadeOutRange) textFadeOutRange.value = fo;
-  if (textFadeInVal) textFadeInVal.textContent = fmtSec(fi);
-  if (textFadeOutVal) textFadeOutVal.textContent = fmtSec(fo);
+export function handleTextRotate(value) {
+  if (!activeLayer) return;
+  const deg = parseInt(value, 10) || 0;
+  activeLayer.dataset.rotate = String(deg);
+  applyTextTransform();
+  const rotateInput = document.getElementById('textRotate');
+  const rotateVal = document.getElementById('textRotateVal');
+  if (rotateInput) rotateInput.value = String(deg);
+  if (rotateVal) rotateVal.textContent = deg + '°';
+  saveProjectDebounced();
 }
 
 // Text fade handlers
 export function handleTextFadeIn() {
-  const activeLayer = getActiveLayer();
   if (!activeLayer) return;
   activeLayer._fadeInMs = (activeLayer._fadeInMs || 0) > 0 ? 0 : 800;
   updateTextFadeUI();
-  // Write the current slide to ensure fade settings are saved
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
 export function handleTextFadeOut() {
-  const activeLayer = getActiveLayer();
   if (!activeLayer) return;
   activeLayer._fadeOutMs = (activeLayer._fadeOutMs || 0) > 0 ? 0 : 800;
   updateTextFadeUI();
-  // Write the current slide to ensure fade settings are saved
-  import('./slide-manager.js').then(({ writeCurrentSlide }) => writeCurrentSlide());
   saveProjectDebounced();
 }
 
 export function handleTextFadeInRange(value) {
-  const activeLayer = getActiveLayer();
   if (!activeLayer) return;
   activeLayer._fadeInMs = parseInt(value, 10) || 0;
-  const textFadeInVal = document.getElementById('textFadeInVal');
-  if (textFadeInVal) textFadeInVal.textContent = fmtSec(activeLayer._fadeInMs);
+  updateTextFadeUI();
+  saveProjectDebounced();
 }
 
 export function handleTextFadeOutRange(value) {
-  const activeLayer = getActiveLayer();
   if (!activeLayer) return;
   activeLayer._fadeOutMs = parseInt(value, 10) || 0;
-  const textFadeOutVal = document.getElementById('textFadeOutVal');
-  if (textFadeOutVal) textFadeOutVal.textContent = fmtSec(activeLayer._fadeOutMs);
+  updateTextFadeUI();
+  saveProjectDebounced();
 }
 
-// Set active layer with visual feedback
-export function handleSetActiveLayer(el) {
-  const work = document.querySelector('#work');
-  const body = document.body;
+// Text zoom handlers
+export function handleTextZoomIn() {
+  if (!activeLayer) return;
+  activeLayer._zoomInMs = (activeLayer._zoomInMs || 0) > 0 ? 0 : 800;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+export function handleTextZoomOut() {
+  if (!activeLayer) return;
+  activeLayer._zoomOutMs = (activeLayer._zoomOutMs || 0) > 0 ? 0 : 800;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+export function handleTextZoomInRange(value) {
+  if (!activeLayer) return;
+  activeLayer._zoomInMs = parseInt(value, 10) || 0;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+export function handleTextZoomOutRange(value) {
+  if (!activeLayer) return;
+  activeLayer._zoomOutMs = parseInt(value, 10) || 0;
+  updateTextZoomUI();
+  saveProjectDebounced();
+}
+
+/**
+ * Get all text layers
+ */
+export function getAllTextLayers() {
+  return [...document.querySelectorAll('.layer')];
+}
+
+/**
+ * Clear all text layers
+ */
+export function clearAllTextLayers() {
+  const layers = getAllTextLayers();
+  layers.forEach(layer => layer.remove());
+  setActiveLayer(null);
+  console.log('✅ All text layers cleared');
+  saveAndRecord();
+}
+
+/**
+ * Initialize text manager
+ */
+export function initializeTextManager() {
+  updateToolbarState();
   
-  setActiveLayer(el);
-  [...work.querySelectorAll('.layer')].forEach(l => l.style.outline = '');
-  if (el && !body.classList.contains('preview') && !body.classList.contains('viewer')) {
-    el.style.outline = '2px dashed #3b82f6';
-  }
-  syncToolbarFromActive();
-}
-
-// Build layers data from DOM
-export function buildLayersFromDOM() {
-  const work = document.querySelector('#work');
-  return [...work.querySelectorAll('.layer')].map(l => {
-    const cs = getComputedStyle(l);
-    return {
-      text: l.textContent,
-      left: parseFloat(l.style.left || '0'),
-      top: parseFloat(l.style.top || '0'),
-      width: l.style.width || null,
-      fontSize: parseInt(cs.fontSize, 10) || 28,
-      fontFamily: cs.fontFamily,
-      color: rgbToHex(cs.color),
-      fontWeight: cs.fontWeight,
-      fontStyle: cs.fontStyle,
-      textDecoration: cs.textDecorationLine || cs.textDecoration || 'none',
-      padding: l.style.padding || '4px 6px',
-      fadeInMs: l._fadeInMs || 0,
-      fadeOutMs: l._fadeOutMs || 0
-    };
+  // Setup global keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // F2 to edit selected text layer
+    if (e.key === 'F2') {
+      e.preventDefault();
+      if (activeLayer && activeLayer.classList.contains('text-layer')) {
+        enterTextEditMode(activeLayer);
+      }
+    }
+    
+    // Escape to exit edit mode
+    if (e.key === 'Escape') {
+      if (isInEditMode()) {
+        exitTextEditMode();
+      }
+    }
   });
+  
+  console.log('✅ Text manager initialized');
 }
 
-// Load layers into DOM
-export function loadLayersIntoDOM(layers) {
-  const work = document.querySelector('#work');
-  const body = document.body;
-  const fontFamilySelect = document.querySelector('#fontFamily');
-  const fontColorInput = document.querySelector('#fontColor');
-  
-  // Remove existing layers
-  [...work.querySelectorAll('.layer')].forEach(n => n.remove());
-  
-  // Add new layers
-  (layers || []).forEach(L => {
-    const t = document.createElement('div');
-    t.className = 'layer';
-    t.contentEditable = !(body.classList.contains('viewer'));
-    t.textContent = L.text || '';
-    t.style.left = (L.left || 16) + 'px';
-    t.style.top = (L.top || 16) + 'px';
-    if (L.width) t.style.width = L.width;
-    t.style.padding = L.padding || '4px 6px';
-    t.style.fontWeight = L.fontWeight || '900';
-    t.style.fontSize = (L.fontSize || 28) + 'px';
-    t.style.fontStyle = L.fontStyle || 'normal';
-    t.style.textDecoration = L.textDecoration || 'none';
-    t.style.cursor = 'move';
-    t.style.fontFamily = L.fontFamily || fontFamilySelect.value;
-    t.style.color = L.color || fontColorInput.value;
-    t._fadeInMs = L.fadeInMs || 0;
-    t._fadeOutMs = L.fadeOutMs || 0;
-    addLayerEventHandlers(t);
-    work.appendChild(t);
-  });
-  
-  // Set active layer to last one or null
-  const lastLayer = [...work.querySelectorAll('.layer')].slice(-1)[0] || null;
-  handleSetActiveLayer(lastLayer);
+// Auto-initialize when imported
+if (typeof document !== 'undefined' && document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeTextManager);
+} else if (typeof document !== 'undefined') {
+  initializeTextManager();
 }
