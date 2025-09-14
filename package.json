@@ -1,17 +1,17 @@
-﻿{
-    "version":  "1.0.0",
-    "name":  "invitation-maker",
-    "scripts":  {
-                    "build":  "npm --prefix frontend run build",
-                    "deploy:staging":  "wrangler deploy",
-                    "deploy":  "wrangler deploy --env=production",
-                    "start":  "node server/index.js"
-                },
-    "type":  "module",
-    "dependencies":  {
-                         "pg":  "^8.11.0"
-                     },
-    "devDependencies":  {
-                            "wrangler":  "^4.33.1"
-                        }
+{
+    "version": "1.0.0",
+    "name": "invitation-maker",
+    "scripts": {
+        "build": "npm --prefix frontend run build",
+        "deploy:staging": "npm run build && wrangler deploy",
+        "deploy": "npm run build && wrangler deploy --env=production",
+        "start": "node server/index.js"
+    },
+    "type": "module",
+    "dependencies": {
+        "pg": "^8.11.0"
+    },
+    "devDependencies": {
+        "wrangler": "^4.33.1"
+    }
 }
