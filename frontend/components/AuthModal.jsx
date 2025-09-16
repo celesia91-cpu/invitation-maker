@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppState } from '../context/AppStateContext.jsx';
 import useAuth from '../hooks/useAuth.js';
+import useModalFocusTrap from '../hooks/useModalFocusTrap.js';
 
 export default function AuthModal({ isOpen, onClose }) {
   const { setTokenBalance } = useAppState();
@@ -10,6 +11,7 @@ export default function AuthModal({ isOpen, onClose }) {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const modalRef = useModalFocusTrap(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -35,6 +37,7 @@ export default function AuthModal({ isOpen, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="authTitle"
+      ref={modalRef}
     >
       <div className="auth-card">
         <h2 id="authTitle">Welcome to Invitation Maker</h2>

@@ -1,10 +1,17 @@
+import useModalFocusTrap from '../hooks/useModalFocusTrap.js';
+
 export default function PreviewModal({ isOpen, onClose, onUseDesign }) {
+  const modalRef = useModalFocusTrap(isOpen, onClose);
+
+  if (!isOpen) return null;
+
   return (
     <div
       id="previewModal"
-      className={`preview-modal${isOpen ? '' : ' hidden'}`}
+      className="preview-modal"
       role="dialog"
       aria-modal="true"
+      ref={modalRef}
     >
       <div className="preview-content">
         <button id="previewClose" className="iconbtn preview-close" aria-label="Close preview" onClick={onClose}>×</button>
