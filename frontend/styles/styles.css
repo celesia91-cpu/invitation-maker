@@ -434,12 +434,13 @@ body.panel-open .sidepanel {
   max-height: 2000px;
   opacity: 1;
   overflow: hidden;
-  transition: max-height var(--collapse-duration) ease, opacity var(--collapse-duration) ease;
+  transition: max-height 0.25s ease-out, opacity 0.25s ease-out;
 }
 
 .group.collapsed .group-content {
   max-height: 0;
   opacity: 0;
+  transition: max-height 0.25s ease-in, opacity 0.25s ease-in;
 }
 
 .group:hover {

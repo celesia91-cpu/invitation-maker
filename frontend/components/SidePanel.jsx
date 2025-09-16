@@ -2,13 +2,11 @@ import { useState } from 'react';
 
 function PanelGroup({ name, label, collapsed, onToggle, children, sectionProps = {} }) {
   const isCollapsed = !!collapsed;
-  console.log(`PanelGroup ${name}: collapsed=${collapsed}, isCollapsed=${isCollapsed}`);
   const contentId = `${name}-content`;
   const buttonId = `${name}-toggle`;
   const { className: extraClassName, ...restSectionProps } = sectionProps;
   const baseClass = `group${isCollapsed ? ' collapsed' : ''}`;
   const sectionClassName = extraClassName ? `${baseClass} ${extraClassName}` : baseClass;
-  console.log(`PanelGroup ${name}: sectionClassName="${sectionClassName}"`);
 
   return (
     <section
@@ -63,16 +61,10 @@ export default function SidePanel() {
   });
 
   const toggleGroup = (groupName) => {
-    console.log('Toggling group:', groupName);
-    setCollapsedGroups(prev => {
-      const newState = {
-        ...prev,
-        [groupName]: !prev[groupName]
-      };
-      console.log('Previous state:', prev);
-      console.log('New state:', newState);
-      return newState;
-    });
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName]
+    }));
   };
 
   return (
