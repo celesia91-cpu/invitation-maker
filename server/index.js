@@ -74,6 +74,17 @@ function readBody(req) {
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret';
 
+function ensureAdmin(req, res) {
+  const user = authenticate(req);
+  const role = users.get(user.id)?.role;
+  if (role !== 'admin') {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Forbidden' }));
+    return null;
+  }
+  return user;
+}
+
 function signJwt(payload) {
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
@@ -227,6 +238,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && req.url === '/api/admin/categories') {
+      if (!ensureAdmin(req, res)) return;
       const list = Array.from(categories.values());
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(list));
@@ -234,6 +246,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && req.url === '/api/admin/categories') {
+      if (!ensureAdmin(req, res)) return;
       const body = await readBody(req);
       const id = String(body.id || '').trim();
       const name = String(body.name || '').trim();
@@ -249,6 +262,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'DELETE' && req.url.startsWith('/api/admin/categories/')) {
+      if (!ensureAdmin(req, res)) return;
       const id = decodeURIComponent(req.url.split('/').pop());
       categories.delete(id);
       res.writeHead(204).end();
@@ -256,6 +270,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && req.url === '/api/admin/designs') {
+      if (!ensureAdmin(req, res)) return;
       const body = await readBody(req);
       const id = body.id ? String(body.id) : String(designs.size + 1);
       const design = {
@@ -276,6 +291,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'PUT' && req.url.startsWith('/api/admin/designs/') && req.url.endsWith('/price')) {
+      if (!ensureAdmin(req, res)) return;
       const parts = req.url.split('/');
       const id = parts[parts.length - 2];
       const body = await readBody(req);
