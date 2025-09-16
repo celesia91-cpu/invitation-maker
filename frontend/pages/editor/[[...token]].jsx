@@ -34,6 +34,7 @@ function EditorContent() {
       setSlides([
         {
           id: 1,
+          name: 'Slide 1',
           image: null,
           layers: [
             { text: 'First Slide', left: 16, top: 16, fontSize: 28, fontFamily: 'system-ui', color: '#ffffff' },
@@ -43,6 +44,7 @@ function EditorContent() {
         },
         {
           id: 2,
+          name: 'Slide 2',
           image: null,
           layers: [
             { text: 'Second Slide', left: 16, top: 16, fontSize: 28, fontFamily: 'system-ui', color: '#ffffff' },
