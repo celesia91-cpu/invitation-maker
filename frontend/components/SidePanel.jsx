@@ -20,7 +20,7 @@ export default function SidePanel() {
     <aside className="sidepanel" id="sidepanel" aria-label="Design panel">
       <div className="panel-body">
         {/* Slides */}
-        <section className={`group ${collapsedGroups.slides ? 'collapsed' : ''}`} data-group="slides" aria-label="Slides">
+        <section className={collapsedGroups.slides ? 'group collapsed' : 'group'} data-group="slides" aria-label="Slides">
           <div className="group-title" onClick={() => toggleGroup('slides')}>
             Slides
             <span className="chevron">▼</span>
@@ -48,7 +48,7 @@ export default function SidePanel() {
         </section>
 
         {/* Text */}
-        <section className={`group ${collapsedGroups.text ? 'collapsed' : ''}`} data-group="text" aria-label="Text">
+        <section className={collapsedGroups.text ? 'group collapsed' : 'group'} data-group="text" aria-label="Text">
           <div className="group-title" onClick={() => toggleGroup('text')}>
             Text
             <span className="chevron">▼</span>
@@ -95,7 +95,7 @@ export default function SidePanel() {
         </section>
 
         {/* Image */}
-        <section className={`group ${collapsedGroups.image ? 'collapsed' : ''}`} data-group="image" aria-label="Image">
+        <section className={collapsedGroups.image ? 'group collapsed' : 'group'} data-group="image" aria-label="Image">
           <div className="group-title" onClick={() => toggleGroup('image')}>
             Image
             <span className="chevron">▼</span>
@@ -141,7 +141,7 @@ export default function SidePanel() {
         </section>
 
         {/* Presets */}
-        <section className={`group ${collapsedGroups.presets ? 'collapsed' : ''}`} data-group="presets" aria-label="Presets">
+        <section className={collapsedGroups.presets ? 'group collapsed' : 'group'} data-group="presets" aria-label="Presets">
           <div className="group-title" onClick={() => toggleGroup('presets')}>
             Presets
             <span className="chevron">▼</span>
@@ -180,7 +180,7 @@ export default function SidePanel() {
         </section>
 
         {/* Event */}
-        <section className={`group ${collapsedGroups.event ? 'collapsed' : ''}`} data-group="event" aria-label="Event" id="mapGroup">
+        <section className={collapsedGroups.event ? 'group collapsed' : 'group'} data-group="event" aria-label="Event" id="mapGroup">
           <div className="group-title" onClick={() => toggleGroup('event')}>
             Event
             <span className="chevron">▼</span>
