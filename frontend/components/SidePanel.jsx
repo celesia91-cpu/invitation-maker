@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function SidePanel() {
   const [collapsedGroups, setCollapsedGroups] = useState({
@@ -8,6 +8,11 @@ export default function SidePanel() {
     presets: false,
     event: false
   });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const toggleGroup = (groupName) => {
     setCollapsedGroups(prev => ({
@@ -20,10 +25,10 @@ export default function SidePanel() {
     <aside className="sidepanel" id="sidepanel" aria-label="Design panel">
       <div className="panel-body">
         {/* Slides */}
-        <section className={collapsedGroups.slides ? 'group collapsed' : 'group'} data-group="slides" aria-label="Slides">
+        <section className={mounted && collapsedGroups.slides ? 'group collapsed' : 'group'} data-group="slides" aria-label="Slides">
           <div className="group-title" onClick={() => toggleGroup('slides')} style={{cursor: 'pointer'}}>
             Slides
-            <span className="chevron">▼</span>
+            {mounted && <span className="chevron">▼</span>}
           </div>
           <div className="group-content">
             <div className="row">
@@ -48,10 +53,10 @@ export default function SidePanel() {
         </section>
 
         {/* Text */}
-        <section className={collapsedGroups.text ? 'group collapsed' : 'group'} data-group="text" aria-label="Text">
+        <section className={mounted && collapsedGroups.text ? 'group collapsed' : 'group'} data-group="text" aria-label="Text">
           <div className="group-title" onClick={() => toggleGroup('text')} style={{cursor: 'pointer'}}>
             Text
-            <span className="chevron">▼</span>
+            {mounted && <span className="chevron">▼</span>}
           </div>
           <div className="group-content">
             <div className="row">
@@ -95,10 +100,10 @@ export default function SidePanel() {
         </section>
 
         {/* Image */}
-        <section className={collapsedGroups.image ? 'group collapsed' : 'group'} data-group="image" aria-label="Image">
+        <section className={mounted && collapsedGroups.image ? 'group collapsed' : 'group'} data-group="image" aria-label="Image">
           <div className="group-title" onClick={() => toggleGroup('image')} style={{cursor: 'pointer'}}>
             Image
-            <span className="chevron">▼</span>
+            {mounted && <span className="chevron">▼</span>}
           </div>
           <div className="group-content">
             <div className="row">
@@ -141,10 +146,10 @@ export default function SidePanel() {
         </section>
 
         {/* Presets */}
-        <section className={collapsedGroups.presets ? 'group collapsed' : 'group'} data-group="presets" aria-label="Presets">
+        <section className={mounted && collapsedGroups.presets ? 'group collapsed' : 'group'} data-group="presets" aria-label="Presets">
           <div className="group-title" onClick={() => toggleGroup('presets')} style={{cursor: 'pointer'}}>
             Presets
-            <span className="chevron">▼</span>
+            {mounted && <span className="chevron">▼</span>}
           </div>
           <div className="group-content">
             <div className="row">
@@ -180,10 +185,10 @@ export default function SidePanel() {
         </section>
 
         {/* Event */}
-        <section className={collapsedGroups.event ? 'group collapsed' : 'group'} data-group="event" aria-label="Event" id="mapGroup">
+        <section className={mounted && collapsedGroups.event ? 'group collapsed' : 'group'} data-group="event" aria-label="Event" id="mapGroup">
           <div className="group-title" onClick={() => toggleGroup('event')} style={{cursor: 'pointer'}}>
             Event
-            <span className="chevron">▼</span>
+            {mounted && <span className="chevron">▼</span>}
           </div>
           <div className="group-content">
             <div className="row">
