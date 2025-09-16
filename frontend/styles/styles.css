@@ -457,6 +457,17 @@ body.panel-open .sidepanel {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.group-title:hover {
+  color: #cbd5e1;
 }
 
 .group-title:focus {
@@ -465,6 +476,11 @@ body.panel-open .sidepanel {
 }
 
 .group-title .chevron {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   transition: transform var(--collapse-duration);
 }
 
@@ -1316,7 +1332,7 @@ input[type="color"]:hover {
 }
 
 .rsvp-btn.confirmed::before {
-  content: '✓ ';
+  content: '\\2713 ';
   font-weight: bold;
   margin-right: 4px;
 }
