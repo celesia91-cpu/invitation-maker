@@ -20,7 +20,7 @@ export default function SlidesPanel() {
         <button onClick={onAdd} style={{ padding: '4px 8px' }}>+ Add</button>
       </div>
       <div style={{ overflowY: 'auto' }}>
-        {slides.map((s) => (
+        {slides.map((s, index) => (
           <button
             key={s.id}
             onClick={() => onSelect(s.id)}
@@ -34,7 +34,7 @@ export default function SlidesPanel() {
               cursor: 'pointer',
             }}
           >
-            {s.name}
+            {s.name || `Slide ${index + 1}`}
           </button>
         ))}
       </div>
