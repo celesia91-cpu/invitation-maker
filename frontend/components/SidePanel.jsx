@@ -21,7 +21,7 @@ export default function SidePanel() {
       <div className="panel-body">
         {/* Slides */}
         <section className={collapsedGroups.slides ? 'group collapsed' : 'group'} data-group="slides" aria-label="Slides">
-          <div className="group-title" onClick={() => toggleGroup('slides')}>
+          <div className="group-title" onClick={() => toggleGroup('slides')} style={{cursor: 'pointer'}}>
             Slides
             <span className="chevron">▼</span>
           </div>
@@ -49,7 +49,7 @@ export default function SidePanel() {
 
         {/* Text */}
         <section className={collapsedGroups.text ? 'group collapsed' : 'group'} data-group="text" aria-label="Text">
-          <div className="group-title" onClick={() => toggleGroup('text')}>
+          <div className="group-title" onClick={() => toggleGroup('text')} style={{cursor: 'pointer'}}>
             Text
             <span className="chevron">▼</span>
           </div>
@@ -96,7 +96,7 @@ export default function SidePanel() {
 
         {/* Image */}
         <section className={collapsedGroups.image ? 'group collapsed' : 'group'} data-group="image" aria-label="Image">
-          <div className="group-title" onClick={() => toggleGroup('image')}>
+          <div className="group-title" onClick={() => toggleGroup('image')} style={{cursor: 'pointer'}}>
             Image
             <span className="chevron">▼</span>
           </div>
@@ -142,7 +142,7 @@ export default function SidePanel() {
 
         {/* Presets */}
         <section className={collapsedGroups.presets ? 'group collapsed' : 'group'} data-group="presets" aria-label="Presets">
-          <div className="group-title" onClick={() => toggleGroup('presets')}>
+          <div className="group-title" onClick={() => toggleGroup('presets')} style={{cursor: 'pointer'}}>
             Presets
             <span className="chevron">▼</span>
           </div>
@@ -181,7 +181,7 @@ export default function SidePanel() {
 
         {/* Event */}
         <section className={collapsedGroups.event ? 'group collapsed' : 'group'} data-group="event" aria-label="Event" id="mapGroup">
-          <div className="group-title" onClick={() => toggleGroup('event')}>
+          <div className="group-title" onClick={() => toggleGroup('event')} style={{cursor: 'pointer'}}>
             Event
             <span className="chevron">▼</span>
           </div>
