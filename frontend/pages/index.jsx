@@ -13,7 +13,7 @@ import useAuth from '../hooks/useAuth.js';
 export default function MarketplacePage() {
   const auth = useAuth();
   // Auto-open auth if there is no active session
-  const [showAuth, setShowAuth] = useState(() => !auth.isAuthenticated);
+  const [showAuth, setShowAuth] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState('marketplace'); // 'marketplace' | 'editor'
   const [showPreview, setShowPreview] = useState(false);
