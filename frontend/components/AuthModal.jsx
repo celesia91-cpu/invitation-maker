@@ -89,7 +89,7 @@ export default function AuthModal({ isOpen, onClose }) {
         </form>
 
         <p style={{ marginTop: 16, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
-          Don't have an account? Create one in your backend admin panel.
+          Don&apos;t have an account? Create one in your backend admin panel.
         </p>
 
         <button
