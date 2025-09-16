@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Topbar from '../components/Topbar.jsx';
 import AuthModal from '../components/AuthModal.jsx';
 import SidePanel from '../components/SidePanel.jsx';
@@ -76,9 +77,16 @@ export default function MarketplacePage() {
               <div id="vGuide" className="guide v" aria-hidden="true"></div>
               <div id="hGuide" className="guide h" aria-hidden="true"></div>
 
-              <div id="userBgWrap">
-                <img id="userBg" alt="" />
-              </div>
+                <div id="userBgWrap">
+                  <Image
+                    id="userBg"
+                    src="/placeholder.jpg"
+                    alt=""
+                    width={800}
+                    height={450}
+                    priority
+                  />
+                </div>
               <video id="fxVideo" autoPlay muted loop playsInline>
                 <source src="/Comp 1.webm" type="video/webm" />
               </video>
