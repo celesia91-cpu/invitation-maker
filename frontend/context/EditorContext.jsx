@@ -3,12 +3,12 @@ import React, { createContext, useContext, useMemo, useReducer } from 'react';
 const EditorStateContext = createContext(null);
 const EditorDispatchContext = createContext(null);
 
-// Counters ensure consistent IDs between server and client rendering
+// ✅ FIX: Use counters instead of Date.now() for consistent server/client rendering
 let slideIdCounter = 0;
 let elementIdCounter = 0;
 
 const initialSlide = () => ({
-  id: `slide_${++slideIdCounter}`,
+  id: `slide_${++slideIdCounter}`, // ✅ FIXED: Was Date.now()
   name: 'Slide 1',
   elements: [],
 });
@@ -32,7 +32,11 @@ function reducer(state, action) {
   switch (action.type) {
     case 'ADD_SLIDE': {
       const slideNumber = state.slides.length + 1;
-      const newSlide = { id: `slide_${++slideIdCounter}`, name: `Slide ${slideNumber}`, elements: [] };
+      const newSlide = { 
+        id: `slide_${++slideIdCounter}`, // ✅ FIXED: Was Date.now()
+        name: `Slide ${slideNumber}`, 
+        elements: [] 
+      };
       return { ...state, slides: [...state.slides, newSlide], selected: { slideId: newSlide.id, elementId: null } };
     }
     case 'RENAME_SLIDE': {
@@ -51,7 +55,7 @@ function reducer(state, action) {
     }
     case 'ADD_TEXT': {
       const el = {
-        id: `el_${++elementIdCounter}`,
+        id: `el_${++elementIdCounter}`, // ✅ FIXED: Was Date.now()
         type: 'text',
         x: action.x ?? 100,
         y: action.y ?? 100,
@@ -78,7 +82,7 @@ function reducer(state, action) {
     }
     case 'ADD_IMAGE': {
       const el = {
-        id: `el_${++elementIdCounter}`,
+        id: `el_${++elementIdCounter}`, // ✅ FIXED: Was Date.now()
         type: 'image',
         x: action.x ?? 100,
         y: action.y ?? 100,
@@ -165,4 +169,3 @@ export function useEditor() {
 }
 
 export default EditorProvider;
-
