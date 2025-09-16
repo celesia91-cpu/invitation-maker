@@ -245,7 +245,7 @@ export default function SidePanel() {
             </div>
           </div>
           <p className="hint" style={{ margin: '8px 0 0', color: '#94a3b8', fontSize: 12 }}>
-            Set the place guests should see when they tap "View Map".
+            Set the place guests should see when they tap &quot;View Map&quot;.
           </p>
         </PanelGroup>
       </div>

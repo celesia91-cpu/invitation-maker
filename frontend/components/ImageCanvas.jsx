@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import Image from 'next/image';
 import { useAppState } from '../context/AppStateContext.jsx';
 
 // Minimal image canvas that mirrors image-manager.js transform state
@@ -42,11 +43,13 @@ export default function ImageCanvas() {
         }}
       >
         {imgState.has ? (
-          <img
+          <Image
             id="userBg"
-            src={imgState.backendImageUrl || imgState.backendThumbnailUrl || undefined}
+            src={imgState.backendImageUrl || imgState.backendThumbnailUrl || '/placeholder.jpg'}
             alt="Background"
-            style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }}
+            fill
+            sizes="100vw"
+            style={{ objectFit: 'contain' }}
           />
         ) : (
           <div style={{ color: '#94a3b8', fontSize: 12, padding: 8 }}>No image selected</div>

@@ -10,7 +10,7 @@ export default function FullscreenOverlay() {
     >
       <div className="fs-card">
         <h2 id="fsTitle">Tap to view full-screen</h2>
-        <p>For the best experience, we'll hide the browser bar.</p>
+        <p>For the best experience, we&apos;ll hide the browser bar.</p>
         <button id="fsEnterBtn" className="fs-btn" type="button">
           Enter Full-Screen
         </button>
