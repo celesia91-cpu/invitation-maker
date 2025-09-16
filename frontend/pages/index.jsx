@@ -19,6 +19,7 @@ export default function MarketplacePage() {
   const [view, setView] = useState('marketplace'); // 'marketplace' | 'editor'
   const [showPreview, setShowPreview] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
+  const [isTopbarVisible, setIsTopbarVisible] = useState(true);
 
   useEffect(() => {
     if (!auth.isAuthenticated) setShowAuth(true);
@@ -30,6 +31,24 @@ export default function MarketplacePage() {
       document.body.classList.toggle('panel-open', panelOpen && view === 'editor');
     }
   }, [panelOpen, view]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const body = document.body;
+    const shouldHideTopbar = view === 'editor' && !isTopbarVisible;
+    body.classList.toggle('topbar-hidden', shouldHideTopbar);
+
+    return () => {
+      body.classList.remove('topbar-hidden');
+    };
+  }, [isTopbarVisible, view]);
+
+  useEffect(() => {
+    if (view !== 'editor') {
+      setIsTopbarVisible(true);
+    }
+  }, [view]);
 
   return (
     <div>
@@ -60,7 +79,16 @@ export default function MarketplacePage() {
         </div>
 
         {/* Mobile topbar toggle (hidden in viewer) */}
-        <button id="topbarToggle" className="iconbtn" aria-expanded="true" aria-label="Collapse top bar">▾</button>
+        <button
+          id="topbarToggle"
+          className="iconbtn"
+          aria-controls="topbar"
+          aria-expanded={isTopbarVisible}
+          aria-label={isTopbarVisible ? 'Collapse top bar' : 'Expand top bar'}
+          onClick={() => setIsTopbarVisible((value) => !value)}
+        >
+          {isTopbarVisible ? '▾' : '▴'}
+        </button>
 
         {/* Fullscreen and rotate overlays */}
         <FullscreenOverlay />
