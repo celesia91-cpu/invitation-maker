@@ -20,8 +20,6 @@ function EditorContent() {
     setSlides,
     activeIndex,
     setActiveIndex,
-    selectedSlide,
-    setSelectedSlide,
     tokenBalance,
   } = useAppState();
   const editorState = useEditorState();
@@ -54,21 +52,8 @@ function EditorContent() {
         },
       ]);
       setActiveIndex(0);
-      setSelectedSlide(0);
     }
-  }, [slides, setSlides, setActiveIndex, setSelectedSlide]);
-
-  // Keep selectedSlide and activeIndex in sync during migration
-  useEffect(() => {
-    if (selectedSlide !== activeIndex) {
-      setActiveIndex(selectedSlide);
-    }
-  }, [selectedSlide, activeIndex, setActiveIndex]);
-  useEffect(() => {
-    if (activeIndex !== selectedSlide) {
-      setSelectedSlide(activeIndex);
-    }
-  }, [activeIndex, selectedSlide, setSelectedSlide]);
+  }, [slides, setSlides, setActiveIndex]);
   
   return (
     <div>

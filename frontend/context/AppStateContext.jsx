@@ -33,8 +33,6 @@ const initialState = {
   // Work area
   workSize: { w: 800, h: 450 },
 
-  // Keep existing simple app-level bits for compatibility with current pages
-  selectedSlide: 0, // used by frontend/pages/editor/[[...token]].jsx
   tokenBalance: 0,
 };
 
@@ -87,9 +85,6 @@ function reducer(state, action) {
       slides[idx] = { ...slide, layers };
       return { ...state, slides };
     }
-    // Back-compat for current editor page usage
-    case 'SET_SELECTED_SLIDE':
-      return { ...state, selectedSlide: action.value | 0 };
     case 'SET_TOKEN_BALANCE':
       return { ...state, tokenBalance: action.value | 0 };
     default:
@@ -123,8 +118,6 @@ export function AppStateProvider({ children }) {
     updateTextLayer: (layer, patch, index) => dispatch({ type: 'UPDATE_TEXT_LAYER', layer, patch, index }),
     removeTextLayer: (layer, index) => dispatch({ type: 'REMOVE_TEXT_LAYER', layer, index }),
 
-    // Back-compat used by existing Editor page
-    setSelectedSlide: (value) => dispatch({ type: 'SET_SELECTED_SLIDE', value }),
     setTokenBalance: (value) => dispatch({ type: 'SET_TOKEN_BALANCE', value }),
   }), [state]);
 
