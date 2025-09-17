@@ -3,6 +3,7 @@
     "name": "invitation-maker",
     "scripts": {
         "build": "npm --prefix frontend run build",
+        "test": "npm --prefix frontend test",
         "deploy:staging": "npm run build && wrangler pages deploy frontend/out --project-name=invitation-maker",
         "deploy": "npm run build && wrangler pages deploy frontend/out --project-name=invitation-maker-production",
         "start": "node server/index.js"
