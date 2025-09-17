@@ -1879,7 +1879,8 @@ body.preview .handle {
 
 .btn:focus-visible,
 .iconbtn:focus-visible,
-.rsvp-btn:focus-visible {
+.rsvp-btn:focus-visible,
+.category-tab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5);
 }
@@ -2309,12 +2310,23 @@ body.resizing {
 }
 
 .category-tabs li {
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 4px;
+  margin: 0;
 }
 
-.category-tabs li.active {
+.category-tab {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.category-tab.active,
+.category-tab[aria-selected="true"] {
   background: #26334f;
 }
 
