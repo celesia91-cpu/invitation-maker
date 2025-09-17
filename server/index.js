@@ -19,11 +19,20 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 100;
 const requests = new Map();
 
+function purgeStaleRequests(now) {
+  for (const [key, entry] of requests) {
+    if (now - entry.start >= RATE_LIMIT_WINDOW_MS) {
+      requests.delete(key);
+    }
+  }
+}
+
 function rateLimit(req, res) {
   const ip = req.socket.remoteAddress;
   const now = Date.now();
   let entry = requests.get(ip);
   if (!entry || now - entry.start >= RATE_LIMIT_WINDOW_MS) {
+    purgeStaleRequests(now);
     entry = { count: 0, start: now };
   }
   entry.count += 1;
