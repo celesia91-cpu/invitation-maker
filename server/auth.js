@@ -3,7 +3,11 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const SECRET = process.env.JWT_SECRET || 'dev-secret';
+const secretFromEnv = process.env.JWT_SECRET;
+if (typeof secretFromEnv !== 'string' || secretFromEnv.length === 0) {
+  throw new Error('JWT_SECRET environment variable must be set');
+}
+const SECRET = secretFromEnv;
 
 function constantTimeEqual(a = '', b = '') {
   const bufA = Buffer.from(String(a));
@@ -20,29 +24,54 @@ function getCookie(cookieHeader = '', name) {
   return '';
 }
 
+function parseJwtSection(segment, type) {
+  let decoded;
+  try {
+    decoded = Buffer.from(segment, 'base64url').toString('utf8');
+  } catch (err) {
+    console.warn(`Failed to decode JWT ${type}:`, err.message);
+    throw new Error(`Invalid token ${type}`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(decoded);
+  } catch (err) {
+    console.warn(`Failed to parse JWT ${type}:`, err.message, decoded.slice(0, 100));
+    throw new Error(`Invalid token ${type}`);
+  }
+  if (typeof parsed !== 'object' || parsed === null) {
+    console.warn(`JWT ${type} is not an object`);
+    throw new Error(`Invalid token ${type}`);
+  }
+  return parsed;
+}
+
 function verifyJwt(token) {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid token');
   const [headerB64, payloadB64, sigB64] = parts;
+
+  const header = parseJwtSection(headerB64, 'header');
+  if (header.alg !== 'HS256') {
+    console.warn('Unsupported JWT algorithm:', header.alg);
+    throw new Error('Unsupported token algorithm');
+  }
+
   const data = `${headerB64}.${payloadB64}`;
   const expected = createHmac('sha256', SECRET).update(data).digest('base64url');
-  const sig = Buffer.from(sigB64, 'base64url');
+  let sig;
+  try {
+    sig = Buffer.from(sigB64, 'base64url');
+  } catch (err) {
+    console.warn('Failed to decode JWT signature:', err.message);
+    throw new Error('Invalid token signature');
+  }
   const exp = Buffer.from(expected, 'base64url');
   if (sig.length !== exp.length || !timingSafeEqual(sig, exp)) {
     throw new Error('Invalid signature');
   }
-  const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
-  let payload;
-  try {
-    payload = JSON.parse(payloadJson);
-  } catch (err) {
-    console.warn('Failed to parse JWT payload:', err.message, payloadJson.slice(0, 100));
-    throw new Error('Invalid token payload');
-  }
-  if (typeof payload !== 'object' || payload === null) {
-    console.warn('JWT payload is not an object');
-    throw new Error('Invalid token payload');
-  }
+
+  const payload = parseJwtSection(payloadB64, 'payload');
   if (typeof payload.exp !== 'number') throw new Error('Missing exp');
   if (Date.now() >= payload.exp * 1000) throw new Error('Token expired');
   return payload;
