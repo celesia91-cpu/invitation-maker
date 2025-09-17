@@ -23,6 +23,17 @@ npx http-server
 ```
 Then navigate to the provided local URL to explore the app.
 
+## Testing
+Run the Jest suite from the repository root so both frontend and backend contributors use the same entry point:
+
+```bash
+npm test
+# Example: filter to a specific suite
+npm test -- PreviewModal
+```
+
+The root `npm test` command simply proxies to the frontend runner, so backend developers can execute the latest UI checks without switching directories.
+
 ## Orientation Guidance
 Mobile and tablet screens are no longer forced into landscape orientation.
 Instead, when the device is held in portrait, a rotate prompt overlay guides
