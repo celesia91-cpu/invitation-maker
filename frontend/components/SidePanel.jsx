@@ -4,6 +4,7 @@ function PanelGroup({ name, label, collapsed, onToggle, children, sectionProps =
   const isCollapsed = !!collapsed;
   const contentId = `${name}-content`;
   const buttonId = `${name}-toggle`;
+  const collapsedDataAttr = isCollapsed ? true : undefined;
   const { className: extraClassName, ...restSectionProps } = sectionProps;
   const baseClass = `group${isCollapsed ? ' collapsed' : ''}`;
   const sectionClassName = extraClassName ? `${baseClass} ${extraClassName}` : baseClass;
@@ -14,7 +15,7 @@ function PanelGroup({ name, label, collapsed, onToggle, children, sectionProps =
       className={sectionClassName}
       data-group={name}
       aria-label={label}
-      data-collapsed={isCollapsed}
+      data-collapsed={collapsedDataAttr}
     >
       <button
         type="button"
