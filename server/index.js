@@ -72,7 +72,11 @@ function readBody(req) {
   });
 }
 
-const SECRET = process.env.JWT_SECRET || 'dev-secret';
+const secretFromEnv = process.env.JWT_SECRET;
+if (typeof secretFromEnv !== 'string' || secretFromEnv.length === 0) {
+  throw new Error('JWT_SECRET environment variable must be set');
+}
+const SECRET = secretFromEnv;
 
 function ensureAdmin(req, res) {
   const user = authenticate(req);
