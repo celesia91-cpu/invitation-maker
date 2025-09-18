@@ -1,8 +1,6 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import EditorProvider, {
-  reducer,
-  initialState,
   useEditor,
   useEditorDispatch,
   useEditorState,
@@ -16,14 +14,19 @@ const clone = (value) => {
   return JSON.parse(JSON.stringify(value));
 };
 
+const testInternals = __getEditorTestInternals();
+
+const createReducerHarness = (initialOverrides) => testInternals.createHarness(initialOverrides);
+
 describe('EditorContext reducer', () => {
   test('ADD_SLIDE appends new slides with incremented ids and selects them', () => {
+    const { initialState, reducer, counters } = createReducerHarness();
     const state = clone(initialState);
-    const { slideIdCounter: beforeSlides } = __getEditorTestInternals();
+    const beforeSlides = counters.slideIdCounter.current;
 
     const firstResult = reducer(state, { type: 'ADD_SLIDE' });
 
-    const { slideIdCounter: afterFirstSlide } = __getEditorTestInternals();
+    const afterFirstSlide = counters.slideIdCounter.current;
     expect(afterFirstSlide).toBe(beforeSlides + 1);
     expect(firstResult.slides).toHaveLength(state.slides.length + 1);
     const addedSlide = firstResult.slides[firstResult.slides.length - 1];
@@ -31,9 +34,9 @@ describe('EditorContext reducer', () => {
     expect(firstResult.selected).toEqual({ slideId: addedSlide.id, elementId: null });
     expect(state.slides).toHaveLength(1);
 
-    const { slideIdCounter: beforeSecond } = __getEditorTestInternals();
+    const beforeSecond = counters.slideIdCounter.current;
     const secondResult = reducer(firstResult, { type: 'ADD_SLIDE' });
-    const { slideIdCounter: afterSecond } = __getEditorTestInternals();
+    const afterSecond = counters.slideIdCounter.current;
 
     expect(afterSecond).toBe(beforeSecond + 1);
     expect(secondResult.slides).toHaveLength(3);
@@ -42,6 +45,7 @@ describe('EditorContext reducer', () => {
   });
 
   test('SELECT_SLIDE focuses the requested slide and clears element selection', () => {
+    const { initialState, reducer } = createReducerHarness();
     const base = clone(initialState);
     const firstSlideId = base.slides[0].id;
     const withAdditionalSlide = reducer(base, { type: 'ADD_SLIDE' });
@@ -54,13 +58,14 @@ describe('EditorContext reducer', () => {
   });
 
   test('ADD_TEXT creates a text element with defaults and increments element id counter', () => {
+    const { initialState, reducer, counters } = createReducerHarness();
     const slideId = initialState.slides[0].id;
     const base = { ...clone(initialState), selected: { slideId, elementId: null } };
-    const { elementIdCounter: beforeElements } = __getEditorTestInternals();
+    const beforeElements = counters.elementIdCounter.current;
 
     const result = reducer(base, { type: 'ADD_TEXT', content: 'Hello world' });
 
-    const { elementIdCounter: afterElements } = __getEditorTestInternals();
+    const afterElements = counters.elementIdCounter.current;
     expect(afterElements).toBe(beforeElements + 1);
     const [element] = result.slides[0].elements;
     expect(element).toMatchObject({
@@ -77,6 +82,7 @@ describe('EditorContext reducer', () => {
   });
 
   test('UPDATE_TEXT patches the targeted element while preserving untouched properties', () => {
+    const { initialState, reducer } = createReducerHarness();
     const slideId = initialState.slides[0].id;
     const base = { ...clone(initialState), selected: { slideId, elementId: null } };
     const withText = reducer(base, { type: 'ADD_TEXT', content: 'Original' });
@@ -100,14 +106,15 @@ describe('EditorContext reducer', () => {
   });
 
   test('ADD_IMAGE appends images with predictable identifiers', () => {
+    const { initialState, reducer, counters } = createReducerHarness();
     const slideId = initialState.slides[0].id;
     const base = { ...clone(initialState), selected: { slideId, elementId: null } };
     const withText = reducer(base, { type: 'ADD_TEXT', content: 'First element' });
-    const { elementIdCounter: beforeImage } = __getEditorTestInternals();
+    const beforeImage = counters.elementIdCounter.current;
 
     const result = reducer(withText, { type: 'ADD_IMAGE', src: '/cat.png', fit: 'contain' });
 
-    const { elementIdCounter: afterImage } = __getEditorTestInternals();
+    const afterImage = counters.elementIdCounter.current;
     expect(afterImage).toBe(beforeImage + 1);
     expect(withText.slides[0].elements).toHaveLength(1);
     expect(result.slides[0].elements).toHaveLength(2);
@@ -116,6 +123,7 @@ describe('EditorContext reducer', () => {
   });
 
   test('DELETE_ELEMENT removes only the specified element from the selected slide', () => {
+    const { initialState, reducer } = createReducerHarness();
     const slideId = initialState.slides[0].id;
     const base = { ...clone(initialState), selected: { slideId, elementId: null } };
     const withText = reducer(base, { type: 'ADD_TEXT', content: 'Keep me' });
@@ -130,6 +138,7 @@ describe('EditorContext reducer', () => {
   });
 
   test('SELECT_ELEMENT records the focused element while keeping the selected slide', () => {
+    const { initialState, reducer } = createReducerHarness();
     const slideId = initialState.slides[0].id;
     const base = { ...clone(initialState), selected: { slideId, elementId: null } };
     const withText = reducer(base, { type: 'ADD_TEXT', content: 'Selectable' });
@@ -141,6 +150,7 @@ describe('EditorContext reducer', () => {
   });
 
   test('SET_VIEWPORT updates dimensions and optionally the scale', () => {
+    const { initialState, reducer } = createReducerHarness();
     const base = clone(initialState);
     const custom = { ...base, viewport: { width: 320, height: 240, scale: 0.75 } };
 
@@ -187,7 +197,7 @@ describe('EditorProvider hooks', () => {
       result.current.dispatch({ type: 'ADD_SLIDE' });
     });
 
-    const { slideIdCounter: currentSlideCounter } = __getEditorTestInternals();
+    const { slideIdCounter: currentSlideCounter } = testInternals.getLatestCounters();
     expect(result.current.state.slides).toHaveLength(2);
     expect(result.current.state.slides[1].id).toBe(`slide_${currentSlideCounter}`);
     expect(result.current.state.selected.slideId).toBe(`slide_${currentSlideCounter}`);
