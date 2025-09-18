@@ -81,7 +81,7 @@ function verifyJwt(token) {
  * Extract and validate the authenticated user from the request.
  * Accepts either a Bearer JWT token or a `session` cookie containing a JWT.
  * @param {import('http').IncomingMessage} req
- * @returns {{ id: string }}
+ * @returns {{ id: string, role: string }}
  */
 export function authenticate(req) {
   const auth = req.headers['authorization'];
@@ -97,6 +97,8 @@ export function authenticate(req) {
   const payload = verifyJwt(token);
   const userId = payload.sub || payload.userId || payload.id;
   if (!userId) throw new Error('Invalid token payload');
-  return { id: String(userId) };
+  const rawRole = typeof payload.role === 'string' ? payload.role.trim() : '';
+  const role = rawRole || 'user';
+  return { id: String(userId), role };
 }
 
