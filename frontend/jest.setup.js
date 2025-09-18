@@ -41,3 +41,48 @@ if (typeof navigator !== 'undefined') {
     value: mockClipboard,
   });
 }
+
+if (typeof global.PointerEvent === 'undefined') {
+  class MockPointerEvent extends MouseEvent {
+    constructor(type, params = {}) {
+      super(type, params);
+
+      this.pointerId = params.pointerId ?? 1;
+      this.width = params.width ?? 0;
+      this.height = params.height ?? 0;
+      this.pressure = params.pressure ?? 0;
+      this.tangentialPressure = params.tangentialPressure ?? 0;
+      this.tiltX = params.tiltX ?? 0;
+      this.tiltY = params.tiltY ?? 0;
+      this.twist = params.twist ?? 0;
+      this.pointerType = params.pointerType ?? 'mouse';
+      this.isPrimary = params.isPrimary ?? true;
+    }
+  }
+
+  global.PointerEvent = MockPointerEvent;
+
+  if (typeof window !== 'undefined') {
+    window.PointerEvent = MockPointerEvent;
+  }
+}
+
+if (typeof Element !== 'undefined') {
+  const elementPrototype = Element.prototype;
+
+  if (typeof elementPrototype.setPointerCapture !== 'function') {
+    Object.defineProperty(elementPrototype, 'setPointerCapture', {
+      configurable: true,
+      value: () => {},
+      writable: true,
+    });
+  }
+
+  if (typeof elementPrototype.releasePointerCapture !== 'function') {
+    Object.defineProperty(elementPrototype, 'releasePointerCapture', {
+      configurable: true,
+      value: () => {},
+      writable: true,
+    });
+  }
+}
