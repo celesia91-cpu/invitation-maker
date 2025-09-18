@@ -89,8 +89,7 @@ const SECRET = secretFromEnv;
 
 function ensureAdmin(req, res) {
   const user = authenticate(req);
-  const role = users.get(user.id)?.role;
-  if (role !== 'admin') {
+  if (user.role !== 'admin') {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Forbidden' }));
     return null;
@@ -129,11 +128,19 @@ const server = http.createServer(async (req, res) => {
         userTokens.set(id, 5);
         userPurchases.set(id, []);
       }
-      const payload = { sub: id, email, exp: Math.floor(Date.now() / 1000) + 60 * 60 };
+      const userRecord = users.get(id);
+      const storedRole =
+        userRecord && typeof userRecord.role === 'string' ? userRecord.role.trim() : '';
+      const payload = {
+        sub: id,
+        email,
+        role: storedRole || 'user',
+        exp: Math.floor(Date.now() / 1000) + 60 * 60
+      };
       const token = signJwt(payload);
       const headers = { 'Content-Type': 'application/json', 'Set-Cookie': `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600` };
       res.writeHead(200, headers);
-      res.end(JSON.stringify({ token, user: { id, email } }));
+      res.end(JSON.stringify({ token, user: { id, email, role: payload.role } }));
       return;
     }
 
@@ -146,9 +153,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/auth/me') {
       try {
         const user = authenticate(req);
-        const profile = users.get(user.id) || { id: user.id, username: 'user' };
+        const profile = users.get(user.id) || { id: user.id, username: 'user', role: user.role };
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ user: { id: profile.id, email: profile.username } }));
+        res.end(
+          JSON.stringify({
+            user: { id: profile.id, email: profile.username, role: profile.role || user.role }
+          })
+        );
       } catch (err) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -170,7 +181,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const id = String(nextUserId++);
-      users.set(id, { id, username, role });
+      users.set(id, { id, username, role: role || 'user' });
       userTokens.set(id, 5);
       userPurchases.set(id, []);
       res.writeHead(201, { 'Content-Type': 'application/json' });
