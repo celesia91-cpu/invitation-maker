@@ -105,3 +105,48 @@ export const userTokens = new Map();
  * Each record: { amount:number, purchasedAt:string }
  */
 export const userPurchases = new Map();
+
+/**
+ * Map of WebM file id -> metadata record
+ * Each record: {
+ *   id:string,
+ *   designId:string,
+ *   storageUri:string,
+ *   durationSeconds:number|null,
+ *   sizeBytes:number|null,
+ *   uploadedBy:string|null,
+ *   createdAt:string,
+ *   updatedAt:string
+ * }
+ */
+const webmOneTimestamp = new Date('2024-03-20T10:00:00Z').toISOString();
+const webmTwoTimestamp = new Date('2024-04-02T15:45:00Z').toISOString();
+
+export const webmFiles = new Map([
+  [
+    '100',
+    {
+      id: '100',
+      designId: '1',
+      storageUri: 'https://cdn.example.com/designs/1/intro.webm',
+      durationSeconds: 12.5,
+      sizeBytes: 2488320,
+      uploadedBy: 'demo',
+      createdAt: webmOneTimestamp,
+      updatedAt: webmOneTimestamp
+    }
+  ],
+  [
+    '101',
+    {
+      id: '101',
+      designId: '2',
+      storageUri: 'https://cdn.example.com/designs/2/highlight.webm',
+      durationSeconds: 8.75,
+      sizeBytes: 1982465,
+      uploadedBy: 'demo',
+      createdAt: webmTwoTimestamp,
+      updatedAt: webmTwoTimestamp
+    }
+  ]
+]);
