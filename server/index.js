@@ -4,7 +4,7 @@
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
 import { authenticate, authorizeRoles, DEFAULT_USER_ROLE } from './auth.js';
-import { getDesignsByUser, getDesignById } from './designs-store.js';
+import { getDesignsByUser, getDesignById, getAdminDesigns } from './designs-store.js';
 import { userTokens, userPurchases, categories, designs } from './database.js';
 import {
   recordView,
@@ -48,6 +48,23 @@ function rateLimit(req, res) {
 const forbidden = ['admin', 'administrator', 'root', 'superuser'];
 const users = new Map();
 let nextUserId = 1;
+
+function normalizeRole(role = '') {
+  return String(role || '').trim().toLowerCase();
+}
+
+function isAdminRole(role = '') {
+  return normalizeRole(role) === 'admin';
+}
+
+function getStoredUser(userId) {
+  return users.get(String(userId));
+}
+
+function isStoredAdminUser(userId) {
+  const record = getStoredUser(userId);
+  return Boolean(record && isAdminRole(record.role));
+}
 
 function isPrivileged(value = '') {
   return forbidden.includes(String(value).toLowerCase());
@@ -304,21 +321,86 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && req.url.split('?')[0] === '/api/admin/designs') {
+      const adminUser = requireAdmin(req, res);
+      if (!adminUser) return;
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const managedByParam = (urlObj.searchParams.get('managedBy') || '').trim();
+      const hasManagedByFilter = managedByParam.length > 0;
+      const includeAll = urlObj.searchParams.get('includeAll') === 'true';
+
+      let list;
+      if (includeAll) {
+        list = Array.from(designs.values());
+        if (hasManagedByFilter) {
+          list = list.filter((design) => design.managedByAdminId === managedByParam);
+        }
+      } else {
+        list = hasManagedByFilter
+          ? await getAdminDesigns({ managedBy: managedByParam })
+          : await getAdminDesigns();
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/admin/designs') {
       const adminUser = requireAdmin(req, res);
       if (!adminUser) return;
       const body = await readBody(req);
       const id = body.id ? String(body.id) : String(designs.size + 1);
+      const rawIsAdminTemplate = body.isAdminTemplate;
+      const isAdminTemplate =
+        typeof rawIsAdminTemplate === 'string'
+          ? rawIsAdminTemplate.toLowerCase() === 'true'
+          : Boolean(rawIsAdminTemplate);
+      const adminNotes =
+        typeof body.adminNotes === 'string' ? body.adminNotes.trim() : '';
+
+      let managedByAdminId = null;
+      if (Object.prototype.hasOwnProperty.call(body, 'managedByAdminId')) {
+        const rawManagedBy = body.managedByAdminId;
+        if (rawManagedBy !== null && rawManagedBy !== undefined) {
+          const trimmed = String(rawManagedBy).trim();
+          if (trimmed) managedByAdminId = trimmed;
+        }
+      }
+
+      if (managedByAdminId && managedByAdminId !== adminUser.id && !isStoredAdminUser(managedByAdminId)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'managedByAdminId must reference an admin user' }));
+        return;
+      }
+
+      if (isAdminTemplate && !managedByAdminId) {
+        managedByAdminId = adminUser.id;
+      }
+
+      if (!managedByAdminId) {
+        managedByAdminId = null;
+      }
+
+      const ownerId = body.userId
+        ? String(body.userId)
+        : isAdminTemplate
+          ? adminUser.id
+          : 'demo';
+      const price = Number(body.price) || 0;
       const design = {
         id,
-        userId: body.userId ? String(body.userId) : 'demo',
-        title: body.title || 'Untitled',
-        category: body.category || '',
+        userId: ownerId,
+        title: body.title ? String(body.title) : 'Untitled',
+        category: body.category ? String(body.category) : '',
         views: 0,
-        thumbnailUrl: body.thumbnailUrl || '',
+        thumbnailUrl: body.thumbnailUrl ? String(body.thumbnailUrl) : '',
         updatedAt: new Date().toISOString(),
-        price: Number(body.price) || 0,
-        premium: Number(body.price) > 0
+        price,
+        premium: price > 0,
+        isAdminTemplate,
+        adminNotes,
+        managedByAdminId
       };
       designs.set(id, design);
       res.writeHead(201, { 'Content-Type': 'application/json' });
