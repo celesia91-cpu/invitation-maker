@@ -3,7 +3,7 @@
 
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
-import { authenticate } from './auth.js';
+import { authenticate, authorizeRoles } from './auth.js';
 import { getDesignsByUser, getDesignById } from './designs-store.js';
 import { userTokens, userPurchases, categories, designs } from './database.js';
 import {
@@ -87,15 +87,7 @@ if (typeof secretFromEnv !== 'string' || secretFromEnv.length === 0) {
 }
 const SECRET = secretFromEnv;
 
-function ensureAdmin(req, res) {
-  const user = authenticate(req);
-  if (user.role !== 'admin') {
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Forbidden' }));
-    return null;
-  }
-  return user;
-}
+const requireAdmin = authorizeRoles('admin');
 
 function signJwt(payload) {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -264,7 +256,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && req.url === '/api/admin/categories') {
-      if (!ensureAdmin(req, res)) return;
+      const adminUser = requireAdmin(req, res);
+      if (!adminUser) return;
       const list = Array.from(categories.values());
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(list));
@@ -272,7 +265,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && req.url === '/api/admin/categories') {
-      if (!ensureAdmin(req, res)) return;
+      const adminUser = requireAdmin(req, res);
+      if (!adminUser) return;
       const body = await readBody(req);
       const id = String(body.id || '').trim();
       const name = String(body.name || '').trim();
@@ -288,7 +282,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'DELETE' && req.url.startsWith('/api/admin/categories/')) {
-      if (!ensureAdmin(req, res)) return;
+      const adminUser = requireAdmin(req, res);
+      if (!adminUser) return;
       const id = decodeURIComponent(req.url.split('/').pop());
       categories.delete(id);
       res.writeHead(204).end();
@@ -296,7 +291,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && req.url === '/api/admin/designs') {
-      if (!ensureAdmin(req, res)) return;
+      const adminUser = requireAdmin(req, res);
+      if (!adminUser) return;
       const body = await readBody(req);
       const id = body.id ? String(body.id) : String(designs.size + 1);
       const design = {
@@ -317,7 +313,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'PUT' && req.url.startsWith('/api/admin/designs/') && req.url.endsWith('/price')) {
-      if (!ensureAdmin(req, res)) return;
+      const adminUser = requireAdmin(req, res);
+      if (!adminUser) return;
       const parts = req.url.split('/');
       const id = parts[parts.length - 2];
       const body = await readBody(req);
