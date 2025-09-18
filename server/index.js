@@ -120,19 +120,19 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Email and password required' }));
         return;
       }
-      // Create or re-use a demo user id based on email
-      let id = Array.from(users.values()).find(u => u.username === email)?.id;
-      if (!id) {
-        id = String(nextUserId++);
-        users.set(id, { id, username: email, role: 'user' });
+      // Create or re-use a demo user based on the email
+      let userRecord = Array.from(users.values()).find(u => u.username === email);
+      if (!userRecord) {
+        const id = String(nextUserId++);
+        userRecord = { id, username: email, role: 'user' };
+        users.set(id, userRecord);
         userTokens.set(id, 5);
         userPurchases.set(id, []);
       }
-      const userRecord = users.get(id);
       const storedRole =
         userRecord && typeof userRecord.role === 'string' ? userRecord.role.trim() : '';
       const payload = {
-        sub: id,
+        sub: userRecord.id,
         email,
         role: storedRole || 'user',
         exp: Math.floor(Date.now() / 1000) + 60 * 60
@@ -140,7 +140,9 @@ const server = http.createServer(async (req, res) => {
       const token = signJwt(payload);
       const headers = { 'Content-Type': 'application/json', 'Set-Cookie': `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600` };
       res.writeHead(200, headers);
-      res.end(JSON.stringify({ token, user: { id, email, role: payload.role } }));
+      res.end(
+        JSON.stringify({ token, user: { id: userRecord.id, email, role: payload.role } })
+      );
       return;
     }
 
