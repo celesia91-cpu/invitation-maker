@@ -2,7 +2,16 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Canvas from '../Canvas.jsx';
-import EditorProvider from '../../context/EditorContext.jsx';
+import EditorProvider, { useEditor } from '../../context/EditorContext.jsx';
+
+jest.mock('../../context/EditorContext.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: ({ children }) => React.createElement(React.Fragment, null, children),
+    useEditor: jest.fn(),
+  };
+});
 
 const baseViewport = { width: 1080, height: 1920, scale: 1 };
 
@@ -40,23 +49,30 @@ const createSlideWithElements = () => ({
   ],
 });
 
+const renderCanvas = (state, dispatch = jest.fn()) => {
+  useEditor.mockReturnValue([state, dispatch]);
+  const view = render(
+    <EditorProvider>
+      <Canvas />
+    </EditorProvider>
+  );
+  return { ...view, dispatch };
+};
+
 describe('Canvas', () => {
   afterEach(() => {
+    useEditor.mockReset();
     jest.restoreAllMocks();
   });
 
   it('renders text and image layers for the active slide', () => {
-    const { container } = render(
-      <EditorProvider
-        initial={{
-          slides: [createSlideWithElements()],
-          selected: { slideId: 'slide_1', elementId: null },
-          viewport: baseViewport,
-        }}
-      >
-        <Canvas />
-      </EditorProvider>
-    );
+    const state = {
+      slides: [createSlideWithElements()],
+      selected: { slideId: 'slide_1', elementId: null },
+      viewport: baseViewport,
+    };
+
+    const { container } = renderCanvas(state);
 
     const textLayer = container.querySelector('[data-element-id="text-1"]');
     expect(textLayer).toBeInTheDocument();
@@ -68,11 +84,13 @@ describe('Canvas', () => {
   });
 
   it('renders a blank fallback when no slides exist', () => {
-    const { container } = render(
-      <EditorProvider initial={{ slides: [], viewport: baseViewport }}>
-        <Canvas />
-      </EditorProvider>
-    );
+    const state = {
+      slides: [],
+      selected: { slideId: null, elementId: null },
+      viewport: baseViewport,
+    };
+
+    const { container } = renderCanvas(state);
 
     const fallback = container.firstChild;
     expect(fallback).toBeInTheDocument();
@@ -81,7 +99,6 @@ describe('Canvas', () => {
 
   it('dispatches SELECT_ELEMENT with the clicked element id', async () => {
     const user = userEvent.setup();
-    const dispatch = jest.fn();
     const state = {
       slides: [
         {
@@ -112,13 +129,7 @@ describe('Canvas', () => {
       ui: { showGrid: false, snapToGrid: true, showAuthModal: false, showShareModal: false },
     };
 
-    jest.spyOn(React, 'useReducer').mockImplementation(() => [state, dispatch]);
-
-    const { container } = render(
-      <EditorProvider>
-        <Canvas />
-      </EditorProvider>
-    );
+    const { container, dispatch } = renderCanvas(state);
 
     const target = container.querySelector('[data-element-id="text-1"]');
     expect(target).toBeInTheDocument();
