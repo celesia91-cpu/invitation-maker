@@ -146,14 +146,28 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url === '/auth/me') {
       try {
-        const user = authenticate(req);
-        const profile = users.get(user.id) || { id: user.id, username: 'user', role: user.role };
+        const authUser = authenticate(req);
+        const storedProfile = users.get(authUser.id);
+        const storedRole =
+          storedProfile && typeof storedProfile.role === 'string'
+            ? storedProfile.role.trim()
+            : '';
+        const tokenRole = typeof authUser.role === 'string' ? authUser.role.trim() : '';
+        const role = storedRole || tokenRole || 'user';
+
+        const username =
+          storedProfile && typeof storedProfile.username === 'string'
+            ? storedProfile.username
+            : 'user';
+
+        const responseUser = {
+          id: String((storedProfile && storedProfile.id) || authUser.id),
+          email: username,
+          role
+        };
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            user: { id: profile.id, email: profile.username, role: profile.role || user.role }
-          })
-        );
+        res.end(JSON.stringify({ user: responseUser }));
       } catch (err) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
