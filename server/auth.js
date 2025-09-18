@@ -9,6 +9,8 @@ if (typeof secretFromEnv !== 'string' || secretFromEnv.length === 0) {
 }
 const SECRET = secretFromEnv;
 
+export const DEFAULT_USER_ROLE = 'user';
+
 function constantTimeEqual(a = '', b = '') {
   const bufA = Buffer.from(String(a));
   const bufB = Buffer.from(String(b));
@@ -98,7 +100,7 @@ export function authenticate(req) {
   const userId = payload.sub || payload.userId || payload.id;
   if (!userId) throw new Error('Invalid token payload');
   const rawRole = typeof payload.role === 'string' ? payload.role.trim() : '';
-  const role = rawRole || 'user';
+  const role = rawRole || DEFAULT_USER_ROLE;
   return { id: String(userId), role };
 }
 
