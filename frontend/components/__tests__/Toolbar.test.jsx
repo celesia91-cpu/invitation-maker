@@ -2,7 +2,16 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Toolbar from '../Toolbar.jsx';
-import EditorProvider from '../../context/EditorContext.jsx';
+import EditorProvider, { useEditor } from '../../context/EditorContext.jsx';
+
+jest.mock('../../context/EditorContext.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: ({ children }) => React.createElement(React.Fragment, null, children),
+    useEditor: jest.fn(),
+  };
+});
 
 const createState = (overrides = {}) => {
   const baseState = {
@@ -26,7 +35,7 @@ const renderToolbar = (stateOverrides) => {
   const state = createState(stateOverrides);
   const dispatch = jest.fn();
 
-  jest.spyOn(React, 'useReducer').mockImplementation(() => [state, dispatch]);
+  useEditor.mockReturnValue([state, dispatch]);
 
   const view = render(
     <EditorProvider>
@@ -38,6 +47,7 @@ const renderToolbar = (stateOverrides) => {
 };
 
 afterEach(() => {
+  useEditor.mockReset();
   jest.restoreAllMocks();
 });
 
