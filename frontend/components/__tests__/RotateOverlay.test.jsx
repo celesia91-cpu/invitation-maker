@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 import RotateOverlay from '../RotateOverlay.jsx';
 
 describe('RotateOverlay', () => {
@@ -9,7 +9,7 @@ describe('RotateOverlay', () => {
     expect(overlay).not.toBeNull();
     expect(overlay).toHaveAttribute('aria-hidden', 'true');
 
-    const heading = screen.getByRole('heading', { name: 'Please rotate your device' });
+    const heading = within(overlay).getByRole('heading', { name: 'Please rotate your device', hidden: true });
     expect(overlay).toContainElement(heading);
   });
 });
