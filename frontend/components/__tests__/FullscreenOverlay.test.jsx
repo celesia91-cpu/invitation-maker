@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import FullscreenOverlay from '../FullscreenOverlay.jsx';
 
 describe('FullscreenOverlay', () => {
   it('renders a modal dialog with the expected accessibility attributes', () => {
     render(<FullscreenOverlay />);
 
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('dialog', { hidden: true });
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(dialog).toHaveAttribute('aria-labelledby', 'fsTitle');
@@ -14,6 +14,7 @@ describe('FullscreenOverlay', () => {
   it('displays the enter full screen button', () => {
     render(<FullscreenOverlay />);
 
-    expect(screen.getByRole('button', { name: 'Enter Full-Screen' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    expect(within(dialog).getByRole('button', { name: 'Enter Full-Screen', hidden: true })).toBeInTheDocument();
   });
 });
