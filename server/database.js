@@ -22,7 +22,10 @@ export const categories = new Map([
  *   thumbnailUrl:string,
  *   updatedAt:string,
  *   price?:number,
- *   premium?:boolean
+ *   premium?:boolean,
+ *   isAdminTemplate?:boolean,
+ *   adminNotes?:string,
+ *   managedByAdminId?:string|null
  * }
  */
 export const designs = new Map([
@@ -37,7 +40,10 @@ export const designs = new Map([
       thumbnailUrl: '/images/birthday-thumb.png',
       updatedAt: new Date('2024-01-01T12:00:00Z').toISOString(),
       price: 0,
-      premium: false
+      premium: false,
+      isAdminTemplate: false,
+      adminNotes: '',
+      managedByAdminId: null
     }
   ],
   [
@@ -51,7 +57,10 @@ export const designs = new Map([
       thumbnailUrl: '/images/wedding-thumb.png',
       updatedAt: new Date('2024-02-15T08:30:00Z').toISOString(),
       price: 0,
-      premium: false
+      premium: false,
+      isAdminTemplate: false,
+      adminNotes: '',
+      managedByAdminId: null
     }
   ]
 ]);

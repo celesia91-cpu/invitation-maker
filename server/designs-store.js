@@ -46,3 +46,21 @@ export async function getDesignById(userId, id) {
   if (!design || design.userId !== userId) return null;
   return design;
 }
+
+/**
+ * Retrieve all designs flagged as admin templates.
+ * Optionally filter by the admin user managing the template.
+ * @param {{ managedBy?: string }} [filters]
+ * @returns {Promise<Array<object>>}
+ */
+export async function getAdminDesigns(filters = {}) {
+  const { managedBy } = filters;
+  let results = Array.from(designs.values()).filter((design) => design.isAdminTemplate);
+
+  if (managedBy) {
+    const managerId = String(managedBy);
+    results = results.filter((design) => design.managedByAdminId === managerId);
+  }
+
+  return results;
+}
