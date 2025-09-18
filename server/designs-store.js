@@ -2,7 +2,19 @@
 // Simple in-memory storage for user designs.
 // In a real application this would interface with a database.
 
-import { designs } from './database.js';
+import { designs, designOwners } from './database.js';
+
+function withDesignOwnership(design) {
+  if (!design) return null;
+  const ownership = designOwners.get(String(design.id));
+  if (!ownership) {
+    return { ...design };
+  }
+  return {
+    ...design,
+    userId: ownership.userId
+  };
+}
 
 /**
  * Retrieve designs for the provided user id.
@@ -11,7 +23,16 @@ import { designs } from './database.js';
  * @returns {Promise<Array<{id:string,title:string,thumbnailUrl:string,updatedAt:string,category?:string,views?:number}>>}
  */
 export async function getDesignsByUser(userId, filters = {}) {
-  let results = Array.from(designs.values()).filter((d) => d.userId === userId);
+  const normalizedUserId = String(userId);
+  const ownedDesignIds = new Set(
+    Array.from(designOwners.entries())
+      .filter(([, ownership]) => ownership.userId === normalizedUserId)
+      .map(([designId]) => String(designId))
+  );
+
+  let results = Array.from(designs.values()).filter((design) =>
+    ownedDesignIds.has(String(design.id))
+  );
   const { category, search } = filters;
 
   if (category && category !== 'popular' && category !== 'recent') {
@@ -32,7 +53,7 @@ export async function getDesignsByUser(userId, filters = {}) {
     results = [...results].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   }
 
-  return results;
+  return results.map((design) => withDesignOwnership(design));
 }
 
 /**
@@ -42,9 +63,12 @@ export async function getDesignsByUser(userId, filters = {}) {
  * @returns {Promise<{id:string,title:string,thumbnailUrl:string,updatedAt:string,category?:string,views?:number}|null>}
  */
 export async function getDesignById(userId, id) {
-  const design = designs.get(String(id));
-  if (!design || design.userId !== userId) return null;
-  return design;
+  const key = String(id);
+  const design = designs.get(key);
+  if (!design) return null;
+  const ownership = designOwners.get(key);
+  if (!ownership || ownership.userId !== String(userId)) return null;
+  return withDesignOwnership(design);
 }
 
 /**
@@ -62,5 +86,7 @@ export async function getAdminDesigns(filters = {}) {
     results = results.filter((design) => design.managedByAdminId === managerId);
   }
 
-  return results;
+  return results.map((design) => withDesignOwnership(design));
 }
+
+export { withDesignOwnership };

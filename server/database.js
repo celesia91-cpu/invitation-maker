@@ -15,7 +15,6 @@ export const categories = new Map([
  * Map of design id -> design record
  * Each record: {
  *   id:string,
- *   userId:string,
  *   title:string,
  *   category:string,
  *   views:number,
@@ -33,7 +32,6 @@ export const designs = new Map([
     '1',
     {
       id: '1',
-      userId: 'demo',
       title: 'Sample Birthday Invite',
       category: 'birthday',
       views: 150,
@@ -50,7 +48,6 @@ export const designs = new Map([
     '2',
     {
       id: '2',
-      userId: 'demo',
       title: 'Wedding Announcement',
       category: 'wedding',
       views: 300,
@@ -61,6 +58,39 @@ export const designs = new Map([
       isAdminTemplate: false,
       adminNotes: '',
       managedByAdminId: null
+    }
+  ]
+]);
+
+/**
+ * Map of design id -> ownership record
+ * Each record: {
+ *   designId:string,
+ *   userId:string,
+ *   createdAt:string,
+ *   updatedAt:string
+ * }
+ */
+const designOneUpdatedAt = new Date('2024-01-01T12:00:00Z').toISOString();
+const designTwoUpdatedAt = new Date('2024-02-15T08:30:00Z').toISOString();
+
+export const designOwners = new Map([
+  [
+    '1',
+    {
+      designId: '1',
+      userId: 'demo',
+      createdAt: designOneUpdatedAt,
+      updatedAt: designOneUpdatedAt
+    }
+  ],
+  [
+    '2',
+    {
+      designId: '2',
+      userId: 'demo',
+      createdAt: designTwoUpdatedAt,
+      updatedAt: designTwoUpdatedAt
     }
   ]
 ]);
