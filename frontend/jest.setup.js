@@ -43,7 +43,17 @@ if (typeof navigator !== 'undefined') {
 }
 
 if (typeof global.PointerEvent === 'undefined') {
-  class MockPointerEvent extends MouseEvent {
+  const BaseMouseEvent = typeof MouseEvent !== 'undefined'
+    ? MouseEvent
+    : class MockMouseEvent {
+        constructor(type, params = {}) {
+          this.type = type;
+          this.bubbles = params.bubbles ?? false;
+          this.cancelable = params.cancelable ?? false;
+        }
+      };
+
+  class MockPointerEvent extends BaseMouseEvent {
     constructor(type, params = {}) {
       super(type, params);
 

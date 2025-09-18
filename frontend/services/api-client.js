@@ -153,11 +153,18 @@ class APIClient {
   // Save token to active storage
   saveToken(token) {
     try {
+      const localStorageRef = typeof localStorage !== 'undefined' ? localStorage : null;
+      const sessionStorageRef = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+
       if (token && typeof token === 'string' && this._storage) {
         const sessionData = { token, lastActivity: Date.now() };
         this._storage.setItem(this._storageKey, JSON.stringify(sessionData));
-        const other = this._storage === localStorage ? sessionStorage : localStorage;
-        try { other && other.removeItem(this._storageKey); } catch (_) {}
+        const storagesToClear = [localStorageRef, sessionStorageRef]
+          .filter((storage) => storage && storage !== this._storage);
+
+        for (const storage of storagesToClear) {
+          try { storage.removeItem(this._storageKey); } catch (_) {}
+        }
         this.token = token;
         this._log('Token saved to storage successfully');
       } else {
