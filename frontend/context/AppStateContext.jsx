@@ -3,7 +3,7 @@ import { createContext, useContext, useMemo, useReducer } from 'react';
 const AppStateContext = createContext(null);
 
 // Initial shared state adapted from state-/image-/slide-manager patterns
-const initialState = {
+export const initialState = {
   // Slides and selection
   slides: [], // [{ image: {src, ...}, layers: [{ text, left, top, fontSize, ... }], workSize: { w, h }, durationMs }]
   activeIndex: 0,
@@ -36,7 +36,7 @@ const initialState = {
   tokenBalance: 0,
 };
 
-function reducer(state, action) {
+export function reducer(state, action) {
   switch (action.type) {
     case 'SET_SLIDES':
       return { ...state, slides: action.slides ?? [] };
@@ -92,11 +92,8 @@ function reducer(state, action) {
   }
 }
 
-export function AppStateProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
-
-  // Action creators exposed to consumers
-  const value = useMemo(() => ({
+export function createAppStateValue(state, dispatch) {
+  return {
     // State
     ...state,
 
@@ -119,7 +116,14 @@ export function AppStateProvider({ children }) {
     removeTextLayer: (layer, index) => dispatch({ type: 'REMOVE_TEXT_LAYER', layer, index }),
 
     setTokenBalance: (value) => dispatch({ type: 'SET_TOKEN_BALANCE', value }),
-  }), [state]);
+  };
+}
+
+export function AppStateProvider({ children }) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  // Action creators exposed to consumers
+  const value = useMemo(() => createAppStateValue(state, dispatch), [state, dispatch]);
 
   return (
     <AppStateContext.Provider value={value}>
