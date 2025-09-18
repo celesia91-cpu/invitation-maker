@@ -4,8 +4,8 @@
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
 import { authenticate, authorizeRoles, DEFAULT_USER_ROLE } from './auth.js';
-import { getDesignsByUser, getDesignById, getAdminDesigns } from './designs-store.js';
-import { userTokens, userPurchases, categories, designs } from './database.js';
+import { getDesignsByUser, getDesignById, getAdminDesigns, withDesignOwnership } from './designs-store.js';
+import { userTokens, userPurchases, categories, designs, designOwners } from './database.js';
 import {
   recordView,
   recordConversion,
@@ -335,6 +335,7 @@ const server = http.createServer(async (req, res) => {
         if (hasManagedByFilter) {
           list = list.filter((design) => design.managedByAdminId === managedByParam);
         }
+        list = list.map((design) => withDesignOwnership(design));
       } else {
         list = hasManagedByFilter
           ? await getAdminDesigns({ managedBy: managedByParam })
@@ -388,14 +389,14 @@ const server = http.createServer(async (req, res) => {
           ? adminUser.id
           : 'demo';
       const price = Number(body.price) || 0;
+      const timestamp = new Date().toISOString();
       const design = {
         id,
-        userId: ownerId,
         title: body.title ? String(body.title) : 'Untitled',
         category: body.category ? String(body.category) : '',
         views: 0,
         thumbnailUrl: body.thumbnailUrl ? String(body.thumbnailUrl) : '',
-        updatedAt: new Date().toISOString(),
+        updatedAt: timestamp,
         price,
         premium: price > 0,
         isAdminTemplate,
@@ -403,8 +404,14 @@ const server = http.createServer(async (req, res) => {
         managedByAdminId
       };
       designs.set(id, design);
+      designOwners.set(id, {
+        designId: id,
+        userId: ownerId,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
       res.writeHead(201, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(design));
+      res.end(JSON.stringify(withDesignOwnership(design)));
       return;
     }
 
@@ -425,7 +432,7 @@ const server = http.createServer(async (req, res) => {
       design.premium = price > 0;
       design.updatedAt = new Date().toISOString();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(design));
+      res.end(JSON.stringify(withDesignOwnership(design)));
       return;
     }
 
