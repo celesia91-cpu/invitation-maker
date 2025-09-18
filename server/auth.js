@@ -102,3 +102,29 @@ export function authenticate(req) {
   return { id: String(userId), role };
 }
 
+/**
+ * Authorize the authenticated user against a list of allowed roles.
+ * Returns the authenticated user for downstream handlers when access is granted.
+ * @param {...string} allowedRoles
+ * @returns {(req: import('http').IncomingMessage, res: import('http').ServerResponse) => ({ id: string, role: string } | null)}
+ */
+export function authorizeRoles(...allowedRoles) {
+  const normalized = allowedRoles
+    .map(role => (typeof role === 'string' ? role.trim().toLowerCase() : ''))
+    .filter(Boolean);
+  const allowedSet = new Set(normalized);
+
+  return (req, res) => {
+    const user = authenticate(req);
+    if (allowedSet.size > 0) {
+      const userRole = String(user.role || '').trim().toLowerCase();
+      if (!allowedSet.has(userRole)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Forbidden' }));
+        return null;
+      }
+    }
+    return user;
+  };
+}
+
