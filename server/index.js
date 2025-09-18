@@ -3,7 +3,7 @@
 
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
-import { authenticate, authorizeRoles } from './auth.js';
+import { authenticate, authorizeRoles, DEFAULT_USER_ROLE } from './auth.js';
 import { getDesignsByUser, getDesignById } from './designs-store.js';
 import { userTokens, userPurchases, categories, designs } from './database.js';
 import {
@@ -116,7 +116,7 @@ const server = http.createServer(async (req, res) => {
       let userRecord = Array.from(users.values()).find(u => u.username === email);
       if (!userRecord) {
         const id = String(nextUserId++);
-        userRecord = { id, username: email, role: 'user' };
+        userRecord = { id, username: email, role: DEFAULT_USER_ROLE };
         users.set(id, userRecord);
         userTokens.set(id, 5);
         userPurchases.set(id, []);
@@ -126,7 +126,7 @@ const server = http.createServer(async (req, res) => {
       const payload = {
         sub: userRecord.id,
         email,
-        role: storedRole || 'user',
+        role: storedRole || DEFAULT_USER_ROLE,
         exp: Math.floor(Date.now() / 1000) + 60 * 60
       };
       const token = signJwt(payload);
@@ -153,7 +153,7 @@ const server = http.createServer(async (req, res) => {
             ? storedProfile.role.trim()
             : '';
         const tokenRole = typeof authUser.role === 'string' ? authUser.role.trim() : '';
-        const role = storedRole || tokenRole || 'user';
+        const role = storedRole || tokenRole || DEFAULT_USER_ROLE;
 
         const username =
           storedProfile && typeof storedProfile.username === 'string'
@@ -189,7 +189,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const id = String(nextUserId++);
-      users.set(id, { id, username, role: role || 'user' });
+      users.set(id, { id, username, role: role || DEFAULT_USER_ROLE });
       userTokens.set(id, 5);
       userPurchases.set(id, []);
       res.writeHead(201, { 'Content-Type': 'application/json' });
