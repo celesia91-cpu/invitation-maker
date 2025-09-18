@@ -168,4 +168,9 @@ export function useEditor() {
   return [useEditorState(), useEditorDispatch()];
 }
 
+export function __getEditorTestInternals() {
+  return { slideIdCounter, elementIdCounter };
+}
+
+export { EditorProvider, initialState, reducer };
 export default EditorProvider;
