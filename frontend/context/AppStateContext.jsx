@@ -14,6 +14,14 @@ export const initialState = {
   // Auth
   userRole: 'guest',
 
+  // Design ownership
+  designOwnership: {
+    currentDesignId: null,
+    ownershipByDesignId: {},
+    loading: false,
+    error: null,
+  },
+
   // Image state (subset of image-manager.js)
   imgState: {
     has: false,
@@ -179,6 +187,129 @@ export function reducer(state, action) {
 
       return { ...state, navigationHistory: [] };
     }
+    case 'SET_CURRENT_DESIGN_ID': {
+      const designOwnership = state.designOwnership || initialState.designOwnership;
+      const nextId = typeof action.designId === 'string' ? action.designId : action.designId != null ? String(action.designId) : null;
+      if (designOwnership.currentDesignId === nextId) {
+        if (designOwnership === state.designOwnership) {
+          return state;
+        }
+      }
+
+      return {
+        ...state,
+        designOwnership: {
+          ...designOwnership,
+          ownershipByDesignId: { ...designOwnership.ownershipByDesignId },
+          currentDesignId: nextId,
+        },
+      };
+    }
+    case 'SET_DESIGN_OWNERSHIP_LOADING': {
+      const designOwnership = state.designOwnership || initialState.designOwnership;
+      const loading = Boolean(action.loading);
+      if (designOwnership.loading === loading && designOwnership === state.designOwnership) {
+        return state;
+      }
+
+      return {
+        ...state,
+        designOwnership: {
+          ...designOwnership,
+          loading,
+        },
+      };
+    }
+    case 'SET_DESIGN_OWNERSHIP_ERROR': {
+      const designOwnership = state.designOwnership || initialState.designOwnership;
+      if (designOwnership.error === action.error && designOwnership === state.designOwnership) {
+        return state;
+      }
+
+      return {
+        ...state,
+        designOwnership: {
+          ...designOwnership,
+          error: action.error ?? null,
+        },
+      };
+    }
+    case 'SET_DESIGN_OWNERSHIP_ENTRIES': {
+      const designOwnership = state.designOwnership || initialState.designOwnership;
+      const prevMap = designOwnership.ownershipByDesignId || {};
+      const entries = Array.isArray(action.entries)
+        ? action.entries
+        : action.entries && typeof action.entries === 'object'
+          ? Object.values(action.entries)
+          : [];
+
+      let hasChanges = Boolean(action.options?.replace);
+      const nextMap = action.options?.replace ? {} : { ...prevMap };
+
+      for (const entry of entries) {
+        if (!entry) continue;
+        const rawId = entry.id ?? entry.designId ?? entry.token ?? null;
+        if (rawId === null || rawId === undefined) continue;
+        const id = typeof rawId === 'string' ? rawId : String(rawId);
+        const normalizedEntry = {
+          owned: entry.owned !== undefined ? Boolean(entry.owned) : true,
+          ...entry,
+          id,
+        };
+        if (!hasChanges && prevMap[id] === normalizedEntry) {
+          continue;
+        }
+        hasChanges = true;
+        nextMap[id] = normalizedEntry;
+      }
+
+      if (!hasChanges && designOwnership === state.designOwnership) {
+        return state;
+      }
+
+      return {
+        ...state,
+        designOwnership: {
+          ...designOwnership,
+          ownershipByDesignId: nextMap,
+        },
+      };
+    }
+    case 'CLEAR_DESIGN_OWNERSHIP_ENTRY': {
+      const designOwnership = state.designOwnership || initialState.designOwnership;
+      const prevMap = designOwnership.ownershipByDesignId || {};
+      const rawId = action.designId ?? action.id ?? null;
+      if (rawId === null || rawId === undefined) {
+        return state;
+      }
+      const id = typeof rawId === 'string' ? rawId : String(rawId);
+      if (!Object.prototype.hasOwnProperty.call(prevMap, id)) {
+        return state;
+      }
+      const nextMap = { ...prevMap };
+      delete nextMap[id];
+      return {
+        ...state,
+        designOwnership: {
+          ...designOwnership,
+          ownershipByDesignId: nextMap,
+        },
+      };
+    }
+    case 'RESET_DESIGN_OWNERSHIP': {
+      if (state.designOwnership === initialState.designOwnership) {
+        return state;
+      }
+      return {
+        ...state,
+        designOwnership: {
+          currentDesignId: initialState.designOwnership.currentDesignId,
+          ownershipByDesignId: { ...initialState.designOwnership.ownershipByDesignId },
+          loading: initialState.designOwnership.loading,
+          error: initialState.designOwnership.error,
+        },
+      };
+    }
     default:
       return state;
   }
@@ -214,6 +345,14 @@ export function createAppStateValue(state, dispatch) {
 
     pushNavigationHistory: (entry) => dispatch({ type: 'PUSH_NAVIGATION_HISTORY', entry }),
     resetNavigationHistory: () => dispatch({ type: 'RESET_NAVIGATION_HISTORY' }),
+
+    // Design ownership helpers
+    setCurrentDesignId: (designId) => dispatch({ type: 'SET_CURRENT_DESIGN_ID', designId }),
+    setDesignOwnershipLoading: (loading) => dispatch({ type: 'SET_DESIGN_OWNERSHIP_LOADING', loading }),
+    setDesignOwnershipError: (error) => dispatch({ type: 'SET_DESIGN_OWNERSHIP_ERROR', error }),
+    setDesignOwnershipEntries: (entries, options) => dispatch({ type: 'SET_DESIGN_OWNERSHIP_ENTRIES', entries, options }),
+    clearDesignOwnershipEntry: (designId) => dispatch({ type: 'CLEAR_DESIGN_OWNERSHIP_ENTRY', designId }),
+    resetDesignOwnership: () => dispatch({ type: 'RESET_DESIGN_OWNERSHIP' }),
   };
 }
 
@@ -247,6 +386,12 @@ export function MockAppStateProvider({ value, children }) {
       navigationHistory: Array.isArray(initialState.navigationHistory)
         ? [...initialState.navigationHistory]
         : [],
+      designOwnership: {
+        currentDesignId: initialState.designOwnership.currentDesignId,
+        ownershipByDesignId: { ...initialState.designOwnership.ownershipByDesignId },
+        loading: initialState.designOwnership.loading,
+        error: initialState.designOwnership.error,
+      },
     };
 
     return createAppStateValue(baseState, () => {});

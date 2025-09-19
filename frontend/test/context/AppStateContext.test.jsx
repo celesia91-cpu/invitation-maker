@@ -206,6 +206,101 @@ describe('AppStateContext reducer', () => {
     const unchanged = reducer(createState(), { type: 'RESET_NAVIGATION_HISTORY' });
     expect(unchanged.navigationHistory).toEqual([]);
   });
+
+  test('SET_CURRENT_DESIGN_ID stores normalized identifiers without mutating previous state', () => {
+    const state = createState({
+      designOwnership: {
+        currentDesignId: 'old-id',
+        ownershipByDesignId: { 'old-id': { id: 'old-id', owned: true } },
+        loading: false,
+        error: null,
+      },
+    });
+
+    const result = reducer(state, { type: 'SET_CURRENT_DESIGN_ID', designId: 123 });
+
+    expect(result.designOwnership.currentDesignId).toBe('123');
+    expect(result.designOwnership).not.toBe(state.designOwnership);
+    expect(result.designOwnership.ownershipByDesignId).not.toBe(state.designOwnership.ownershipByDesignId);
+    expect(state.designOwnership.currentDesignId).toBe('old-id');
+  });
+
+  test('SET_DESIGN_OWNERSHIP_ENTRIES merges normalized entries and supports replacement', () => {
+    const state = createState({
+      designOwnership: {
+        currentDesignId: 'demo',
+        ownershipByDesignId: {
+          demo: { id: 'demo', owned: true },
+          stale: { id: 'stale', owned: false },
+        },
+        loading: false,
+        error: null,
+      },
+    });
+
+    const merged = reducer(state, {
+      type: 'SET_DESIGN_OWNERSHIP_ENTRIES',
+      entries: [
+        { id: 'demo', owned: false },
+        { designId: 'fresh', owned: true },
+      ],
+    });
+
+    expect(merged.designOwnership.ownershipByDesignId.demo.owned).toBe(false);
+    expect(merged.designOwnership.ownershipByDesignId.fresh.owned).toBe(true);
+    expect(merged.designOwnership.ownershipByDesignId.stale).toBeDefined();
+
+    const replaced = reducer(merged, {
+      type: 'SET_DESIGN_OWNERSHIP_ENTRIES',
+      entries: [{ id: 'new', owned: true }],
+      options: { replace: true },
+    });
+
+    expect(replaced.designOwnership.ownershipByDesignId).toEqual({ new: { id: 'new', owned: true } });
+  });
+
+  test('CLEAR_DESIGN_OWNERSHIP_ENTRY removes a single entry by identifier', () => {
+    const state = createState({
+      designOwnership: {
+        currentDesignId: 'demo',
+        ownershipByDesignId: {
+          demo: { id: 'demo', owned: true },
+          other: { id: 'other', owned: false },
+        },
+        loading: false,
+        error: null,
+      },
+    });
+
+    const cleared = reducer(state, { type: 'CLEAR_DESIGN_OWNERSHIP_ENTRY', designId: 'demo' });
+
+    expect(cleared.designOwnership.ownershipByDesignId.demo).toBeUndefined();
+    expect(cleared.designOwnership.ownershipByDesignId.other).toBeDefined();
+
+    const untouched = reducer(state, { type: 'CLEAR_DESIGN_OWNERSHIP_ENTRY', designId: 'missing' });
+    expect(untouched.designOwnership.ownershipByDesignId.demo).toBeDefined();
+  });
+
+  test('RESET_DESIGN_OWNERSHIP clears current state to defaults', () => {
+    const state = createState({
+      designOwnership: {
+        currentDesignId: 'demo',
+        ownershipByDesignId: { demo: { id: 'demo', owned: true } },
+        loading: true,
+        error: new Error('fail'),
+      },
+    });
+
+    const result = reducer(state, { type: 'RESET_DESIGN_OWNERSHIP' });
+
+    expect(result.designOwnership).toEqual({
+      currentDesignId: null,
+      ownershipByDesignId: {},
+      loading: false,
+      error: null,
+    });
+    expect(state.designOwnership.currentDesignId).toBe('demo');
+  });
 });
 
 describe('AppStateContext action creators', () => {
@@ -321,6 +416,57 @@ describe('AppStateContext action creators', () => {
     value.resetNavigationHistory();
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_NAVIGATION_HISTORY' });
+  });
+
+  test('setCurrentDesignId dispatches SET_CURRENT_DESIGN_ID', () => {
+    const { dispatch, value } = createValue();
+
+    value.setCurrentDesignId('abc');
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CURRENT_DESIGN_ID', designId: 'abc' });
+  });
+
+  test('setDesignOwnershipLoading dispatches SET_DESIGN_OWNERSHIP_LOADING', () => {
+    const { dispatch, value } = createValue();
+
+    value.setDesignOwnershipLoading(true);
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DESIGN_OWNERSHIP_LOADING', loading: true });
+  });
+
+  test('setDesignOwnershipError dispatches SET_DESIGN_OWNERSHIP_ERROR', () => {
+    const { dispatch, value } = createValue();
+    const error = new Error('boom');
+
+    value.setDesignOwnershipError(error);
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DESIGN_OWNERSHIP_ERROR', error });
+  });
+
+  test('setDesignOwnershipEntries dispatches SET_DESIGN_OWNERSHIP_ENTRIES', () => {
+    const { dispatch, value } = createValue();
+    const entries = [{ id: 'a' }];
+    const options = { replace: true };
+
+    value.setDesignOwnershipEntries(entries, options);
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DESIGN_OWNERSHIP_ENTRIES', entries, options });
+  });
+
+  test('clearDesignOwnershipEntry dispatches CLEAR_DESIGN_OWNERSHIP_ENTRY', () => {
+    const { dispatch, value } = createValue();
+
+    value.clearDesignOwnershipEntry('abc');
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'CLEAR_DESIGN_OWNERSHIP_ENTRY', designId: 'abc' });
+  });
+
+  test('resetDesignOwnership dispatches RESET_DESIGN_OWNERSHIP', () => {
+    const { dispatch, value } = createValue();
+
+    value.resetDesignOwnership();
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_DESIGN_OWNERSHIP' });
   });
 });
 

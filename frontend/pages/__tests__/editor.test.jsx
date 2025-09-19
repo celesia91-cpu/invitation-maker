@@ -37,6 +37,13 @@ jest.mock('../../context/AppStateContext.jsx', () => {
       playing: false,
       userRole: 'guest',
       tokenBalance: 0,
+      designOwnership: {
+        currentDesignId: null,
+        ownershipByDesignId: {},
+        loading: false,
+        error: null,
+        ...(initialState.designOwnership ?? {}),
+      },
       workSize: { ...defaultWorkSize, ...(initialState.workSize ?? {}) },
       imgState: { ...defaultImgState, ...(initialState.imgState ?? {}) },
       ...initialState,
@@ -220,14 +227,32 @@ jest.mock('../../hooks/useAuth.js', () => ({
   })),
 }));
 
+jest.mock('../../hooks/useDesignOwnership.js', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
 import { useRouter } from 'next/router';
 import Editor from '../editor/[[...token]].jsx';
 import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
+import useDesignOwnership from '../../hooks/useDesignOwnership.js';
+
+const createDesignOwnershipValue = (overrides = {}) => ({
+  currentDesignId: null,
+  setCurrentDesignId: jest.fn(),
+  isDesignOwned: jest.fn().mockReturnValue(true),
+  ensureOwnership: jest.fn().mockResolvedValue(true),
+  loading: false,
+  error: null,
+  ...overrides,
+});
 
 describe('Editor page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useRouter.mockReturnValue({ query: {} });
+    useDesignOwnership.mockReset();
+    useDesignOwnership.mockReturnValue(createDesignOwnershipValue());
   });
 
   function renderEditor({ initialState, actionsRef } = {}) {
@@ -246,6 +271,7 @@ describe('Editor page', () => {
     expect(await screen.findByText(/Token: abc123/i)).toBeInTheDocument();
     expect(screen.getByText(/View: preview/i)).toBeInTheDocument();
     expect(screen.getByText(/Token Balance: 99/i)).toBeInTheDocument();
+    expect(screen.getByText(/Design Access:/i)).toBeInTheDocument();
   });
 
   it('seeds default slides and resets the active index when no slides exist', async () => {
@@ -284,6 +310,33 @@ describe('Editor page', () => {
     expect(container.querySelector('#work')).toBeInTheDocument();
     expect(await screen.findByPlaceholderText('Type text')).toBeInTheDocument();
     expect(container.querySelector('.drag-demo')).toBeInTheDocument();
+  });
+
+  it('locks the editor UI when the active design is not owned', async () => {
+    const setCurrentDesignId = jest.fn();
+    const ensureOwnership = jest.fn().mockResolvedValue(false);
+    useDesignOwnership.mockReturnValue(
+      createDesignOwnershipValue({
+        currentDesignId: 'design-locked',
+        setCurrentDesignId,
+        isDesignOwned: jest.fn().mockReturnValue(false),
+        ensureOwnership,
+        loading: false,
+      })
+    );
+    useRouter.mockReturnValue({ query: { token: ['design-locked'] } });
+
+    renderEditor({ initialState: { slides: [], activeIndex: 0 } });
+
+    expect(await screen.findByText(/editing is locked until you purchase this design/i)).toBeInTheDocument();
+    expect(setCurrentDesignId).toHaveBeenCalledWith('design-locked');
+    expect(ensureOwnership).toHaveBeenCalledWith('design-locked');
+
+    const lockedRegions = document.querySelectorAll('[data-editing-locked="true"]');
+    expect(lockedRegions.length).toBeGreaterThan(0);
+    lockedRegions.forEach((element) => {
+      expect(element).toHaveAttribute('aria-disabled', 'true');
+    });
   });
 });
 
