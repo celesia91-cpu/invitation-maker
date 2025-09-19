@@ -4,6 +4,7 @@ import { createHmac } from 'node:crypto';
 
 import { webmFiles } from '../database.js';
 import { addWebmFile } from '../webm-store.js';
+import { acquireTestServer } from './test-server.js';
 
 process.env.JWT_SECRET ??= 'test-secret';
 process.env.NODE_ENV = 'test';
@@ -11,6 +12,7 @@ process.env.NODE_ENV = 'test';
 const { default: server } = await import('../index.js');
 
 let baseUrl;
+let serverHandle;
 const initialWebmIds = new Set(webmFiles.keys());
 const AUTH_ERROR_MESSAGE = 'Design ownership required';
 
@@ -52,21 +54,15 @@ async function request(path, options = {}) {
 }
 
 test.before(async () => {
-  await new Promise((resolve) => {
-    server.listen(0, () => resolve());
-  });
-  const address = server.address();
-  if (typeof address === 'string') {
-    baseUrl = address;
-  } else {
-    baseUrl = `http://127.0.0.1:${address.port}`;
-  }
+  serverHandle = await acquireTestServer(server);
+  baseUrl = serverHandle.baseUrl;
 });
 
 test.after(async () => {
-  await new Promise((resolve, reject) => {
-    server.close((err) => (err ? reject(err) : resolve()));
-  });
+  if (serverHandle) {
+    await serverHandle.release();
+    serverHandle = null;
+  }
 });
 
 test.afterEach(() => {

@@ -25,6 +25,7 @@ import {
   getWebmFilesByDesign,
   updateWebmFile
 } from './webm-store.js';
+import { getNavigationState, saveNavigationState } from './navigation-state-store.js';
 
 const port = process.env.PORT || 3001;
 
@@ -350,6 +351,55 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ tokens }));
       return;
+    }
+
+    if (req.url === '/api/navigation/state') {
+      if (req.method === 'GET') {
+        let authUser;
+        try {
+          authUser = authenticate(req);
+        } catch (err) {
+          respondError(res, 401, 'authorization_error', 'Authentication required');
+          return;
+        }
+        const state = getNavigationState(authUser.id);
+        respondJson(res, 200, { state });
+        return;
+      }
+
+      if (req.method === 'PUT' || req.method === 'PATCH') {
+        let authUser;
+        try {
+          authUser = authenticate(req);
+        } catch (err) {
+          respondError(res, 401, 'authorization_error', 'Authentication required');
+          return;
+        }
+
+        let body;
+        try {
+          body = await readBody(req);
+        } catch (err) {
+          respondError(res, 422, 'validation_error', 'Invalid JSON body');
+          return;
+        }
+
+        if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+          respondError(res, 422, 'validation_error', 'Navigation state payload must be an object');
+          return;
+        }
+
+        let state;
+        try {
+          state = saveNavigationState(authUser.id, body);
+        } catch (err) {
+          respondError(res, 422, 'validation_error', err.message || 'Unable to save navigation state');
+          return;
+        }
+
+        respondJson(res, 200, { state });
+        return;
+      }
     }
 
     if (req.method === 'POST' && req.url === '/api/purchase') {
