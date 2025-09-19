@@ -8,7 +8,12 @@ export default function useAuth() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { setUserRole, resetUserRole } = useAppState();
+  const {
+    setUserRole,
+    resetUserRole,
+    resetDesignOwnership,
+    setCurrentDesignId,
+  } = useAppState();
 
   const applyUserRole = useCallback(
     (nextUser) => {
@@ -40,8 +45,10 @@ export default function useAuth() {
 
     if (!appliedRole) {
       resetUserRole();
+      resetDesignOwnership();
+      setCurrentDesignId(null);
     }
-  }, [api, applyUserRole, resetUserRole]);
+  }, [api, applyUserRole, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
 
   const login = useCallback(
     async ({ email, password, remember = false }) => {
@@ -54,6 +61,8 @@ export default function useAuth() {
           applyUserRole(res.user);
         } else {
           resetUserRole();
+          resetDesignOwnership();
+          setCurrentDesignId(null);
         }
         return res;
       } catch (e) {
@@ -63,7 +72,7 @@ export default function useAuth() {
         setLoading(false);
       }
     },
-    [api, applyUserRole, resetUserRole]
+    [api, applyUserRole, resetDesignOwnership, resetUserRole, setCurrentDesignId]
   );
 
   const logout = useCallback(async () => {
@@ -73,15 +82,19 @@ export default function useAuth() {
       await api.logout();
       setUser(null);
       resetUserRole();
+      resetDesignOwnership();
+      setCurrentDesignId(null);
     } catch (e) {
       // surface warning but still clear local state
       setError(e);
       setUser(null);
       resetUserRole();
+      resetDesignOwnership();
+      setCurrentDesignId(null);
     } finally {
       setLoading(false);
     }
-  }, [api, resetUserRole]);
+  }, [api, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
 
   const refreshUser = useCallback(async () => {
     setLoading(true);
@@ -93,16 +106,20 @@ export default function useAuth() {
         applyUserRole(res.user);
       } else {
         resetUserRole();
+        resetDesignOwnership();
+        setCurrentDesignId(null);
       }
       return res?.user ?? null;
     } catch (e) {
       setError(e);
       resetUserRole();
+      resetDesignOwnership();
+      setCurrentDesignId(null);
       return null;
     } finally {
       setLoading(false);
     }
-  }, [api, applyUserRole, resetUserRole]);
+  }, [api, applyUserRole, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
 
   return {
     // state

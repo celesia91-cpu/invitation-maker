@@ -10,9 +10,17 @@ import PreviewModal from '../components/PreviewModal.jsx';
 import PurchaseModal from '../components/PurchaseModal.jsx';
 import Marketplace from '../components/Marketplace.jsx';
 import useAuth from '../hooks/useAuth.js';
+import useDesignOwnership from '../hooks/useDesignOwnership.js';
+
+const DEFAULT_MARKETPLACE_DESIGN_ID = 'demo-marketplace-design';
 
 export default function MarketplacePage() {
   const auth = useAuth();
+  const {
+    setCurrentDesignId,
+    isDesignOwned,
+    currentDesignId,
+  } = useDesignOwnership();
   // Auto-open auth if there is no active session
   const [showAuth, setShowAuth] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -20,6 +28,7 @@ export default function MarketplacePage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
   const [isTopbarVisible, setIsTopbarVisible] = useState(true);
+  const [activeDesignId, setActiveDesignId] = useState(DEFAULT_MARKETPLACE_DESIGN_ID);
 
   useEffect(() => {
     if (!auth.isAuthenticated) setShowAuth(true);
@@ -50,6 +59,25 @@ export default function MarketplacePage() {
     }
   }, [view]);
 
+  useEffect(() => {
+    if (activeDesignId) {
+      setCurrentDesignId(activeDesignId);
+    }
+  }, [activeDesignId, setCurrentDesignId]);
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      setActiveDesignId(DEFAULT_MARKETPLACE_DESIGN_ID);
+    }
+  }, [auth.isAuthenticated]);
+
+  const ensureDesignId = () => {
+    setActiveDesignId((previous) => {
+      if (previous) return previous;
+      return currentDesignId || DEFAULT_MARKETPLACE_DESIGN_ID;
+    });
+  };
+
   return (
     <div>
       {/* Authentication Modal */}
@@ -67,8 +95,19 @@ export default function MarketplacePage() {
       {/* Editor page wrapper */}
       <div id="editorPage" className={`page${view === 'editor' ? '' : ' hidden'}`}>
         <Topbar
-          onPreviewClick={() => setShowPreview(true)}
-          onShareClick={() => setShowPurchase(true)}
+          onPreviewClick={() => {
+            ensureDesignId();
+            setShowPreview(true);
+          }}
+          onShareClick={() => {
+            ensureDesignId();
+            const designId = activeDesignId || currentDesignId || DEFAULT_MARKETPLACE_DESIGN_ID;
+            if (isDesignOwned(designId)) {
+              setView('editor');
+            } else {
+              setShowPurchase(true);
+            }
+          }}
           onTogglePanel={() => setPanelOpen((v) => !v)}
           panelOpen={panelOpen}
         />
@@ -144,12 +183,32 @@ export default function MarketplacePage() {
       {/* Global modals */}
       <PreviewModal
         isOpen={showPreview}
+        designId={activeDesignId}
         onClose={() => setShowPreview(false)}
-        onUseDesign={() => { setShowPreview(false); setShowPurchase(true); }}
+        onUseDesign={({ designId, owned }) => {
+          const nextDesignId = designId || activeDesignId || DEFAULT_MARKETPLACE_DESIGN_ID;
+          setActiveDesignId(nextDesignId);
+          if (owned) {
+            setShowPreview(false);
+            setView('editor');
+          } else {
+            setShowPreview(false);
+            setShowPurchase(true);
+          }
+        }}
       />
       <PurchaseModal
         isOpen={showPurchase}
-        onConfirm={() => setShowPurchase(false)}
+        designId={activeDesignId}
+        onConfirm={({ designId, owned }) => {
+          if (designId) {
+            setActiveDesignId(designId);
+          }
+          setShowPurchase(false);
+          if (owned) {
+            setView('editor');
+          }
+        }}
         onCancel={() => setShowPurchase(false)}
       />
     </div>

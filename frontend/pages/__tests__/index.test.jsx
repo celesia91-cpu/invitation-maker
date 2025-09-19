@@ -31,6 +31,7 @@ const createAuthValue = (overrides = {}) => {
     refreshUser: jest.fn(),
     api: {
       isAuthenticated: () => isAuthenticated,
+      getUserDesigns: jest.fn().mockResolvedValue({ designs: [] }),
     },
     ...overrides,
   };
@@ -117,6 +118,9 @@ describe('MarketplacePage', () => {
       expect(screen.queryByRole('button', { name: /use this design/i })).not.toBeInTheDocument();
     });
 
+    const confirmPurchaseButton = await screen.findByRole('button', { name: /confirm purchase/i });
+    expect(confirmPurchaseButton).toBeInTheDocument();
+
     const cancelPurchaseButton = await screen.findByRole('button', { name: /cancel/i });
     expect(cancelPurchaseButton).toBeInTheDocument();
 
@@ -124,6 +128,7 @@ describe('MarketplacePage', () => {
 
     await waitFor(() => {
       expect(screen.queryByText(/you need tokens to edit this design/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /confirm purchase/i })).not.toBeInTheDocument();
     });
   });
 
