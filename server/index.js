@@ -18,6 +18,13 @@ import {
   getPopularDesigns,
   getConversionRates
 } from './analytics-store.js';
+import {
+  addWebmFile,
+  deleteWebmFile,
+  getWebmFileById,
+  getWebmFilesByDesign,
+  updateWebmFile
+} from './webm-store.js';
 
 const port = process.env.PORT || 3001;
 
@@ -122,6 +129,74 @@ if (typeof secretFromEnv !== 'string' || secretFromEnv.length === 0) {
 const SECRET = secretFromEnv;
 
 const requireAdmin = authorizeRoles('admin');
+
+const AUTH_ERROR_MESSAGE = 'Design ownership required';
+
+function respondJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(payload));
+}
+
+function respondError(res, statusCode, type, message) {
+  respondJson(res, statusCode, { error: { type, message } });
+}
+
+function getAuthenticatedUser(req, res) {
+  try {
+    return authenticate(req);
+  } catch (err) {
+    respondError(res, 401, 'authorization_error', 'Authentication required');
+    return null;
+  }
+}
+
+function userOwnsDesign(user, designId) {
+  if (isAdminRole(user.role)) {
+    return true;
+  }
+  const ownership = designOwners.get(String(designId));
+  return Boolean(ownership && ownership.userId === user.id);
+}
+
+function ensureDesignAccess(res, user, designId) {
+  if (userOwnsDesign(user, designId)) {
+    return true;
+  }
+  respondError(res, 403, 'authorization_error', AUTH_ERROR_MESSAGE);
+  return false;
+}
+
+function coerceNullableNumber(value, fieldName) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    throw new Error(`${fieldName} must be a number`);
+  }
+  return numeric;
+}
+
+function requireJsonBody(req, res) {
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (!contentType.includes('application/json')) {
+    respondError(res, 422, 'validation_error', 'JSON body required');
+    return false;
+  }
+  return true;
+}
+
+async function parseJsonBody(req, res) {
+  try {
+    return await readBody(req);
+  } catch (err) {
+    respondError(res, 422, 'validation_error', 'Invalid JSON body');
+    return null;
+  }
+}
 
 function signJwt(payload) {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -508,9 +583,259 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && req.url.startsWith('/api/designs/')) {
-      const user = authenticate(req);
+    if (req.method === 'POST' && req.url === '/api/webm') {
+      const user = getAuthenticatedUser(req, res);
+      if (!user) return;
+      if (!requireJsonBody(req, res)) return;
+      const body = await parseJsonBody(req, res);
+      if (body === null) return;
+
+      const designId =
+        typeof body.designId === 'string'
+          ? body.designId.trim()
+          : body.designId !== undefined && body.designId !== null
+            ? String(body.designId).trim()
+            : '';
+      if (!designId) {
+        respondError(res, 422, 'validation_error', 'designId is required');
+        return;
+      }
+
+      if (!designs.has(designId)) {
+        respondError(res, 422, 'validation_error', 'designId must reference an existing design');
+        return;
+      }
+
+      if (!ensureDesignAccess(res, user, designId)) {
+        return;
+      }
+
+      const storageUri = typeof body.storageUri === 'string' ? body.storageUri.trim() : '';
+      if (!storageUri) {
+        respondError(res, 422, 'validation_error', 'storageUri is required');
+        return;
+      }
+
+      let durationSeconds;
+      let sizeBytes;
+      try {
+        durationSeconds = coerceNullableNumber(body.durationSeconds, 'durationSeconds');
+        sizeBytes = coerceNullableNumber(body.sizeBytes, 'sizeBytes');
+      } catch (err) {
+        respondError(res, 422, 'validation_error', err.message || 'Invalid numeric field');
+        return;
+      }
+
+      let uploadedBy;
+      if (Object.prototype.hasOwnProperty.call(body, 'uploadedBy')) {
+        if (body.uploadedBy === null) {
+          uploadedBy = null;
+        } else {
+          uploadedBy = String(body.uploadedBy).trim();
+          if (!uploadedBy) uploadedBy = user.id;
+        }
+      } else {
+        uploadedBy = user.id;
+      }
+
+      const payload = {
+        designId,
+        storageUri,
+        uploadedBy
+      };
+      if (durationSeconds !== undefined) payload.durationSeconds = durationSeconds;
+      if (sizeBytes !== undefined) payload.sizeBytes = sizeBytes;
+
+      try {
+        const record = await addWebmFile(payload);
+        respondJson(res, 201, record);
+      } catch (err) {
+        respondError(res, 422, 'validation_error', err.message || 'Unable to create WebM asset');
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && req.url.startsWith('/api/webm/')) {
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const webmId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
+      if (!webmId) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+
+      const user = getAuthenticatedUser(req, res);
+      if (!user) return;
+
+      const record = await getWebmFileById(webmId);
+      if (!record) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+      if (!ensureDesignAccess(res, user, record.designId)) {
+        return;
+      }
+      respondJson(res, 200, record);
+      return;
+    }
+
+    if (req.method === 'PATCH' && req.url.startsWith('/api/webm/')) {
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const webmId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
+      if (!webmId) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+
+      const user = getAuthenticatedUser(req, res);
+      if (!user) return;
+      if (!requireJsonBody(req, res)) return;
+      const body = await parseJsonBody(req, res);
+      if (body === null) return;
+
+      const existing = await getWebmFileById(webmId);
+      if (!existing) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+      if (!ensureDesignAccess(res, user, existing.designId)) {
+        return;
+      }
+
+      const updates = {};
+
+      if (Object.prototype.hasOwnProperty.call(body, 'storageUri')) {
+        if (body.storageUri === null) {
+          updates.storageUri = null;
+        } else {
+          const value = typeof body.storageUri === 'string' ? body.storageUri.trim() : '';
+          if (!value) {
+            respondError(res, 422, 'validation_error', 'storageUri must be a non-empty string');
+            return;
+          }
+          updates.storageUri = value;
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, 'durationSeconds')) {
+        try {
+          updates.durationSeconds = coerceNullableNumber(body.durationSeconds, 'durationSeconds');
+        } catch (err) {
+          respondError(res, 422, 'validation_error', err.message || 'Invalid durationSeconds');
+          return;
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, 'sizeBytes')) {
+        try {
+          updates.sizeBytes = coerceNullableNumber(body.sizeBytes, 'sizeBytes');
+        } catch (err) {
+          respondError(res, 422, 'validation_error', err.message || 'Invalid sizeBytes');
+          return;
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, 'uploadedBy')) {
+        if (body.uploadedBy === null) {
+          updates.uploadedBy = null;
+        } else {
+          const value = String(body.uploadedBy).trim();
+          if (!value) {
+            respondError(res, 422, 'validation_error', 'uploadedBy must be a non-empty string');
+            return;
+          }
+          updates.uploadedBy = value;
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, 'designId')) {
+        const nextDesignId =
+          typeof body.designId === 'string'
+            ? body.designId.trim()
+            : body.designId !== null && body.designId !== undefined
+              ? String(body.designId).trim()
+              : '';
+        if (!nextDesignId) {
+          respondError(res, 422, 'validation_error', 'designId must be a non-empty string');
+          return;
+        }
+        if (!designs.has(nextDesignId)) {
+          respondError(res, 422, 'validation_error', 'designId must reference an existing design');
+          return;
+        }
+        if (!ensureDesignAccess(res, user, nextDesignId)) {
+          return;
+        }
+        updates.designId = nextDesignId;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        respondError(res, 422, 'validation_error', 'No updatable fields provided');
+        return;
+      }
+
+      try {
+        const record = await updateWebmFile(webmId, updates);
+        if (!record) {
+          respondError(res, 404, 'not_found', 'WebM asset not found');
+          return;
+        }
+        respondJson(res, 200, record);
+      } catch (err) {
+        respondError(res, 422, 'validation_error', err.message || 'Unable to update WebM asset');
+      }
+      return;
+    }
+
+    if (req.method === 'DELETE' && req.url.startsWith('/api/webm/')) {
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const webmId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
+      if (!webmId) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+
+      const user = getAuthenticatedUser(req, res);
+      if (!user) return;
+
+      const existing = await getWebmFileById(webmId);
+      if (!existing) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+
+      if (!ensureDesignAccess(res, user, existing.designId)) {
+        return;
+      }
+
+      const deleted = await deleteWebmFile(webmId);
+      if (!deleted) {
+        respondError(res, 404, 'not_found', 'WebM asset not found');
+        return;
+      }
+      res.writeHead(204).end();
+      return;
+    }
+
+    if (req.method === 'GET' && req.url.startsWith('/api/designs/')) {
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      if (urlObj.pathname.endsWith('/webm')) {
+        const user = getAuthenticatedUser(req, res);
+        if (!user) return;
+        const parts = urlObj.pathname.split('/').filter(Boolean);
+        const designId = parts.length >= 4 ? decodeURIComponent(parts[2]) : '';
+        if (!designId || !designs.has(designId)) {
+          respondError(res, 404, 'not_found', 'Design not found');
+          return;
+        }
+        if (!ensureDesignAccess(res, user, designId)) {
+          return;
+        }
+        const files = await getWebmFilesByDesign(designId);
+        respondJson(res, 200, { designId, data: files });
+        return;
+      }
+
+      const user = authenticate(req);
       const param = decodeURIComponent(urlObj.pathname.slice('/api/designs/'.length));
       if (/^\d+$/.test(param)) {
         const design = await getDesignById(user.id, param);
@@ -529,9 +854,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const search = urlObj.searchParams.get('search') || undefined;
-      const designs = await getDesignsByUser(user.id, { category: param, search });
+      const userDesigns = await getDesignsByUser(user.id, { category: param, search });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(designs));
+      res.end(JSON.stringify(userDesigns));
       return;
     }
 
@@ -540,9 +865,9 @@ const server = http.createServer(async (req, res) => {
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const category = urlObj.searchParams.get('category') || undefined;
       const search = urlObj.searchParams.get('search') || undefined;
-      const designs = await getDesignsByUser(user.id, { category, search });
+      const userDesigns = await getDesignsByUser(user.id, { category, search });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(designs));
+      res.end(JSON.stringify(userDesigns));
       return;
     }
     res.writeHead(404, { 'Content-Type': 'application/json' });
