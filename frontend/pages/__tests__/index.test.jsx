@@ -1,10 +1,12 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import userEvent from '@testing-library/user-event';
 import MarketplacePage from '../index.jsx';
 import { AppStateProvider } from '../../context/AppStateContext.jsx';
 import useAuth from '../../hooks/useAuth.js';
 import useModalFocusTrap from '../../hooks/useModalFocusTrap.js';
+import { createMockRouter } from '../../test/utils/createMockRouter.js';
 
 jest.mock('../../hooks/useAuth.js', () => ({
   __esModule: true,
@@ -34,12 +36,17 @@ const createAuthValue = (overrides = {}) => {
   };
 };
 
-const renderPage = () =>
-  render(
-    <AppStateProvider>
-      <MarketplacePage />
-    </AppStateProvider>
+const renderPage = (routerOverrides) => {
+  const router = createMockRouter(routerOverrides);
+
+  return render(
+    <RouterContext.Provider value={router}>
+      <AppStateProvider>
+        <MarketplacePage />
+      </AppStateProvider>
+    </RouterContext.Provider>
   );
+};
 
 describe('MarketplacePage', () => {
   beforeEach(() => {

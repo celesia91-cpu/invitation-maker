@@ -1,4 +1,9 @@
-import { createAppStateValue, initialState, reducer } from '../../context/AppStateContext.jsx';
+import {
+  createAppStateValue,
+  initialState,
+  reducer,
+  formatNavigationLabel,
+} from '../../context/AppStateContext.jsx';
 
 describe('AppStateContext reducer', () => {
   const clone = (value) => {
@@ -165,6 +170,42 @@ describe('AppStateContext reducer', () => {
 
     expect(result).toBe(state);
   });
+
+  test('PUSH_NAVIGATION_HISTORY normalizes entries and avoids duplicate hrefs', () => {
+    const history = [{ href: '/existing', label: 'Existing' }];
+    const state = createState({ navigationHistory: history });
+
+    const result = reducer(state, {
+      type: 'PUSH_NAVIGATION_HISTORY',
+      entry: { href: '/editor', label: '  Editor  ' },
+    });
+
+    expect(result).not.toBe(state);
+    expect(result.navigationHistory).toHaveLength(2);
+    expect(result.navigationHistory[0]).toBe(history[0]);
+    expect(result.navigationHistory[1]).toEqual({ href: '/editor', label: 'Editor' });
+
+    const deduped = reducer(result, {
+      type: 'PUSH_NAVIGATION_HISTORY',
+      entry: { href: '/editor' },
+    });
+
+    expect(deduped.navigationHistory).toHaveLength(2);
+    expect(deduped.navigationHistory[1]).toEqual({ href: '/editor', label: 'Editor' });
+  });
+
+  test('RESET_NAVIGATION_HISTORY clears existing history without affecting other state', () => {
+    const state = createState({ navigationHistory: [{ href: '/a', label: 'A' }], tokenBalance: 5 });
+
+    const result = reducer(state, { type: 'RESET_NAVIGATION_HISTORY' });
+
+    expect(result.navigationHistory).toEqual([]);
+    expect(result.tokenBalance).toBe(5);
+    expect(state.navigationHistory).toHaveLength(1);
+
+    const unchanged = reducer(createState(), { type: 'RESET_NAVIGATION_HISTORY' });
+    expect(unchanged.navigationHistory).toEqual([]);
+  });
 });
 
 describe('AppStateContext action creators', () => {
@@ -263,5 +304,38 @@ describe('AppStateContext action creators', () => {
     value.resetUserRole();
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_USER_ROLE', role: initialState.userRole });
+  });
+
+  test('pushNavigationHistory dispatches PUSH_NAVIGATION_HISTORY', () => {
+    const { dispatch, value } = createValue();
+    const entry = { href: '/editor', label: 'Editor' };
+
+    value.pushNavigationHistory(entry);
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'PUSH_NAVIGATION_HISTORY', entry });
+  });
+
+  test('resetNavigationHistory dispatches RESET_NAVIGATION_HISTORY', () => {
+    const { dispatch, value } = createValue();
+
+    value.resetNavigationHistory();
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_NAVIGATION_HISTORY' });
+  });
+});
+
+describe('formatNavigationLabel', () => {
+  test('formats the root path as Home', () => {
+    expect(formatNavigationLabel('/')).toBe('Home');
+    expect(formatNavigationLabel('')).toBe('Home');
+  });
+
+  test('derives a readable label from the last path segment', () => {
+    expect(formatNavigationLabel('/templates/birthday-party')).toBe('Birthday Party');
+    expect(formatNavigationLabel('/editor/layer_controls')).toBe('Layer Controls');
+  });
+
+  test('decodes encoded segments safely', () => {
+    expect(formatNavigationLabel('/space/%F0%9F%8C%8C')).toBe('🌌');
   });
 });
