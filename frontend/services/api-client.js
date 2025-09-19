@@ -380,6 +380,26 @@ class APIClient {
     return this.post('/purchase', { tokens: amount });
   }
 
+  // Marketplace endpoints
+  async listMarketplace(filters = {}) {
+    const params = {};
+    const { role, category, search } = filters || {};
+
+    if (typeof role === 'string' && role.trim()) {
+      params.role = role.trim().toLowerCase();
+    }
+
+    if (typeof category === 'string' && category.trim()) {
+      params.category = category.trim();
+    }
+
+    if (typeof search === 'string' && search.trim()) {
+      params.search = search.trim();
+    }
+
+    return this.get('/api/marketplace', params);
+  }
+
   // Enhanced authentication methods with session management
   async register(userData) {
     this.isRetrying = true;
