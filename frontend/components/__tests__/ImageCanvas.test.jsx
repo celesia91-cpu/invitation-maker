@@ -17,10 +17,10 @@ jest.mock('../../context/AppStateContext.jsx', () => {
 
 import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
-function renderImageCanvas(value) {
+function renderImageCanvas(value, childNodes = null) {
   return render(
     <MockAppStateProvider value={value}>
-      <ImageCanvas />
+      <ImageCanvas>{childNodes}</ImageCanvas>
     </MockAppStateProvider>
   );
 }
@@ -102,5 +102,18 @@ describe('ImageCanvas', () => {
 
     const image = screen.getByAltText('Background');
     expect(image).toHaveAttribute('src', imageUrls.backendImageUrl);
+  });
+
+  it('renders children inside the canvas container', () => {
+    const { container } = renderImageCanvas(
+      {
+        imgState: { ...baseImgState },
+        workSize: { w: 400, h: 300 },
+      },
+      <span data-testid="overlay">Overlay</span>
+    );
+
+    const overlay = container.querySelector('[data-testid="overlay"]');
+    expect(overlay).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import userEvent from '@testing-library/user-event';
 import MarketplacePage from '../index.jsx';
@@ -19,7 +19,22 @@ jest.mock('../../hooks/useModalFocusTrap.js', () => ({
 }));
 
 const createAuthValue = (overrides = {}) => {
-  const isAuthenticated = overrides.isAuthenticated ?? false;
+  const { api: apiOverride, isAuthenticated: isAuthenticatedOverride, ...rest } = overrides;
+  const isAuthenticated = isAuthenticatedOverride ?? false;
+
+  const defaultApi = {
+    isAuthenticated: () => isAuthenticated,
+    getUserDesigns: jest.fn().mockResolvedValue({ designs: [] }),
+    uploadImage: jest.fn().mockResolvedValue({
+      image: {
+        id: 'demo-image',
+        url: '/placeholder.jpg',
+        thumbnailUrl: '/placeholder-thumb.jpg',
+        width: 800,
+        height: 450,
+      },
+    }),
+  };
 
   return {
     user: null,
@@ -29,11 +44,8 @@ const createAuthValue = (overrides = {}) => {
     login: jest.fn(),
     logout: jest.fn(),
     refreshUser: jest.fn(),
-    api: {
-      isAuthenticated: () => isAuthenticated,
-      getUserDesigns: jest.fn().mockResolvedValue({ designs: [] }),
-    },
-    ...overrides,
+    ...rest,
+    api: { ...defaultApi, ...(apiOverride ?? {}) },
   };
 };
 
@@ -178,5 +190,101 @@ describe('MarketplacePage', () => {
       expect(document.body).toHaveClass('panel-open');
       expect(panelButton).toHaveAttribute('aria-expanded', 'true');
     });
+  });
+
+  it('uploads a background image and updates the canvas on success', async () => {
+    const uploadResponse = {
+      image: {
+        id: 'uploaded',
+        url: 'https://example.com/uploaded.png',
+        thumbnailUrl: 'https://example.com/thumb.png',
+        width: 1024,
+        height: 576,
+      },
+    };
+    let resolveUpload;
+    const uploadImage = jest.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpload = resolve;
+        })
+    );
+
+    useAuth.mockReturnValue(
+      createAuthValue({ isAuthenticated: true, api: { uploadImage } })
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
+
+    const input = screen.getByLabelText(/upload background image/i);
+    const file = new File(['content'], 'background.png', { type: 'image/png' });
+
+    await user.upload(input, file);
+
+    expect(uploadImage).toHaveBeenCalledWith(file);
+
+    const uploadingButton = screen.getByRole('button', { name: /uploading/i });
+    expect(uploadingButton).toBeDisabled();
+
+    await screen.findByLabelText(/upload progress/i);
+
+    await act(async () => {
+      resolveUpload(uploadResponse);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('background.png');
+    });
+
+    const image = await screen.findByAltText('Background');
+    expect(image).toHaveAttribute('src', expect.stringContaining('https://example.com/uploaded.png'));
+  });
+
+  it('displays an error message when the upload fails', async () => {
+    const uploadError = new Error('Network down');
+    let rejectUpload;
+    const uploadImage = jest.fn().mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectUpload = reject;
+        })
+    );
+
+    useAuth.mockReturnValue(
+      createAuthValue({ isAuthenticated: true, api: { uploadImage } })
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
+
+    const input = screen.getByLabelText(/upload background image/i);
+    const file = new File(['oops'], 'failure.png', { type: 'image/png' });
+
+    await user.upload(input, file);
+
+    expect(uploadImage).toHaveBeenCalledWith(file);
+
+    try {
+      await act(async () => {
+        rejectUpload(uploadError);
+      });
+    } catch (_) {
+      // expected rejection from the mocked upload
+    }
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Network down');
+    });
+
+    const placeholder = screen.getByText(/no image selected/i);
+    expect(placeholder).toBeInTheDocument();
+
+    const button = screen.getByRole('button', { name: /upload background/i });
+    expect(button).toBeEnabled();
   });
 });

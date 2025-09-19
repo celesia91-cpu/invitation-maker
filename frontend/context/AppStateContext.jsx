@@ -41,6 +41,14 @@ export const initialState = {
     backendThumbnailUrl: null,
   },
 
+  fileUpload: {
+    status: 'idle',
+    progress: 0,
+    error: null,
+    lastUpload: null,
+    fileName: null,
+  },
+
   // Work area
   workSize: { w: 800, h: 450 },
 
@@ -112,6 +120,78 @@ export function reducer(state, action) {
       return { ...state, workSize: { w: action.w | 0, h: action.h | 0 } };
     case 'UPDATE_IMG_STATE':
       return { ...state, imgState: { ...state.imgState, ...(action.patch ?? {}) } };
+    case 'START_FILE_UPLOAD': {
+      const prevUpload = state.fileUpload || initialState.fileUpload;
+      return {
+        ...state,
+        fileUpload: {
+          status: 'uploading',
+          progress: 0,
+          error: null,
+          lastUpload: prevUpload?.lastUpload ?? null,
+          fileName: action.fileName ?? null,
+        },
+      };
+    }
+    case 'SET_FILE_UPLOAD_PROGRESS': {
+      const prevUpload = state.fileUpload || initialState.fileUpload;
+      const progressValue = Number.isFinite(action.progress)
+        ? Math.min(100, Math.max(0, action.progress))
+        : prevUpload.progress ?? 0;
+      if (
+        prevUpload.progress === progressValue &&
+        prevUpload.status === 'uploading'
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        fileUpload: {
+          ...prevUpload,
+          progress: progressValue,
+        },
+      };
+    }
+    case 'COMPLETE_FILE_UPLOAD': {
+      const prevUpload = state.fileUpload || initialState.fileUpload;
+      const fileName = action.fileName ?? prevUpload.fileName ?? null;
+      return {
+        ...state,
+        fileUpload: {
+          status: 'success',
+          progress: 100,
+          error: null,
+          lastUpload: {
+            status: 'success',
+            fileName,
+            result: action.result ?? null,
+          },
+          fileName,
+        },
+      };
+    }
+    case 'FAIL_FILE_UPLOAD': {
+      const prevUpload = state.fileUpload || initialState.fileUpload;
+      const fileName = action.fileName ?? prevUpload.fileName ?? null;
+      const error = action.error ?? null;
+      const progressValue = Number.isFinite(action.progress)
+        ? Math.min(100, Math.max(0, action.progress))
+        : 0;
+      return {
+        ...state,
+        fileUpload: {
+          status: 'error',
+          progress: progressValue,
+          error,
+          lastUpload: {
+            status: 'error',
+            fileName,
+            error,
+          },
+          fileName,
+        },
+      };
+    }
     case 'ADD_TEXT_LAYER': {
       const slides = state.slides.slice();
       const idx = action.index ?? state.activeIndex;
@@ -333,6 +413,43 @@ export function createAppStateValue(state, dispatch) {
     // Image state
     updateImgState: (patch) => dispatch({ type: 'UPDATE_IMG_STATE', patch }),
 
+    // File upload helpers
+    startFileUpload: (options) => {
+      const fileName =
+        typeof options === 'string' ? options : options?.fileName ?? null;
+      dispatch({ type: 'START_FILE_UPLOAD', fileName });
+    },
+    setFileUploadProgress: (progress) =>
+      dispatch({ type: 'SET_FILE_UPLOAD_PROGRESS', progress }),
+    completeFileUpload: (options) =>
+      dispatch({
+        type: 'COMPLETE_FILE_UPLOAD',
+        fileName:
+          typeof options === 'string'
+            ? options
+            : options?.fileName ?? null,
+        result:
+          typeof options === 'object' && options !== null
+            ? options.result ?? null
+            : null,
+      }),
+    failFileUpload: (options) =>
+      dispatch({
+        type: 'FAIL_FILE_UPLOAD',
+        fileName:
+          typeof options === 'string'
+            ? options
+            : options?.fileName ?? null,
+        error:
+          typeof options === 'object' && options !== null
+            ? options.error ?? null
+            : null,
+        progress:
+          typeof options === 'object' && options !== null
+            ? options.progress
+            : undefined,
+      }),
+
     // Text layers
     addTextLayer: (text, index) => dispatch({ type: 'ADD_TEXT_LAYER', text, index }),
     updateTextLayer: (layer, patch, index) => dispatch({ type: 'UPDATE_TEXT_LAYER', layer, patch, index }),
@@ -391,6 +508,9 @@ export function MockAppStateProvider({ value, children }) {
         ownershipByDesignId: { ...initialState.designOwnership.ownershipByDesignId },
         loading: initialState.designOwnership.loading,
         error: initialState.designOwnership.error,
+      },
+      fileUpload: {
+        ...initialState.fileUpload,
       },
     };
 

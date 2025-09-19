@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import Topbar from '../components/Topbar.jsx';
 import AuthModal from '../components/AuthModal.jsx';
 import SidePanel from '../components/SidePanel.jsx';
@@ -9,6 +8,8 @@ import RotateOverlay from '../components/RotateOverlay.jsx';
 import PreviewModal from '../components/PreviewModal.jsx';
 import PurchaseModal from '../components/PurchaseModal.jsx';
 import Marketplace from '../components/Marketplace.jsx';
+import ImageCanvas from '../components/ImageCanvas.jsx';
+import UploadBackgroundButton from '../components/UploadBackgroundButton.jsx';
 import useAuth from '../hooks/useAuth.js';
 import useDesignOwnership from '../hooks/useDesignOwnership.js';
 
@@ -140,20 +141,9 @@ export default function MarketplacePage() {
 
         <main className="stage">
           <div className="wrap">
-            <div id="work" aria-label="Invitation stage (16:9)">
+            <ImageCanvas>
               <div id="vGuide" className="guide v" aria-hidden="true"></div>
               <div id="hGuide" className="guide h" aria-hidden="true"></div>
-
-                <div id="userBgWrap">
-                  <Image
-                    id="userBg"
-                    src="/placeholder.jpg"
-                    alt=""
-                    width={800}
-                    height={450}
-                    priority
-                  />
-                </div>
               <video id="fxVideo" autoPlay muted loop playsInline>
                 <source src="/Comp 1.webm" type="video/webm" />
               </video>
@@ -173,9 +163,8 @@ export default function MarketplacePage() {
                 <button id="rsvpMap" className="rsvp-btn primary">View Map</button>
               </div>
 
-              <button id="uploadBgBtn">Upload Background</button>
-              <input type="file" id="bgFileInput" accept="image/*" />
-            </div>
+              <UploadBackgroundButton api={auth.api} />
+            </ImageCanvas>
           </div>
         </main>
       </div>
