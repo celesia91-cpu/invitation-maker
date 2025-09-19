@@ -12,6 +12,16 @@ const { default: server } = await import('../index.js');
 
 let baseUrl;
 const initialWebmIds = new Set(webmFiles.keys());
+const AUTH_ERROR_MESSAGE = 'Design ownership required';
+
+function expectAuthorizationError(body, message = AUTH_ERROR_MESSAGE) {
+  assert.deepEqual(body, {
+    error: {
+      type: 'authorization_error',
+      message
+    }
+  });
+}
 
 function signJwt(payload) {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -110,12 +120,7 @@ test('POST /api/webm rejects requests from non-owners', async () => {
   });
 
   assert.equal(response.status, 403);
-  assert.deepEqual(body, {
-    error: {
-      type: 'authorization_error',
-      message: 'Design ownership required'
-    }
-  });
+  expectAuthorizationError(body);
 });
 
 test('GET /api/webm/:id returns metadata when owner requests it', async () => {
@@ -136,12 +141,16 @@ test('GET /api/webm/:id blocks access for non-owners', async () => {
   });
 
   assert.equal(response.status, 403);
-  assert.deepEqual(body, {
-    error: {
-      type: 'authorization_error',
-      message: 'Design ownership required'
-    }
+  expectAuthorizationError(body);
+});
+
+test('GET /api/webm/:id requires authentication', async () => {
+  const { response, body } = await request('/api/webm/100', {
+    method: 'GET'
   });
+
+  assert.equal(response.status, 401);
+  expectAuthorizationError(body, 'Authentication required');
 });
 
 test('GET /api/designs/:id/webm lists design assets for the owner', async () => {
@@ -163,12 +172,16 @@ test('GET /api/designs/:id/webm rejects non-owners', async () => {
   });
 
   assert.equal(response.status, 403);
-  assert.deepEqual(body, {
-    error: {
-      type: 'authorization_error',
-      message: 'Design ownership required'
-    }
+  expectAuthorizationError(body);
+});
+
+test('GET /api/designs/:id/webm returns 401 when unauthenticated', async () => {
+  const { response, body } = await request('/api/designs/1/webm', {
+    method: 'GET'
   });
+
+  assert.equal(response.status, 401);
+  expectAuthorizationError(body, 'Authentication required');
 });
 
 test('PATCH /api/webm/:id updates metadata for the owner', async () => {
@@ -209,12 +222,7 @@ test('PATCH /api/webm/:id forbids updates from non-owners', async () => {
   });
 
   assert.equal(response.status, 403);
-  assert.deepEqual(body, {
-    error: {
-      type: 'authorization_error',
-      message: 'Design ownership required'
-    }
-  });
+  expectAuthorizationError(body);
 });
 
 test('DELETE /api/webm/:id removes the record for the owner', async () => {
@@ -246,11 +254,6 @@ test('DELETE /api/webm/:id rejects non-owners', async () => {
   });
 
   assert.equal(response.status, 403);
-  assert.deepEqual(body, {
-    error: {
-      type: 'authorization_error',
-      message: 'Design ownership required'
-    }
-  });
+  expectAuthorizationError(body);
   assert.equal(webmFiles.has(created.id), true);
 });
