@@ -2,15 +2,9 @@
 // Minimal HTTP server exposing GET /api/designs
 
 import http from 'node:http';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { authenticate, authorizeRoles, DEFAULT_USER_ROLE } from './auth.js';
-import {
-  getDesignsByUser,
-  getDesignById,
-  getAdminDesigns,
-  getMarketplaceDesigns,
-  withDesignOwnership
-} from './designs-store.js';
+import { getDesignsByUser, getDesignById, getMarketplaceDesigns, withDesignOwnership } from './designs-store.js';
 import { userTokens, userPurchases, categories, designs, designOwners } from './database.js';
 import {
   recordView,
@@ -165,6 +159,217 @@ function ensureDesignAccess(res, user, designId) {
   }
   respondError(res, 403, 'authorization_error', AUTH_ERROR_MESSAGE);
   return false;
+}
+
+const ADMIN_DESIGN_STATUSES = new Set(['draft', 'published', 'archived']);
+
+function normalizeString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function cloneSlides(slides = []) {
+  if (!Array.isArray(slides)) return [];
+  try {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(slides);
+    }
+  } catch (err) {
+    // Fall back to JSON cloning below when structuredClone is unavailable.
+  }
+  return JSON.parse(JSON.stringify(slides));
+}
+
+function cloneTags(tags = []) {
+  if (!Array.isArray(tags)) return [];
+  return tags
+    .map((tag) => normalizeString(String(tag)))
+    .filter((tag) => tag.length > 0);
+}
+
+function respondValidationErrors(res, details, message = 'Validation failed') {
+  respondJson(res, 422, {
+    error: {
+      type: 'validation_error',
+      message,
+      details
+    }
+  });
+}
+
+function validateAdminDesignPayload(body, { requireAllFields = false, allowOwnerChange = true } = {}) {
+  const errors = [];
+  const normalized = {};
+
+  const shouldValidate = (field) => requireAllFields || Object.prototype.hasOwnProperty.call(body, field);
+
+  if (shouldValidate('title')) {
+    const title = normalizeString(body.title);
+    if (!title) {
+      errors.push({ field: 'title', message: 'Title is required' });
+    } else {
+      normalized.title = title;
+    }
+  }
+
+  if (shouldValidate('status')) {
+    const status = normalizeString(body.status).toLowerCase();
+    if (!status) {
+      errors.push({ field: 'status', message: 'Status is required' });
+    } else if (!ADMIN_DESIGN_STATUSES.has(status)) {
+      errors.push({ field: 'status', message: 'Unsupported status value' });
+    } else {
+      normalized.status = status;
+    }
+  }
+
+  if (shouldValidate('thumbnailUrl')) {
+    if (body.thumbnailUrl === undefined || body.thumbnailUrl === null) {
+      normalized.thumbnailUrl = '';
+    } else if (typeof body.thumbnailUrl === 'string') {
+      normalized.thumbnailUrl = body.thumbnailUrl.trim();
+    } else {
+      errors.push({ field: 'thumbnailUrl', message: 'thumbnailUrl must be a string' });
+    }
+  }
+
+  if (shouldValidate('slides')) {
+    if (body.slides === undefined || body.slides === null) {
+      normalized.slides = [];
+    } else if (!Array.isArray(body.slides)) {
+      errors.push({ field: 'slides', message: 'slides must be an array' });
+    } else {
+      normalized.slides = cloneSlides(body.slides);
+    }
+  }
+
+  if (shouldValidate('tags')) {
+    if (body.tags === undefined || body.tags === null) {
+      normalized.tags = [];
+    } else if (!Array.isArray(body.tags)) {
+      errors.push({ field: 'tags', message: 'tags must be an array' });
+    } else {
+      normalized.tags = cloneTags(body.tags);
+    }
+  }
+
+  if (shouldValidate('notes')) {
+    if (body.notes === undefined || body.notes === null) {
+      normalized.notes = '';
+    } else if (typeof body.notes === 'string') {
+      normalized.notes = body.notes;
+    } else {
+      errors.push({ field: 'notes', message: 'notes must be a string' });
+    }
+  }
+
+  if (allowOwnerChange && shouldValidate('ownerId')) {
+    if (body.ownerId === undefined || body.ownerId === null) {
+      normalized.ownerId = null;
+    } else {
+      const ownerId = normalizeString(body.ownerId);
+      normalized.ownerId = ownerId || null;
+    }
+  }
+
+  if (!allowOwnerChange && Object.prototype.hasOwnProperty.call(body, 'ownerId')) {
+    errors.push({ field: 'ownerId', message: 'ownerId cannot be modified' });
+  }
+
+  return { errors, normalized };
+}
+
+function assignDesignOwnerRecord(designId, ownerId, timestamp) {
+  const key = String(designId);
+  const record = designOwners.get(key);
+  const userId = ownerId === undefined ? record?.userId ?? null : ownerId;
+  if (record) {
+    designOwners.set(key, {
+      ...record,
+      userId,
+      updatedAt: timestamp
+    });
+  } else {
+    designOwners.set(key, {
+      designId: key,
+      userId,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+  }
+}
+
+function shapeAdminDesign(design) {
+  if (!design) return null;
+  const ownership = designOwners.get(String(design.id));
+  const ownerId = ownership ? ownership.userId ?? null : null;
+  const slides = Array.isArray(design.slides) ? cloneSlides(design.slides) : [];
+  const tags = Array.isArray(design.tags) ? [...design.tags] : [];
+  return {
+    id: String(design.id),
+    ownerId,
+    title: String(design.title || 'Untitled'),
+    status: ADMIN_DESIGN_STATUSES.has(design.status) ? design.status : 'draft',
+    thumbnailUrl: String(design.thumbnailUrl || ''),
+    updatedAt: design.updatedAt || new Date().toISOString(),
+    createdAt: design.createdAt || design.updatedAt || new Date().toISOString(),
+    slides,
+    tags,
+    notes: typeof design.notes === 'string' ? design.notes : ''
+  };
+}
+
+function getAdminDesignId(req) {
+  const path = req.url.split('?')[0];
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length === 4 && segments[0] === 'api' && segments[1] === 'admin' && segments[2] === 'designs') {
+    const rawId = decodeURIComponent(segments[3]);
+    return rawId.trim();
+  }
+  return '';
+}
+
+function checkIfUnmodifiedSince(req, res, design) {
+  const header = req.headers['if-unmodified-since'];
+  if (!header) return true;
+  const providedTimestamp = Date.parse(header);
+  if (Number.isNaN(providedTimestamp)) {
+    respondValidationErrors(res, [
+      { field: 'If-Unmodified-Since', message: 'Invalid If-Unmodified-Since header' }
+    ]);
+    return false;
+  }
+  const updatedAt = Date.parse(design.updatedAt || 0);
+  if (!Number.isFinite(updatedAt)) {
+    return true;
+  }
+  if (updatedAt > providedTimestamp) {
+    respondError(res, 409, 'conflict_error', 'Design was modified by another request');
+    return false;
+  }
+  return true;
+}
+
+function applyAdminDesignUpdates(design, updates, timestamp) {
+  if (updates.title !== undefined) {
+    design.title = updates.title;
+  }
+  if (updates.status !== undefined) {
+    design.status = updates.status;
+  }
+  if (updates.thumbnailUrl !== undefined) {
+    design.thumbnailUrl = updates.thumbnailUrl;
+  }
+  if (updates.slides !== undefined) {
+    design.slides = updates.slides;
+  }
+  if (updates.tags !== undefined) {
+    design.tags = updates.tags;
+  }
+  if (updates.notes !== undefined) {
+    design.notes = updates.notes;
+    design.adminNotes = updates.notes;
+  }
+  design.updatedAt = timestamp;
 }
 
 function coerceNullableNumber(value, fieldName) {
@@ -505,94 +710,295 @@ const server = http.createServer(async (req, res) => {
       const adminUser = requireAdmin(req, res);
       if (!adminUser) return;
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
-      const managedByParam = (urlObj.searchParams.get('managedBy') || '').trim();
-      const hasManagedByFilter = managedByParam.length > 0;
-      const includeAll = urlObj.searchParams.get('includeAll') === 'true';
+      const managedByParam = normalizeString(urlObj.searchParams.get('managedBy'));
+      const statusFilter = normalizeString(urlObj.searchParams.get('status')).toLowerCase();
+      const ownerFilter = normalizeString(urlObj.searchParams.get('ownerId'));
+      const searchParam = normalizeString(urlObj.searchParams.get('search')).toLowerCase();
+      let list = Array.from(designs.values());
 
-      let list;
-      if (includeAll) {
-        list = Array.from(designs.values());
-        if (hasManagedByFilter) {
-          list = list.filter((design) => design.managedByAdminId === managedByParam);
-        }
-        list = list.map((design) => withDesignOwnership(design));
-      } else {
-        list = hasManagedByFilter
-          ? await getAdminDesigns({ managedBy: managedByParam })
-          : await getAdminDesigns();
+      if (managedByParam) {
+        list = list.filter((design) => normalizeString(design.managedByAdminId) === managedByParam);
       }
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(list));
+      if (statusFilter && ADMIN_DESIGN_STATUSES.has(statusFilter)) {
+        list = list.filter((design) => normalizeString(design.status).toLowerCase() === statusFilter);
+      }
+
+      if (ownerFilter) {
+        list = list.filter((design) => {
+          const record = designOwners.get(String(design.id));
+          return normalizeString(record?.userId).toLowerCase() === ownerFilter.toLowerCase();
+        });
+      }
+
+      if (searchParam) {
+        list = list.filter((design) => {
+          const title = String(design.title || '').toLowerCase();
+          const tags = Array.isArray(design.tags)
+            ? design.tags.map((tag) => String(tag).toLowerCase()).join(' ')
+            : '';
+          return title.includes(searchParam) || tags.includes(searchParam);
+        });
+      }
+
+      list = list.sort((a, b) => {
+        const updatedA = Date.parse(a.updatedAt || 0) || 0;
+        const updatedB = Date.parse(b.updatedAt || 0) || 0;
+        return updatedB - updatedA;
+      });
+
+      const DEFAULT_PAGE = 1;
+      const DEFAULT_PAGE_SIZE = 25;
+      const MAX_PAGE_SIZE = 100;
+
+      const page = Math.max(
+        DEFAULT_PAGE,
+        Number.parseInt(urlObj.searchParams.get('page') || DEFAULT_PAGE, 10) || DEFAULT_PAGE
+      );
+      const requestedPageSize = Number.parseInt(
+        urlObj.searchParams.get('pageSize') || DEFAULT_PAGE_SIZE,
+        10
+      );
+      const pageSize = Math.min(
+        MAX_PAGE_SIZE,
+        Math.max(1, Number.isFinite(requestedPageSize) ? requestedPageSize : DEFAULT_PAGE_SIZE)
+      );
+      const startIndex = (page - 1) * pageSize;
+      const paged = list.slice(startIndex, startIndex + pageSize);
+
+      const response = {
+        data: paged.map((design) => shapeAdminDesign(design)),
+        pagination: {
+          page,
+          pageSize,
+          total: list.length
+        }
+      };
+
+      respondJson(res, 200, response);
       return;
     }
 
     if (req.method === 'POST' && req.url === '/api/admin/designs') {
       const adminUser = requireAdmin(req, res);
       if (!adminUser) return;
-      const body = await readBody(req);
-      const id = body.id ? String(body.id) : String(designs.size + 1);
-      const rawIsAdminTemplate = body.isAdminTemplate;
-      const isAdminTemplate =
-        typeof rawIsAdminTemplate === 'string'
-          ? rawIsAdminTemplate.toLowerCase() === 'true'
-          : Boolean(rawIsAdminTemplate);
-      const adminNotes =
-        typeof body.adminNotes === 'string' ? body.adminNotes.trim() : '';
+      if (!requireJsonBody(req, res)) return;
+      const body = await parseJsonBody(req, res);
+      if (body === null) return;
 
-      let managedByAdminId = null;
-      if (Object.prototype.hasOwnProperty.call(body, 'managedByAdminId')) {
-        const rawManagedBy = body.managedByAdminId;
-        if (rawManagedBy !== null && rawManagedBy !== undefined) {
-          const trimmed = String(rawManagedBy).trim();
-          if (trimmed) managedByAdminId = trimmed;
-        }
+      const { errors, normalized } = validateAdminDesignPayload(body, {
+        requireAllFields: true,
+        allowOwnerChange: true
+      });
+
+      const managedByAdminIdValue = normalizeString(body?.managedByAdminId);
+      if (managedByAdminIdValue && managedByAdminIdValue !== adminUser.id && !isStoredAdminUser(managedByAdminIdValue)) {
+        errors.push({ field: 'managedByAdminId', message: 'managedByAdminId must reference an admin user' });
       }
 
-      if (managedByAdminId && managedByAdminId !== adminUser.id && !isStoredAdminUser(managedByAdminId)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'managedByAdminId must reference an admin user' }));
+      if (errors.length > 0) {
+        respondValidationErrors(res, errors);
         return;
       }
 
-      if (isAdminTemplate && !managedByAdminId) {
-        managedByAdminId = adminUser.id;
-      }
-
-      if (!managedByAdminId) {
-        managedByAdminId = null;
-      }
-
-      const ownerId = body.userId
-        ? String(body.userId)
-        : isAdminTemplate
-          ? adminUser.id
-          : 'demo';
-      const price = Number(body.price) || 0;
+      const id = `dsgn_${randomUUID()}`;
       const timestamp = new Date().toISOString();
+      const ownerId = normalized.ownerId ?? null;
+      const rawIsAdminTemplate = body?.isAdminTemplate;
+      const isAdminTemplate =
+        rawIsAdminTemplate === undefined
+          ? ownerId === null
+          : typeof rawIsAdminTemplate === 'string'
+            ? rawIsAdminTemplate.toLowerCase() === 'true'
+            : Boolean(rawIsAdminTemplate);
+      const managedByAdminId = isAdminTemplate
+        ? managedByAdminIdValue || adminUser.id
+        : managedByAdminIdValue || null;
+
+      const priceValue = Number.parseFloat(body?.price);
+      const price = Number.isFinite(priceValue) ? priceValue : 0;
+
       const design = {
         id,
-        title: body.title ? String(body.title) : 'Untitled',
-        category: body.category ? String(body.category) : '',
-        views: 0,
-        thumbnailUrl: body.thumbnailUrl ? String(body.thumbnailUrl) : '',
+        title: normalized.title,
+        status: normalized.status,
+        thumbnailUrl: normalized.thumbnailUrl ?? '',
+        slides: normalized.slides ?? [],
+        tags: normalized.tags ?? [],
+        notes: normalized.notes ?? '',
+        adminNotes: normalized.notes ?? '',
+        createdAt: timestamp,
         updatedAt: timestamp,
+        views: 0,
+        category: normalizeString(body?.category),
         price,
         premium: price > 0,
         isAdminTemplate,
-        adminNotes,
         managedByAdminId
       };
+
       designs.set(id, design);
-      designOwners.set(id, {
-        designId: id,
-        userId: ownerId,
-        createdAt: timestamp,
-        updatedAt: timestamp
-      });
-      res.writeHead(201, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(withDesignOwnership(design)));
+      assignDesignOwnerRecord(id, ownerId, timestamp);
+
+      respondJson(res, 201, shapeAdminDesign(design));
       return;
+    }
+
+    if (req.method === 'PUT' && req.url.startsWith('/api/admin/designs/')) {
+      const designId = getAdminDesignId(req);
+      if (!designId) {
+        // Defer to other more specific admin design routes (e.g., price updates).
+      } else {
+        const adminUser = requireAdmin(req, res);
+        if (!adminUser) return;
+        const existing = designs.get(designId);
+        if (!existing) {
+          respondError(res, 404, 'not_found', 'Design not found');
+          return;
+        }
+
+        if (!checkIfUnmodifiedSince(req, res, existing)) {
+          return;
+        }
+
+        if (!requireJsonBody(req, res)) return;
+        const body = await parseJsonBody(req, res);
+        if (body === null) return;
+
+        const { errors, normalized } = validateAdminDesignPayload(body, {
+          requireAllFields: true,
+          allowOwnerChange: true
+        });
+
+        const managedByAdminIdValue = normalizeString(body?.managedByAdminId);
+        if (managedByAdminIdValue && managedByAdminIdValue !== adminUser.id && !isStoredAdminUser(managedByAdminIdValue)) {
+          errors.push({ field: 'managedByAdminId', message: 'managedByAdminId must reference an admin user' });
+        }
+
+        if (errors.length > 0) {
+          respondValidationErrors(res, errors);
+          return;
+        }
+
+        const ownerId = normalized.ownerId ?? null;
+        const rawIsAdminTemplate = body?.isAdminTemplate;
+        const isAdminTemplate =
+          rawIsAdminTemplate === undefined
+            ? ownerId === null
+            : typeof rawIsAdminTemplate === 'string'
+              ? rawIsAdminTemplate.toLowerCase() === 'true'
+              : Boolean(rawIsAdminTemplate);
+        const managedByAdminId = isAdminTemplate
+          ? managedByAdminIdValue || adminUser.id
+          : managedByAdminIdValue || null;
+
+        const priceValue = Number.parseFloat(body?.price);
+        const price = Number.isFinite(priceValue) ? priceValue : existing.price ?? 0;
+
+        const timestamp = new Date().toISOString();
+
+        applyAdminDesignUpdates(
+          existing,
+          {
+            title: normalized.title,
+            status: normalized.status,
+            thumbnailUrl: normalized.thumbnailUrl ?? '',
+            slides: normalized.slides ?? [],
+            tags: normalized.tags ?? [],
+            notes: normalized.notes ?? ''
+          },
+          timestamp
+        );
+
+        existing.price = price;
+        existing.premium = price > 0;
+        existing.isAdminTemplate = isAdminTemplate;
+        existing.managedByAdminId = managedByAdminId;
+        if (body?.category !== undefined) {
+          existing.category = normalizeString(body.category);
+        }
+        if (!existing.createdAt) {
+          existing.createdAt = timestamp;
+        }
+
+        assignDesignOwnerRecord(designId, ownerId, timestamp);
+
+        respondJson(res, 200, shapeAdminDesign(existing));
+        return;
+      }
+    }
+
+    if (req.method === 'PATCH' && req.url.startsWith('/api/admin/designs/')) {
+      const designId = getAdminDesignId(req);
+      if (!designId) {
+        // Ignore non-resource PATCH routes and allow other handlers to evaluate.
+      } else {
+        const adminUser = requireAdmin(req, res);
+        if (!adminUser) return;
+        const existing = designs.get(designId);
+        if (!existing) {
+          respondError(res, 404, 'not_found', 'Design not found');
+          return;
+        }
+
+        if (!checkIfUnmodifiedSince(req, res, existing)) {
+          return;
+        }
+
+        if (!requireJsonBody(req, res)) return;
+        const body = await parseJsonBody(req, res);
+        if (body === null) return;
+
+        const { errors, normalized } = validateAdminDesignPayload(body, {
+          requireAllFields: false,
+          allowOwnerChange: false
+        });
+
+        if (errors.length > 0) {
+          respondValidationErrors(res, errors);
+          return;
+        }
+
+        if (Object.keys(normalized).length === 0) {
+          respondValidationErrors(res, [{ field: '*', message: 'No updatable fields provided' }]);
+          return;
+        }
+
+        const timestamp = new Date().toISOString();
+
+        applyAdminDesignUpdates(existing, normalized, timestamp);
+
+        respondJson(res, 200, shapeAdminDesign(existing));
+        return;
+      }
+    }
+
+    if (req.method === 'DELETE' && req.url.startsWith('/api/admin/designs/')) {
+      const designId = getAdminDesignId(req);
+      if (!designId) {
+        // Allow other handlers to process paths without a direct design id.
+      } else {
+        const adminUser = requireAdmin(req, res);
+        if (!adminUser) return;
+        const existing = designs.get(designId);
+        if (!existing) {
+          respondError(res, 404, 'not_found', 'Design not found');
+          return;
+        }
+
+        if (!checkIfUnmodifiedSince(req, res, existing)) {
+          return;
+        }
+
+        const timestamp = new Date().toISOString();
+        existing.status = 'archived';
+        existing.updatedAt = timestamp;
+        existing.archivedAt = timestamp;
+        existing.archivedByAdminId = adminUser.id;
+
+        res.writeHead(204).end();
+        return;
+      }
     }
 
     if (req.method === 'PUT' && req.url.startsWith('/api/admin/designs/') && req.url.endsWith('/price')) {
