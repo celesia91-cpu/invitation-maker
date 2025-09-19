@@ -98,6 +98,14 @@ cookie.
 }
 ```
 
+### Admin design management (in planning)
+Upcoming administrative endpoints for managing invitation designs are
+captured in [docs/admin-design-management-api.md](docs/admin-design-management-api.md).
+The plan covers authentication expectations, payload schemas, and
+CRUD operations such as `GET /api/admin/designs` and
+`POST /api/admin/designs` so backend and frontend contributors can
+coordinate before implementation.
+
 ## Database Maintenance
 A foreign key now links `rsvps.customer_id` to `customers.id`. Before applying the migration, use the helper scripts to ensure data integrity:
 
