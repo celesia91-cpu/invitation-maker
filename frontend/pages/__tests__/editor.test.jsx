@@ -35,6 +35,7 @@ jest.mock('../../context/AppStateContext.jsx', () => {
       slides: [],
       activeIndex: 0,
       playing: false,
+      userRole: 'guest',
       tokenBalance: 0,
       workSize: { ...defaultWorkSize, ...(initialState.workSize ?? {}) },
       imgState: { ...defaultImgState, ...(initialState.imgState ?? {}) },
@@ -77,6 +78,23 @@ jest.mock('../../context/AppStateContext.jsx', () => {
     if (!setTokenBalanceRef.current) {
       setTokenBalanceRef.current = jest.fn((value) => {
         setState((prev) => ({ ...prev, tokenBalance: value ?? 0 }));
+      });
+    }
+
+    const setUserRoleRef = React.useRef();
+    if (!setUserRoleRef.current) {
+      setUserRoleRef.current = jest.fn((role) => {
+        setState((prev) => ({
+          ...prev,
+          userRole: typeof role === 'string' && role.trim() ? role : 'guest',
+        }));
+      });
+    }
+
+    const resetUserRoleRef = React.useRef();
+    if (!resetUserRoleRef.current) {
+      resetUserRoleRef.current = jest.fn(() => {
+        setState((prev) => ({ ...prev, userRole: 'guest' }));
       });
     }
 
@@ -148,6 +166,8 @@ jest.mock('../../context/AppStateContext.jsx', () => {
         setWorkSize: setWorkSizeRef.current,
         updateImgState: updateImgStateRef.current,
         setTokenBalance: setTokenBalanceRef.current,
+        setUserRole: setUserRoleRef.current,
+        resetUserRole: resetUserRoleRef.current,
         addTextLayer: addTextLayerRef.current,
         updateTextLayer: updateTextLayerRef.current,
         removeTextLayer: removeTextLayerRef.current,
@@ -162,6 +182,8 @@ jest.mock('../../context/AppStateContext.jsx', () => {
           setActiveIndex: setActiveIndexRef.current,
           setWorkSize: setWorkSizeRef.current,
           setTokenBalance: setTokenBalanceRef.current,
+          setUserRole: setUserRoleRef.current,
+          resetUserRole: resetUserRoleRef.current,
         };
       }
     }, [actionsRef]);

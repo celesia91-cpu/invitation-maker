@@ -147,6 +147,24 @@ describe('AppStateContext reducer', () => {
     expect(result.tokenBalance).toBe(12);
     expect(state.tokenBalance).toBe(7);
   });
+
+  test('SET_USER_ROLE normalizes falsy roles to guest and trims strings', () => {
+    const state = createState({ userRole: 'guest' });
+
+    const next = reducer(state, { type: 'SET_USER_ROLE', role: '  Admin  ' });
+    expect(next.userRole).toBe('Admin');
+
+    const fallback = reducer(next, { type: 'SET_USER_ROLE', role: '' });
+    expect(fallback.userRole).toBe('guest');
+  });
+
+  test('SET_USER_ROLE returns the same reference when the role is unchanged', () => {
+    const state = createState({ userRole: 'creator' });
+
+    const result = reducer(state, { type: 'SET_USER_ROLE', role: 'creator' });
+
+    expect(result).toBe(state);
+  });
 });
 
 describe('AppStateContext action creators', () => {
@@ -229,5 +247,21 @@ describe('AppStateContext action creators', () => {
     value.setTokenBalance(42);
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_TOKEN_BALANCE', value: 42 });
+  });
+
+  test('setUserRole dispatches SET_USER_ROLE', () => {
+    const { dispatch, value } = createValue();
+
+    value.setUserRole('admin');
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_USER_ROLE', role: 'admin' });
+  });
+
+  test('resetUserRole dispatches SET_USER_ROLE with the guest role', () => {
+    const { dispatch, value } = createValue();
+
+    value.resetUserRole();
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_USER_ROLE', role: initialState.userRole });
   });
 });

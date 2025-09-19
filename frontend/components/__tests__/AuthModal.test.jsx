@@ -23,15 +23,23 @@ jest.mock('../../hooks/useModalFocusTrap.js', () => ({
 
 const loginMock = jest.fn();
 const setTokenBalanceMock = jest.fn();
+const setUserRoleMock = jest.fn();
+const resetUserRoleMock = jest.fn();
 
 describe('AuthModal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     loginMock.mockReset();
     setTokenBalanceMock.mockReset();
+    setUserRoleMock.mockReset();
+    resetUserRoleMock.mockReset();
 
     useAuth.mockReturnValue({ login: loginMock });
-    useAppState.mockReturnValue({ setTokenBalance: setTokenBalanceMock });
+    useAppState.mockReturnValue({
+      setTokenBalance: setTokenBalanceMock,
+      setUserRole: setUserRoleMock,
+      resetUserRole: resetUserRoleMock,
+    });
     useModalFocusTrap.mockReturnValue({ current: null });
   });
 
@@ -46,7 +54,7 @@ describe('AuthModal', () => {
     const user = userEvent.setup();
     const onClose = jest.fn();
 
-    loginMock.mockResolvedValue({ balance: 25 });
+    loginMock.mockResolvedValue({ balance: 25, user: { role: 'admin' } });
 
     render(<AuthModal isOpen onClose={onClose} />);
 
@@ -66,6 +74,8 @@ describe('AuthModal', () => {
     });
 
     await waitFor(() => expect(setTokenBalanceMock).toHaveBeenCalledWith(25));
+    await waitFor(() => expect(setUserRoleMock).toHaveBeenCalledWith('admin'));
+    expect(resetUserRoleMock).not.toHaveBeenCalled();
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled();
   });
@@ -100,6 +110,8 @@ describe('AuthModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid credentials');
     expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled();
     expect(setTokenBalanceMock).not.toHaveBeenCalled();
+    expect(setUserRoleMock).not.toHaveBeenCalled();
+    expect(resetUserRoleMock).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
 });

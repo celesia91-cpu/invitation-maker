@@ -4,7 +4,7 @@ import useAuth from '../hooks/useAuth.js';
 import useModalFocusTrap from '../hooks/useModalFocusTrap.js';
 
 export default function AuthModal({ isOpen, onClose }) {
-  const { setTokenBalance } = useAppState();
+  const { setTokenBalance, setUserRole, resetUserRole } = useAppState();
   const auth = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +22,12 @@ export default function AuthModal({ isOpen, onClose }) {
     try {
       const response = await auth.login({ email, password, remember });
       setTokenBalance(response.balance || 0);
+      const role = response?.user?.role;
+      if (typeof role === 'string' && role.trim()) {
+        setUserRole(role);
+      } else {
+        resetUserRole();
+      }
       onClose?.();
     } catch (err) {
       setError(err.message || 'Login failed');

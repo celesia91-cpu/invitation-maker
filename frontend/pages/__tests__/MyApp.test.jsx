@@ -26,5 +26,8 @@ describe('MyApp', () => {
     expect(recordedProps).toEqual(pageProps);
     expect(recordedContext).toBeDefined();
     expect(typeof recordedContext.setSlides).toBe('function');
+    expect(recordedContext.userRole).toBe('guest');
+    expect(typeof recordedContext.setUserRole).toBe('function');
+    expect(typeof recordedContext.resetUserRole).toBe('function');
   });
 });
