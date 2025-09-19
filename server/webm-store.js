@@ -106,10 +106,20 @@ export async function updateWebmFile(id, updates = {}) {
   return cloneWebmFile(nextRecord);
 }
 
+export async function deleteWebmFile(id) {
+  const key = String(id);
+  if (!webmFiles.has(key)) {
+    return false;
+  }
+  webmFiles.delete(key);
+  return true;
+}
+
 export default {
   getWebmFileById,
   getWebmFilesByDesign,
   getWebmFilesByUser,
   addWebmFile,
-  updateWebmFile
+  updateWebmFile,
+  deleteWebmFile
 };
