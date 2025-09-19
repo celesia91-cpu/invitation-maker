@@ -8,7 +8,8 @@
  */
 export const categories = new Map([
   ['birthday', { id: 'birthday', name: 'Birthday' }],
-  ['wedding', { id: 'wedding', name: 'Wedding' }]
+  ['wedding', { id: 'wedding', name: 'Wedding' }],
+  ['corporate', { id: 'corporate', name: 'Corporate' }]
 ]);
 
 /**
@@ -41,7 +42,13 @@ export const designs = new Map([
       premium: false,
       isAdminTemplate: false,
       adminNotes: '',
-      managedByAdminId: null
+      managedByAdminId: null,
+      visibility: {
+        creator: true,
+        consumer: true,
+        admin: true
+      },
+      badges: ['trending']
     }
   ],
   [
@@ -57,7 +64,35 @@ export const designs = new Map([
       premium: false,
       isAdminTemplate: false,
       adminNotes: '',
-      managedByAdminId: null
+      managedByAdminId: null,
+      visibility: {
+        creator: true,
+        consumer: false,
+        admin: true
+      },
+      badges: ['creator-beta']
+    }
+  ],
+  [
+    '3',
+    {
+      id: '3',
+      title: 'Premium Event Template',
+      category: 'corporate',
+      views: 45,
+      thumbnailUrl: '/images/corporate-thumb.png',
+      updatedAt: new Date('2024-03-10T09:15:00Z').toISOString(),
+      price: 24.99,
+      premium: true,
+      isAdminTemplate: true,
+      adminNotes: 'Reserved for managed accounts',
+      managedByAdminId: '1',
+      visibility: {
+        creator: false,
+        consumer: true,
+        admin: true
+      },
+      badges: ['premium', 'new']
     }
   ]
 ]);
@@ -73,6 +108,7 @@ export const designs = new Map([
  */
 const designOneUpdatedAt = new Date('2024-01-01T12:00:00Z').toISOString();
 const designTwoUpdatedAt = new Date('2024-02-15T08:30:00Z').toISOString();
+const designThreeUpdatedAt = new Date('2024-03-10T09:15:00Z').toISOString();
 
 export const designOwners = new Map([
   [
@@ -91,6 +127,15 @@ export const designOwners = new Map([
       userId: 'demo',
       createdAt: designTwoUpdatedAt,
       updatedAt: designTwoUpdatedAt
+    }
+  ],
+  [
+    '3',
+    {
+      designId: '3',
+      userId: 'studio-omega',
+      createdAt: designThreeUpdatedAt,
+      updatedAt: designThreeUpdatedAt
     }
   ]
 ]);

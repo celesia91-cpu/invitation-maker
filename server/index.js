@@ -4,7 +4,13 @@
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
 import { authenticate, authorizeRoles, DEFAULT_USER_ROLE } from './auth.js';
-import { getDesignsByUser, getDesignById, getAdminDesigns, withDesignOwnership } from './designs-store.js';
+import {
+  getDesignsByUser,
+  getDesignById,
+  getAdminDesigns,
+  getMarketplaceDesigns,
+  withDesignOwnership
+} from './designs-store.js';
 import { userTokens, userPurchases, categories, designs, designOwners } from './database.js';
 import {
   recordView,
@@ -55,6 +61,17 @@ function normalizeRole(role = '') {
 
 function isAdminRole(role = '') {
   return normalizeRole(role) === 'admin';
+}
+
+const MARKETPLACE_ROLE_ALIASES = new Map([
+  ['user', 'consumer']
+]);
+const MARKETPLACE_ROLES = new Set(['creator', 'consumer', 'admin']);
+
+function resolveMarketplaceRole(role = '') {
+  const normalized = normalizeRole(role);
+  if (!normalized) return '';
+  return MARKETPLACE_ROLE_ALIASES.get(normalized) || normalized;
 }
 
 function getStoredUser(userId) {
@@ -433,6 +450,61 @@ const server = http.createServer(async (req, res) => {
       design.updatedAt = new Date().toISOString();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(withDesignOwnership(design)));
+      return;
+    }
+
+    if (req.method === 'GET' && req.url.split('?')[0] === '/api/marketplace') {
+      const authUser = authenticate(req);
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+
+      let defaultRole = resolveMarketplaceRole(authUser.role) || 'consumer';
+      if (!MARKETPLACE_ROLES.has(defaultRole)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unsupported role' }));
+        return;
+      }
+
+      const requestedRoleParam = urlObj.searchParams.get('role');
+      let effectiveRole = defaultRole;
+      if (requestedRoleParam !== null) {
+        const requestedRole = resolveMarketplaceRole(requestedRoleParam);
+        if (!MARKETPLACE_ROLES.has(requestedRole)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unsupported role' }));
+          return;
+        }
+        if (!isAdminRole(defaultRole) && requestedRole !== defaultRole) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Forbidden role override' }));
+          return;
+        }
+        effectiveRole = requestedRole;
+      }
+
+      const categoryParam = urlObj.searchParams.get('category');
+      const searchParam = urlObj.searchParams.get('search');
+      const category = categoryParam ? categoryParam.trim() : '';
+      if (category && !/^[\w-]+$/.test(category)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid category filter' }));
+        return;
+      }
+
+      const search = searchParam ? searchParam.trim() : '';
+      if (search.length > 100) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Search query too long' }));
+        return;
+      }
+
+      const payload = await getMarketplaceDesigns({
+        role: effectiveRole,
+        category: category || undefined,
+        search: search || undefined
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
       return;
     }
 

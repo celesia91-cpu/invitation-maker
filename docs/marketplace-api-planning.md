@@ -1,61 +1,65 @@
-# Marketplace API Planning
+# Marketplace API
 
-This document captures the upcoming `/api/marketplace` endpoint that will expose curated design inventory to different client roles. The goal is to ensure both frontend and backend contributors understand the query contract before implementation lands.
+The `/api/marketplace` endpoint surfaces curated design inventory to authenticated clients while enforcing role-aware visibility.
 
-## Endpoint Overview
+## Request contract
 
-- **Route**: `GET /api/marketplace`
+- **Method**: `GET`
+- **Path**: `/api/marketplace`
 - **Query parameters**:
-  - `role` (optional): Limits the dataset to the caller's intended persona. Supported values will include `creator`, `consumer`, and `admin`. Requests without a `role` parameter default to the authenticated user's role as resolved by the session/JWT middleware.
-  - Additional filters (e.g., `category`, `search`) will be layered on in later iterations once the role-aware scaffolding is in place.
-- **Response envelope**:
+  - `role` (optional): Preview results for a specific persona. The server defaults to the authenticated user's role, treating the legacy `user` role as the `consumer` marketplace view. Admins may supply any supported value; non-admin callers receive `403 Forbidden` if they try to override their own role. Unknown roles return `400 Bad Request`.
+  - `category` (optional): Narrows listings to a specific category id. Values must match `^[\w-]+$` once trimmed.
+  - `search` (optional): Case-insensitive substring match applied to titles, categories, and designer display names. Queries longer than 100 characters are rejected to keep lookups inexpensive.
 
-  ```json
-  {
-    "role": "creator",
-    "data": [
-      {
-        "id": "dsgn_001",
-        "title": "Art Deco Announcement",
-        "thumbnailUrl": "https://cdn.example.com/designs/dsgn_001_thumb.jpg",
-        "designer": {
-          "id": "user_9",
-          "displayName": "River Studio"
-        },
-        "badges": ["featured", "new"],
-        "priceCents": 1299
+## Authorization behaviour
+
+All marketplace calls require a valid session or bearer token. The server resolves the effective role before consulting the data layer:
+
+1. Authenticate the caller via the existing JWT helper.
+2. Derive the baseline role from the JWT payload (`user` values are mapped to `consumer`).
+3. Allow admins to preview other roles via `?role=...`; other callers are restricted to their own role.
+4. Reject unrecognised roles with `400` before querying the store.
+
+## Response shape
+
+The handler forwards the structured payload produced by `getMarketplaceDesigns({ role, category, search })` in `server/designs-store.js`:
+
+```json
+{
+  "role": "consumer",
+  "data": [
+    {
+      "id": "3",
+      "title": "Premium Event Template",
+      "thumbnailUrl": "/images/corporate-thumb.png",
+      "category": "corporate",
+      "badges": ["premium", "new"],
+      "priceCents": 2499,
+      "premium": true,
+      "designer": {
+        "id": "studio-omega",
+        "displayName": "Studio Omega"
       }
-    ]
-  }
-  ```
+    }
+  ]
+}
+```
 
-  The `role` field echoes the applied filter so the UI can confirm which persona view it is rendering. Each design payload will be trimmed to fields that make sense for the marketplace grid; future revisions may include analytics snippets (e.g., `conversionRate`) depending on the authenticated role.
+### Role-specific fields
 
-## Authorization & Access Control
+- **Creators** receive a `flags` object describing admin template metadata (`isAdminTemplate`, `managedByAdminId`).
+- **Admins** receive additional insights: the raw visibility map (`creator`, `consumer`, `admin` flags), `managedByAdminId`, and the latest conversion rate pulled from the analytics store.
 
-- All marketplace traffic continues to require a valid session or bearer token. Public, unauthenticated access is out of scope for this phase because design metadata may expose embargoed templates.
-- The API should reuse the existing `authenticate()` helper and gracefully reject unknown roles with `400 Bad Request` to avoid leaking role experimentation to general users.
-- Admin callers can explicitly request any supported role via `?role=...` so dashboards can preview user experiences. Non-admin callers may only request their own role; attempting to override it should return `403 Forbidden`.
-- Downstream filtering inside the store module must also enforce ownership/visibility rules. For example, a `creator` role should only see designs they manage or designs flagged as `creatorVisible`, while a `consumer` role should be limited to listings approved for storefront display.
+### Visibility rules
 
-## Server Implementation Plan
+`getMarketplaceDesigns` filters the in-memory `designs` map using the per-role visibility flags stored on each design record:
 
-To support the role-based filter, the following code updates are planned:
+- `creator` view includes designs marked `visibility.creator`.
+- `consumer` view includes designs marked `visibility.consumer`.
+- `admin` view bypasses visibility checks but still reports the visibility matrix for auditing.
 
-### `server/index.js`
+Category and search filters are applied after the visibility check. Results are sorted by design id for deterministic responses, and prices are normalised into `priceCents` integers. Designer metadata is derived from the ownership map so marketplace cards can display consistent attribution.
 
-1. **Parse the query string** on `/api/marketplace` requests so the handler can read an optional `role` parameter.
-2. **Resolve the effective role** by defaulting to the authenticated user's role and only honoring the query override when the caller is an admin. Unknown role values should trigger a `400` response.
-3. **Pass the role filter into the store** by invoking a new `getMarketplaceDesigns({ role, ...filters })` helper (described below) and forward its structured payload (`{ role, data }`).
-4. **Normalize error handling** so authorization failures (`403`) and validation issues (`400`) are surfaced before reaching the store layer, keeping the store focused on data shaping.
-5. **Update rate limiting and analytics hooks** (if applicable) to include the resolved role in their logging contexts so usage dashboards can distinguish between creator and consumer traffic.
+## Tests
 
-### `server/designs-store.js`
-
-1. **Add a dedicated `getMarketplaceDesigns` export** that accepts a filter object containing `role`, `category`, and `search` keys. The function should derive the relevant subset from the existing `designs` map without mutating it.
-2. **Gate designs by visibility flags**: introduce or reuse metadata such as `design.visibility` or `design.roles` to ensure each role only receives authorized listings. The helper should fall back to the prior user-based ownership checks (`withDesignOwnership`) when the role is `creator`.
-3. **Shape the response records** to include nested designer info, pricing, badges, and any other marketplace-facing properties while omitting internal analytics fields that do not apply to the requested role.
-4. **Expose lightweight metrics hooks** (e.g., returning `conversionRate` only for admin/admin-preview calls) so higher-privilege roles gain deeper insights without complicating the API contract for consumers.
-5. **Maintain backward compatibility** by leaving the existing `getDesignsByUser` flow untouched; new marketplace logic should live alongside current exports to avoid regressions in authenticated design dashboards.
-
-Implementation work will begin once the above contract is signed off, ensuring both the HTTP surface and the data layer support role-aware marketplace browsing.
+`server/__tests__/marketplace.test.js` exercises the helper to confirm consumer, creator, and admin roles each receive the expected listings and that unsupported roles are rejected. The admin test also verifies conversion rates are surfaced when analytics data exists.
