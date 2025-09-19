@@ -37,7 +37,60 @@ export const initialState = {
   workSize: { w: 800, h: 450 },
 
   tokenBalance: 0,
+
+  // Router
+  navigationHistory: [],
 };
+
+const HOME_LABEL = 'Home';
+
+function safeDecodeURIComponent(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (error) {
+    return value;
+  }
+}
+
+export function formatNavigationLabel(href) {
+  if (typeof href !== 'string' || !href.trim()) {
+    return HOME_LABEL;
+  }
+
+  const path = href.split('#')[0].split('?')[0];
+  if (!path || path === '/' || path.trim() === '') {
+    return HOME_LABEL;
+  }
+
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return HOME_LABEL;
+  }
+
+  const lastSegment = safeDecodeURIComponent(segments[segments.length - 1]);
+  const cleaned = lastSegment.replace(/[-_]+/g, ' ').trim();
+  if (!cleaned) {
+    return HOME_LABEL;
+  }
+
+  return cleaned.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function normalizeNavigationEntry(entry) {
+  if (!entry || typeof entry.href !== 'string') {
+    return null;
+  }
+
+  const href = entry.href.trim();
+  if (!href) {
+    return null;
+  }
+
+  const rawLabel = typeof entry.label === 'string' ? entry.label.trim() : '';
+  const label = rawLabel || formatNavigationLabel(href);
+
+  return { href, label };
+}
 
 export function reducer(state, action) {
   switch (action.type) {
@@ -96,6 +149,36 @@ export function reducer(state, action) {
       if (state.userRole === nextRole) return state;
       return { ...state, userRole: nextRole };
     }
+    case 'PUSH_NAVIGATION_HISTORY': {
+      const entry = normalizeNavigationEntry(action.entry);
+      if (!entry) {
+        return state;
+      }
+
+      const history = state.navigationHistory ?? [];
+      const lastEntry = history[history.length - 1];
+      if (lastEntry && lastEntry.href === entry.href) {
+        if (lastEntry.label === entry.label) {
+          return state;
+        }
+
+        const nextHistory = history.slice();
+        nextHistory[nextHistory.length - 1] = entry;
+        return { ...state, navigationHistory: nextHistory };
+      }
+
+      return {
+        ...state,
+        navigationHistory: history.concat(entry),
+      };
+    }
+    case 'RESET_NAVIGATION_HISTORY': {
+      if (!state.navigationHistory || state.navigationHistory.length === 0) {
+        return state;
+      }
+
+      return { ...state, navigationHistory: [] };
+    }
     default:
       return state;
   }
@@ -128,6 +211,9 @@ export function createAppStateValue(state, dispatch) {
 
     setUserRole: (role) => dispatch({ type: 'SET_USER_ROLE', role }),
     resetUserRole: () => dispatch({ type: 'SET_USER_ROLE', role: initialState.userRole }),
+
+    pushNavigationHistory: (entry) => dispatch({ type: 'PUSH_NAVIGATION_HISTORY', entry }),
+    resetNavigationHistory: () => dispatch({ type: 'RESET_NAVIGATION_HISTORY' }),
   };
 }
 
@@ -158,6 +244,9 @@ export function MockAppStateProvider({ value, children }) {
       slides: Array.isArray(initialState.slides) ? [...initialState.slides] : [],
       imgState: { ...initialState.imgState },
       workSize: { ...initialState.workSize },
+      navigationHistory: Array.isArray(initialState.navigationHistory)
+        ? [...initialState.navigationHistory]
+        : [],
     };
 
     return createAppStateValue(baseState, () => {});
