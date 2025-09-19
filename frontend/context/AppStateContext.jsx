@@ -11,6 +11,9 @@ export const initialState = {
   // Playback
   playing: false,
 
+  // Auth
+  userRole: 'guest',
+
   // Image state (subset of image-manager.js)
   imgState: {
     has: false,
@@ -87,6 +90,12 @@ export function reducer(state, action) {
     }
     case 'SET_TOKEN_BALANCE':
       return { ...state, tokenBalance: action.value | 0 };
+    case 'SET_USER_ROLE': {
+      const requestedRole = typeof action.role === 'string' ? action.role.trim() : '';
+      const nextRole = requestedRole || initialState.userRole;
+      if (state.userRole === nextRole) return state;
+      return { ...state, userRole: nextRole };
+    }
     default:
       return state;
   }
@@ -116,6 +125,9 @@ export function createAppStateValue(state, dispatch) {
     removeTextLayer: (layer, index) => dispatch({ type: 'REMOVE_TEXT_LAYER', layer, index }),
 
     setTokenBalance: (value) => dispatch({ type: 'SET_TOKEN_BALANCE', value }),
+
+    setUserRole: (role) => dispatch({ type: 'SET_USER_ROLE', role }),
+    resetUserRole: () => dispatch({ type: 'SET_USER_ROLE', role: initialState.userRole }),
   };
 }
 
@@ -140,8 +152,24 @@ export function useAppState() {
 
 // Mock provider for testing
 export function MockAppStateProvider({ value, children }) {
+  const fallbackValue = useMemo(() => {
+    const baseState = {
+      ...initialState,
+      slides: Array.isArray(initialState.slides) ? [...initialState.slides] : [],
+      imgState: { ...initialState.imgState },
+      workSize: { ...initialState.workSize },
+    };
+
+    return createAppStateValue(baseState, () => {});
+  }, []);
+
+  const mergedValue = useMemo(() => ({
+    ...fallbackValue,
+    ...(value ?? {}),
+  }), [fallbackValue, value]);
+
   return (
-    <AppStateContext.Provider value={value}>
+    <AppStateContext.Provider value={mergedValue}>
       {children}
     </AppStateContext.Provider>
   );
