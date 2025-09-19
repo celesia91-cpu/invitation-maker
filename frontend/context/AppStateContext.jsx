@@ -137,3 +137,12 @@ export function useAppState() {
   if (!ctx) throw new Error('useAppState must be used within an AppStateProvider');
   return ctx;
 }
+
+// Mock provider for testing
+export function MockAppStateProvider({ value, children }) {
+  return (
+    <AppStateContext.Provider value={value}>
+      {children}
+    </AppStateContext.Provider>
+  );
+}

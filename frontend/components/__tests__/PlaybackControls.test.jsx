@@ -29,7 +29,7 @@ function renderPlaybackControls({ initialPlaying = false } = {}) {
         setPlayingSpy(value);
         setPlaying(value);
       },
-      [setPlayingSpy]
+      []
     );
 
     const value = React.useMemo(

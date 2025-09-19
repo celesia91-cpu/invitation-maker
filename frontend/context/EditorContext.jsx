@@ -285,5 +285,5 @@ export function __getEditorTestInternals() {
   };
 }
 
-export { EditorProvider, initialState, createEditorReducer };
+export { initialState, createEditorReducer };
 export default EditorProvider;
