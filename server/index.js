@@ -198,6 +198,44 @@ async function parseJsonBody(req, res) {
   }
 }
 
+function getRequestUrl(req) {
+  const hostHeader = req.headers?.host;
+  const base = hostHeader ? `http://${hostHeader}` : 'http://localhost';
+  return new URL(req.url, base);
+}
+
+function getWebmIdFromRequest(req) {
+  const urlObj = getRequestUrl(req);
+  const rawId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
+  const trimmed = rawId.trim();
+  return trimmed || '';
+}
+
+function ensureWebmId(req, res) {
+  const webmId = getWebmIdFromRequest(req);
+  if (!webmId) {
+    respondError(res, 404, 'not_found', 'WebM asset not found');
+    return '';
+  }
+  return webmId;
+}
+
+function getDesignIdForWebmListing(req) {
+  const urlObj = getRequestUrl(req);
+  const segments = urlObj.pathname.split('/').filter(Boolean);
+  if (
+    segments.length === 4 &&
+    segments[0] === 'api' &&
+    segments[1] === 'designs' &&
+    segments[3] === 'webm'
+  ) {
+    const decoded = decodeURIComponent(segments[2]);
+    const trimmed = decoded.trim();
+    return trimmed || '';
+  }
+  return '';
+}
+
 function signJwt(payload) {
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
@@ -656,12 +694,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && req.url.startsWith('/api/webm/')) {
-      const urlObj = new URL(req.url, `http://${req.headers.host}`);
-      const webmId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
-      if (!webmId) {
-        respondError(res, 404, 'not_found', 'WebM asset not found');
-        return;
-      }
+      const webmId = ensureWebmId(req, res);
+      if (!webmId) return;
 
       const user = getAuthenticatedUser(req, res);
       if (!user) return;
@@ -679,12 +713,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'PATCH' && req.url.startsWith('/api/webm/')) {
-      const urlObj = new URL(req.url, `http://${req.headers.host}`);
-      const webmId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
-      if (!webmId) {
-        respondError(res, 404, 'not_found', 'WebM asset not found');
-        return;
-      }
+      const webmId = ensureWebmId(req, res);
+      if (!webmId) return;
 
       const user = getAuthenticatedUser(req, res);
       if (!user) return;
@@ -787,12 +817,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'DELETE' && req.url.startsWith('/api/webm/')) {
-      const urlObj = new URL(req.url, `http://${req.headers.host}`);
-      const webmId = decodeURIComponent(urlObj.pathname.slice('/api/webm/'.length));
-      if (!webmId) {
-        respondError(res, 404, 'not_found', 'WebM asset not found');
-        return;
-      }
+      const webmId = ensureWebmId(req, res);
+      if (!webmId) return;
 
       const user = getAuthenticatedUser(req, res);
       if (!user) return;
@@ -817,24 +843,25 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && req.url.startsWith('/api/designs/')) {
-      const urlObj = new URL(req.url, `http://${req.headers.host}`);
-      if (urlObj.pathname.endsWith('/webm')) {
-        const user = getAuthenticatedUser(req, res);
-        if (!user) return;
-        const parts = urlObj.pathname.split('/').filter(Boolean);
-        const designId = parts.length >= 4 ? decodeURIComponent(parts[2]) : '';
-        if (!designId || !designs.has(designId)) {
+      const designIdForWebm = getDesignIdForWebmListing(req);
+      if (designIdForWebm) {
+        if (!designs.has(designIdForWebm)) {
           respondError(res, 404, 'not_found', 'Design not found');
           return;
         }
-        if (!ensureDesignAccess(res, user, designId)) {
+
+        const user = getAuthenticatedUser(req, res);
+        if (!user) return;
+        if (!ensureDesignAccess(res, user, designIdForWebm)) {
           return;
         }
-        const files = await getWebmFilesByDesign(designId);
-        respondJson(res, 200, { designId, data: files });
+
+        const files = await getWebmFilesByDesign(designIdForWebm);
+        respondJson(res, 200, { designId: designIdForWebm, data: files });
         return;
       }
 
+      const urlObj = getRequestUrl(req);
       const user = authenticate(req);
       const param = decodeURIComponent(urlObj.pathname.slice('/api/designs/'.length));
       if (/^\d+$/.test(param)) {
