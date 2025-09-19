@@ -84,6 +84,111 @@ describe('AppStateContext reducer', () => {
     expect(state.imgState).toBe(imgState);
   });
 
+  test('START_FILE_UPLOAD resets progress and clears errors', () => {
+    const lastUpload = { status: 'success', fileName: 'previous.png' };
+    const state = createState({
+      fileUpload: {
+        status: 'error',
+        progress: 55,
+        error: new Error('boom'),
+        lastUpload,
+        fileName: 'previous.png',
+      },
+    });
+
+    const result = reducer(state, { type: 'START_FILE_UPLOAD', fileName: 'current.png' });
+
+    expect(result.fileUpload).toEqual({
+      status: 'uploading',
+      progress: 0,
+      error: null,
+      lastUpload,
+      fileName: 'current.png',
+    });
+    expect(result.fileUpload.lastUpload).toBe(lastUpload);
+  });
+
+  test('SET_FILE_UPLOAD_PROGRESS clamps progress values without discarding metadata', () => {
+    const state = createState({
+      fileUpload: {
+        status: 'uploading',
+        progress: 0,
+        error: null,
+        lastUpload: null,
+        fileName: 'uploading.png',
+      },
+    });
+
+    const result = reducer(state, { type: 'SET_FILE_UPLOAD_PROGRESS', progress: 150 });
+
+    expect(result.fileUpload.progress).toBe(100);
+    expect(result.fileUpload.status).toBe('uploading');
+    expect(result.fileUpload.fileName).toBe('uploading.png');
+  });
+
+  test('COMPLETE_FILE_UPLOAD records success state and last upload payload', () => {
+    const state = createState({
+      fileUpload: {
+        status: 'uploading',
+        progress: 40,
+        error: null,
+        lastUpload: null,
+        fileName: 'final.png',
+      },
+    });
+
+    const payload = { id: 'img-1', url: 'https://example.com/final.png' };
+    const result = reducer(state, {
+      type: 'COMPLETE_FILE_UPLOAD',
+      fileName: 'final.png',
+      result: payload,
+    });
+
+    expect(result.fileUpload).toEqual({
+      status: 'success',
+      progress: 100,
+      error: null,
+      lastUpload: {
+        status: 'success',
+        fileName: 'final.png',
+        result: payload,
+      },
+      fileName: 'final.png',
+    });
+  });
+
+  test('FAIL_FILE_UPLOAD stores the error and clamps progress', () => {
+    const error = new Error('Upload failed');
+    const state = createState({
+      fileUpload: {
+        status: 'uploading',
+        progress: 20,
+        error: null,
+        lastUpload: null,
+        fileName: 'failed.png',
+      },
+    });
+
+    const result = reducer(state, {
+      type: 'FAIL_FILE_UPLOAD',
+      fileName: 'failed.png',
+      error,
+      progress: -10,
+    });
+
+    expect(result.fileUpload).toEqual({
+      status: 'error',
+      progress: 0,
+      error,
+      lastUpload: {
+        status: 'error',
+        fileName: 'failed.png',
+        error,
+      },
+      fileName: 'failed.png',
+    });
+  });
+
   test('ADD_TEXT_LAYER appends a new layer only to the targeted slide', () => {
     const slides = [
       { id: 'one', layers: [{ text: 'keep', left: 0, top: 0 }] },
@@ -350,6 +455,49 @@ describe('AppStateContext action creators', () => {
     value.updateImgState(patch);
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'UPDATE_IMG_STATE', patch });
+  });
+
+  test('startFileUpload dispatches START_FILE_UPLOAD', () => {
+    const { dispatch, value } = createValue();
+
+    value.startFileUpload('demo.png');
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'START_FILE_UPLOAD', fileName: 'demo.png' });
+  });
+
+  test('setFileUploadProgress dispatches SET_FILE_UPLOAD_PROGRESS', () => {
+    const { dispatch, value } = createValue();
+
+    value.setFileUploadProgress(25);
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_FILE_UPLOAD_PROGRESS', progress: 25 });
+  });
+
+  test('completeFileUpload dispatches COMPLETE_FILE_UPLOAD with payload', () => {
+    const { dispatch, value } = createValue();
+    const payload = { fileName: 'result.png', result: { id: 'img' } };
+
+    value.completeFileUpload(payload);
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'COMPLETE_FILE_UPLOAD',
+      fileName: 'result.png',
+      result: payload.result,
+    });
+  });
+
+  test('failFileUpload dispatches FAIL_FILE_UPLOAD with error', () => {
+    const { dispatch, value } = createValue();
+    const error = new Error('nope');
+
+    value.failFileUpload({ fileName: 'bad.png', error, progress: 3 });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'FAIL_FILE_UPLOAD',
+      fileName: 'bad.png',
+      error,
+      progress: 3,
+    });
   });
 
   test('addTextLayer dispatches ADD_TEXT_LAYER', () => {

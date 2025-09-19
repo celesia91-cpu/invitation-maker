@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useAppState } from '../context/AppStateContext.jsx';
 
 // Minimal image canvas that mirrors image-manager.js transform state
-export default function ImageCanvas() {
+export default function ImageCanvas({ children }) {
   const { imgState, workSize } = useAppState();
 
   const transform = useMemo(() => {
@@ -55,6 +55,7 @@ export default function ImageCanvas() {
           <div style={{ color: '#94a3b8', fontSize: 12, padding: 8 }}>No image selected</div>
         )}
       </div>
+      {children}
     </div>
   );
 }
