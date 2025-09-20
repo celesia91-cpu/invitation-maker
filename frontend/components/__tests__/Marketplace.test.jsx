@@ -208,23 +208,47 @@ describe('Marketplace', () => {
     });
   });
 
-  it('renders admin marketplace metrics for admin role responses', async () => {
+  it('does not render admin-only analytics for non-admin roles', async () => {
+    const { listMarketplace } = mockAuth({ role: 'consumer', listings: [] });
+
+    render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
+
+    await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(1));
+
+    expect(screen.queryByTestId('admin-marketplace-analytics')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('admin-marketplace-card-extras')).not.toBeInTheDocument();
+  });
+
+  it('renders admin marketplace analytics and controls for admin role responses', async () => {
     const adminListings = [
       {
         id: '1',
         title: 'Premium Event Template',
         designer: { displayName: 'Studio Omega' },
         conversionRate: 0.5,
+        flags: { managedBy: 'ops-team' },
       },
     ];
     const { listMarketplace } = mockAuth({ role: 'admin', listings: adminListings });
 
     render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
 
+    const analytics = await screen.findByTestId('admin-marketplace-analytics');
+    expect(analytics).toHaveTextContent('Admin Insights');
+    expect(analytics).toHaveTextContent('Total Listings');
+    expect(analytics).toHaveTextContent('Listings With Flags');
+    expect(analytics).toHaveTextContent('Average Conversion Rate');
+    expect(analytics).toHaveTextContent('Open listing controls');
+    expect(analytics).toHaveTextContent('Top performer:');
+
+    const adminExtras = await screen.findByTestId('admin-marketplace-card-extras');
+    expect(adminExtras).toHaveTextContent('Admin insights');
+    expect(adminExtras).toHaveTextContent('Conversion Rate: 50%');
+    expect(adminExtras).toHaveTextContent('managedBy: ops-team');
+
     const card = await screen.findByTestId('marketplace-card-1');
     expect(card).toHaveTextContent('Premium Event Template');
     expect(card).toHaveTextContent('Studio Omega');
-    expect(card).toHaveTextContent('Conversion Rate: 50%');
 
     expect(listMarketplace).toHaveBeenCalledTimes(1);
     expect(listMarketplace.mock.calls[0][0]).toEqual({

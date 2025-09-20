@@ -1,9 +1,19 @@
 import { useEffect, useMemo } from 'react';
+import AdminPreviewActions from './admin/AdminPreviewActions.jsx';
+import { useAppState } from '../context/AppStateContext.jsx';
 import useDesignOwnership from '../hooks/useDesignOwnership.js';
 import useModalFocusTrap from '../hooks/useModalFocusTrap.js';
 
+function normalizeRole(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().toLowerCase();
+}
+
 export default function PreviewModal({ isOpen, designId, onClose, onUseDesign }) {
   const modalRef = useModalFocusTrap(isOpen, onClose);
+  const { userRole } = useAppState();
   const {
     currentDesignId,
     setCurrentDesignId,
@@ -35,6 +45,8 @@ export default function PreviewModal({ isOpen, designId, onClose, onUseDesign })
   if (!isOpen) return null;
 
   const owned = resolvedDesignId ? isDesignOwned(resolvedDesignId) : false;
+  const normalizedRole = normalizeRole(userRole);
+  const isAdmin = normalizedRole === 'admin';
   const buttonLabel = owned ? 'Edit This Design' : 'Use This Design';
   const statusMessage = (() => {
     if (loading) return 'Checking ownership status…';
@@ -70,6 +82,9 @@ export default function PreviewModal({ isOpen, designId, onClose, onUseDesign })
           </button>
           <button id="favoriteDesignBtn" className="btn">Favorite</button>
         </div>
+        {isAdmin && (
+          <AdminPreviewActions designId={resolvedDesignId} isOwned={owned} />
+        )}
       </div>
     </div>
   );
