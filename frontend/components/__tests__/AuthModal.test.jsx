@@ -34,7 +34,11 @@ describe('AuthModal', () => {
     setUserRoleMock.mockReset();
     resetUserRoleMock.mockReset();
 
-    useAuth.mockReturnValue({ login: loginMock });
+    useAuth.mockReturnValue({
+      login: loginMock,
+      isInitialized: true,
+      isAuthenticated: false,
+    });
     useAppState.mockReturnValue({
       setTokenBalance: setTokenBalanceMock,
       setUserRole: setUserRoleMock,

@@ -21,6 +21,7 @@ describe('useDesignOwnership', () => {
     const getUserDesigns = jest.fn().mockResolvedValue({ designs: [{ id: 'design-1' }, { id: 'design-2', owned: false }] });
     useAuth.mockReturnValue({
       isAuthenticated: true,
+      isInitialized: true,
       api: { getUserDesigns },
     });
 
@@ -39,6 +40,7 @@ describe('useDesignOwnership', () => {
     const getUserDesigns = jest.fn().mockRejectedValue(error);
     useAuth.mockReturnValue({
       isAuthenticated: true,
+      isInitialized: true,
       api: { getUserDesigns },
     });
 
@@ -69,6 +71,7 @@ describe('useDesignOwnership', () => {
     const getUserDesigns = jest.fn().mockResolvedValue({ designs: [] });
     useAuth.mockReturnValue({
       isAuthenticated: true,
+      isInitialized: true,
       api: { getUserDesigns },
     });
 

@@ -49,8 +49,9 @@ export default function MarketplacePage() {
   const [currentSurface, setCurrentSurface] = useState('marketplace');
 
   useEffect(() => {
-    if (!auth.isAuthenticated) setShowAuth(true);
-  }, [auth.isAuthenticated]);
+    if (!auth.isInitialized) return;
+    setShowAuth(!auth.isAuthenticated);
+  }, [auth.isAuthenticated, auth.isInitialized]);
 
   const syncDesignSelection = useCallback(
     (designId, options = {}) => {

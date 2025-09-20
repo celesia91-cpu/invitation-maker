@@ -38,6 +38,7 @@ function mockAuth({
     user,
     api,
     isAuthenticated: true,
+    isInitialized: true,
     loading: false,
     error: null,
   });

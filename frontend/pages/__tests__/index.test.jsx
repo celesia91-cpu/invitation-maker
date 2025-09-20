@@ -41,11 +41,13 @@ const createAuthValue = (overrides = {}) => {
   const {
     api: apiOverride,
     isAuthenticated: isAuthenticatedOverride,
+    isInitialized: isInitializedOverride,
     user: userOverride,
     userRole: userRoleOverride,
     ...rest
   } = overrides;
   const isAuthenticated = isAuthenticatedOverride ?? false;
+  const isInitialized = isInitializedOverride ?? true;
   const resolvedUser = userOverride || (userRoleOverride ? { role: userRoleOverride } : null);
 
   const defaultApi = {
@@ -68,6 +70,7 @@ const createAuthValue = (overrides = {}) => {
     loading: false,
     error: null,
     isAuthenticated,
+    isInitialized,
     login: jest.fn(),
     logout: jest.fn(),
     refreshUser: jest.fn(),
@@ -127,7 +130,7 @@ const renderPage = (
     ? { value: { userRole, ...(providerValue ?? {}) } }
     : {};
 
-  const result = render(
+  const renderTree = () => (
     <RouterContext.Provider value={router}>
       <ProviderComponent {...providerProps}>
         {useMockProvider ? (
@@ -141,7 +144,13 @@ const renderPage = (
     </RouterContext.Provider>
   );
 
-  return { ...result, router };
+  const result = render(renderTree());
+
+  const rerenderPage = () => {
+    result.rerender(renderTree());
+  };
+
+  return { ...result, router, rerenderPage };
 };
 
 const renderPageWithHistory = (
@@ -188,10 +197,56 @@ describe('MarketplacePage', () => {
     expect(dialog).toBeInTheDocument();
   });
 
-  it('keeps the auth modal closed when the user is authenticated', async () => {
-    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
+  it('waits for initialization before opening the auth modal and closes once authenticated', async () => {
+    let authState = createAuthValue({ isAuthenticated: false, isInitialized: false });
+    useAuth.mockImplementation(() => authState);
 
-    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+    const { rerenderPage } = renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+
+    expect(
+      screen.queryByRole('dialog', { name: /welcome to invitation maker/i })
+    ).not.toBeInTheDocument();
+
+    authState = createAuthValue({ isAuthenticated: false, isInitialized: true });
+    await act(async () => {
+      rerenderPage();
+    });
+
+    const dialog = await screen.findByRole('dialog', { name: /welcome to invitation maker/i });
+    expect(dialog).toBeInTheDocument();
+
+    authState = createAuthValue({
+      isAuthenticated: true,
+      isInitialized: true,
+      userRole: 'creator',
+    });
+    await act(async () => {
+      rerenderPage();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /welcome to invitation maker/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps the auth modal closed when the user is authenticated after initialization', async () => {
+    let authState = createAuthValue({ isAuthenticated: false, isInitialized: false });
+    useAuth.mockImplementation(() => authState);
+
+    const { rerenderPage } = renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+
+    expect(
+      screen.queryByRole('dialog', { name: /welcome to invitation maker/i })
+    ).not.toBeInTheDocument();
+
+    authState = createAuthValue({
+      isAuthenticated: true,
+      isInitialized: true,
+      userRole: 'creator',
+    });
+    await act(async () => {
+      rerenderPage();
+    });
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /welcome to invitation maker/i })).not.toBeInTheDocument();

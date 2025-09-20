@@ -15,7 +15,7 @@ describe('useAuth', () => {
     jest.clearAllMocks();
   });
 
-  it('reports unauthenticated until the client initialization effect completes', async () => {
+  it('reports initialization progress and hydration results for persisted sessions', async () => {
     const getUser = jest.fn().mockReturnValue({ id: 'demo-user', role: 'creator' });
     const api = {
       isAuthenticated: jest.fn().mockReturnValue(true),
@@ -30,14 +30,23 @@ describe('useAuth', () => {
     const states = [];
     const { result } = renderHook(() => {
       const value = useAuth();
-      states.push(value.isAuthenticated);
+      states.push({
+        isAuthenticated: value.isAuthenticated,
+        isInitialized: value.isInitialized,
+      });
       return value;
     }, { wrapper });
 
-    expect(states[0]).toBe(false);
+    expect(states[0]).toEqual({ isAuthenticated: false, isInitialized: false });
 
     await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
       expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    expect(states[states.length - 1]).toEqual({
+      isAuthenticated: true,
+      isInitialized: true,
     });
 
     expect(api.isAuthenticated).toHaveBeenCalled();
