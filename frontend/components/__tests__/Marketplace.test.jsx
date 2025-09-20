@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Marketplace from '../Marketplace.jsx';
 import useAuth from '../../hooks/useAuth.js';
@@ -8,7 +8,13 @@ jest.mock('../../hooks/useAuth.js', () => ({
   default: jest.fn(),
 }));
 
-function mockAuth({ role = 'consumer', user: userOverrides = {}, listings = [], implementation } = {}) {
+function mockAuth({
+  role = 'consumer',
+  user: userOverrides = {},
+  listings = [],
+  implementation,
+  apiOverrides = {},
+} = {}) {
   const normalizedListings = listings.map((listing, index) => ({
     id: listing.id ?? String(index + 1),
     title: listing.title ?? `Design ${index + 1}`,
@@ -26,15 +32,17 @@ function mockAuth({ role = 'consumer', user: userOverrides = {}, listings = [], 
 
   const user = { role, ...userOverrides };
 
+  const api = { listMarketplace, ...apiOverrides };
+
   useAuth.mockReturnValue({
     user,
-    api: { listMarketplace },
+    api,
     isAuthenticated: true,
     loading: false,
     error: null,
   });
 
-  return { listMarketplace };
+  return { listMarketplace, api };
 }
 
 beforeEach(() => {
@@ -219,9 +227,16 @@ describe('Marketplace', () => {
 
     expect(screen.queryByTestId('admin-marketplace-analytics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-marketplace-card-extras')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /manage listing/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /publish listing/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete listing/i })).not.toBeInTheDocument();
   });
 
   it('renders admin marketplace analytics and controls for admin role responses', async () => {
+    const user = userEvent.setup();
+    const manageMarketplaceListing = jest.fn();
+    const publishMarketplaceListing = jest.fn();
+    const deleteMarketplaceListing = jest.fn();
     const adminListings = [
       {
         id: '1',
@@ -229,9 +244,18 @@ describe('Marketplace', () => {
         designer: { displayName: 'Studio Omega' },
         conversionRate: 0.5,
         flags: { managedBy: 'ops-team' },
+        status: 'draft',
       },
     ];
-    const { listMarketplace } = mockAuth({ role: 'admin', listings: adminListings });
+    const { listMarketplace } = mockAuth({
+      role: 'admin',
+      listings: adminListings,
+      apiOverrides: {
+        manageMarketplaceListing,
+        publishMarketplaceListing,
+        deleteMarketplaceListing,
+      },
+    });
 
     render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
 
@@ -244,9 +268,27 @@ describe('Marketplace', () => {
     expect(analytics).toHaveTextContent('Top performer:');
 
     const adminExtras = await screen.findByTestId('admin-marketplace-card-extras');
-    expect(adminExtras).toHaveTextContent('Admin insights');
+    expect(adminExtras).toHaveTextContent('Admin controls');
+    expect(adminExtras).toHaveTextContent('Listing ID:');
+    expect(adminExtras).toHaveTextContent('Status: Draft');
     expect(adminExtras).toHaveTextContent('Conversion Rate: 50%');
     expect(adminExtras).toHaveTextContent('managedBy: ops-team');
+
+    const manageButton = within(adminExtras).getByRole('button', { name: /manage listing/i });
+    const publishButton = within(adminExtras).getByRole('button', { name: /publish listing/i });
+    const deleteButton = within(adminExtras).getByRole('button', { name: /delete listing/i });
+
+    expect(manageButton).toBeEnabled();
+    expect(publishButton).toBeEnabled();
+    expect(deleteButton).toBeEnabled();
+
+    await user.click(manageButton);
+    await user.click(publishButton);
+    await user.click(deleteButton);
+
+    expect(manageMarketplaceListing).toHaveBeenCalledWith('1');
+    expect(publishMarketplaceListing).toHaveBeenCalledWith('1');
+    expect(deleteMarketplaceListing).toHaveBeenCalledWith('1');
 
     const card = await screen.findByTestId('marketplace-card-1');
     expect(card).toHaveTextContent('Premium Event Template');
@@ -258,6 +300,36 @@ describe('Marketplace', () => {
       category: undefined,
       search: undefined,
     });
+  });
+
+  it('disables the publish control when a listing is already live', async () => {
+    const publishMarketplaceListing = jest.fn();
+    const adminListings = [
+      {
+        id: '42',
+        title: 'Live Event Template',
+        designer: { displayName: 'Studio Delta' },
+        conversionRate: 0.72,
+        flags: {},
+        status: 'published',
+        published: true,
+      },
+    ];
+    const { listMarketplace } = mockAuth({
+      role: 'admin',
+      listings: adminListings,
+      apiOverrides: { publishMarketplaceListing },
+    });
+
+    render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
+
+    const extras = await screen.findByTestId('admin-marketplace-card-extras');
+    const publishButton = within(extras).getByRole('button', { name: /published/i });
+
+    expect(publishButton).toBeDisabled();
+    expect(publishMarketplaceListing).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(1));
   });
 
   it('shows a My Designs tab for admins and requests ownership-aware listings when selected', async () => {
