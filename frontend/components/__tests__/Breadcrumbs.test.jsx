@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import Breadcrumbs from '../Breadcrumbs.jsx';
 import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
@@ -54,8 +54,36 @@ describe('Breadcrumbs', () => {
     const router = createMockRouter({ asPath: '/templates/birthday-party', pathname: '/templates/[slug]' });
     renderWithProviders({ router });
 
-    const link = screen.getByRole('link', { name: 'Birthday Party' });
-    expect(link).toHaveAttribute('href', '/templates/birthday-party');
-    expect(link).toHaveAttribute('aria-current', 'page');
+    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    const links = within(nav).getAllByRole('link');
+
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveTextContent('Marketplace');
+    expect(links[0]).toHaveAttribute('href', '/');
+    expect(links[0]).not.toHaveAttribute('aria-current');
+
+    expect(links[1]).toHaveTextContent('Birthday Party');
+    expect(links[1]).toHaveAttribute('href', '/templates/birthday-party');
+    expect(links[1]).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('prepends admin role waypoints when history is seeded', () => {
+    renderWithProviders({
+      value: {
+        userRole: 'admin',
+        navigationHistory: [
+          { href: '/editor', label: 'Editor' },
+        ],
+      },
+    });
+
+    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    const links = within(nav).getAllByRole('link');
+
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Marketplace',
+      'Admin Dashboard',
+      'Editor',
+    ]);
   });
 });

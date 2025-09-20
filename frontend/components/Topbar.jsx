@@ -1,23 +1,30 @@
 import { useMemo } from 'react';
 import { useAppState } from '../context/AppStateContext.jsx';
 import { resolveCapabilities, resolveRole } from '../utils/roleCapabilities.js';
+import { getRoleNavigationLinks } from '../utils/navigationLinks.js';
 
 export default function Topbar({
   onPreviewClick,
   onShareClick,
   onTogglePanel,
   panelOpen,
+  currentRole,
   roleCapabilities,
 }) {
   const { userRole } = useAppState();
 
   const { role: resolvedRole, canEdit } = useMemo(() => {
-    const fallbackRole = resolveRole(userRole);
+    const fallbackRole = resolveRole(currentRole ?? userRole);
     if (roleCapabilities && typeof roleCapabilities === 'object') {
       return resolveCapabilities(roleCapabilities, fallbackRole);
     }
     return resolveCapabilities({ role: fallbackRole }, fallbackRole);
-  }, [roleCapabilities, userRole]);
+  }, [currentRole, roleCapabilities, userRole]);
+
+  const navigationLinks = useMemo(
+    () => getRoleNavigationLinks(resolvedRole),
+    [resolvedRole]
+  );
 
   const readOnly = !canEdit;
   const editLockTitle = readOnly
@@ -32,6 +39,15 @@ export default function Topbar({
       data-editor-readonly={readOnly || undefined}
     >
       <div className="brand"> Celesia Animated Invitation</div>
+      <nav className="topbar-nav" aria-label="Primary">
+        <ul className="topbar-links">
+          {navigationLinks.map((link) => (
+            <li key={link.key || link.href} className="topbar-link-item">
+              <a href={link.href}>{link.label}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
       <div className="grow"></div>
 
       {/* editor controls hidden in viewer via .edit-only */}
