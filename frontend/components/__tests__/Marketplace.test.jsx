@@ -8,7 +8,7 @@ jest.mock('../../hooks/useAuth.js', () => ({
   default: jest.fn(),
 }));
 
-function mockAuth({ role = 'consumer', listings = [], implementation } = {}) {
+function mockAuth({ role = 'consumer', user: userOverrides = {}, listings = [], implementation } = {}) {
   const normalizedListings = listings.map((listing, index) => ({
     id: listing.id ?? String(index + 1),
     title: listing.title ?? `Design ${index + 1}`,
@@ -24,8 +24,10 @@ function mockAuth({ role = 'consumer', listings = [], implementation } = {}) {
       data: normalizedListings,
     });
 
+  const user = { role, ...userOverrides };
+
   useAuth.mockReturnValue({
-    user: { role },
+    user,
     api: { listMarketplace },
     isAuthenticated: true,
     loading: false,
@@ -256,5 +258,37 @@ describe('Marketplace', () => {
       category: undefined,
       search: undefined,
     });
+  });
+
+  it('shows a My Designs tab for admins and requests ownership-aware listings when selected', async () => {
+    const user = userEvent.setup();
+    const { listMarketplace } = mockAuth({ role: 'admin', user: { id: '42-admin' }, listings: [] });
+
+    render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
+
+    const myDesignsTab = await screen.findByRole('tab', { name: /my designs/i });
+    expect(myDesignsTab).toBeInTheDocument();
+    expect(myDesignsTab).toHaveAttribute('aria-selected', 'false');
+
+    await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(1));
+
+    await user.click(myDesignsTab);
+
+    await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(2));
+    expect(listMarketplace.mock.calls[1][0]).toEqual({
+      role: 'admin',
+      category: 'owned-by-42-admin',
+      search: undefined,
+    });
+    expect(myDesignsTab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('does not show the My Designs tab for non-admin users', async () => {
+    const { listMarketplace } = mockAuth({ role: 'consumer', listings: [] });
+
+    render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
+
+    await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('tab', { name: /my designs/i })).not.toBeInTheDocument();
   });
 });

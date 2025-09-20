@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminMarketplaceAnalytics from './admin/AdminMarketplaceAnalytics.jsx';
 import AdminMarketplaceCardExtras from './admin/AdminMarketplaceCardExtras.jsx';
 import useAuth from '../hooks/useAuth.js';
 
-const CATEGORY_OPTIONS = [
+const BASE_CATEGORY_OPTIONS = [
   { id: '', label: 'All' },
   { id: 'popular', label: 'Popular' },
   { id: 'recent', label: 'Recently Added' },
@@ -12,6 +12,22 @@ const CATEGORY_OPTIONS = [
   { id: 'Birthday', label: 'Birthday' },
   { id: 'Wedding', label: 'Wedding' },
 ];
+
+function toOwnershipSegment(value) {
+  if (value === undefined || value === null) return '';
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return '';
+  return normalized.replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function getAdminOwnershipCategoryId(user) {
+  const segment =
+    toOwnershipSegment(user?.id) ||
+    toOwnershipSegment(user?.username) ||
+    toOwnershipSegment(user?.email) ||
+    'admin';
+  return `owned-by-${segment}`;
+}
 
 const MARKETPLACE_ROLE_ALIASES = new Map([
   ['user', 'consumer'],
@@ -49,7 +65,7 @@ function formatConversionRate(value) {
 }
 
 export default function Marketplace({ isOpen, onSkipToEditor }) {
-  const [activeCategory, setActiveCategory] = useState(CATEGORY_OPTIONS[0].id);
+  const [activeCategory, setActiveCategory] = useState(BASE_CATEGORY_OPTIONS[0].id);
   const [searchTerm, setSearchTerm] = useState('');
   const [listingsByKey, setListingsByKey] = useState({});
   const [loadingByKey, setLoadingByKey] = useState({});
@@ -70,11 +86,34 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
 
   const normalizedRole = normalizeRole(user?.role);
   const isAdmin = normalizedRole === 'admin';
+  const adminOwnershipCategoryId = useMemo(
+    () => getAdminOwnershipCategoryId(user || {}),
+    [user?.email, user?.id, user?.username]
+  );
+  const categoryOptions = useMemo(() => {
+    if (!isAdmin) {
+      return BASE_CATEGORY_OPTIONS;
+    }
+    return [
+      ...BASE_CATEGORY_OPTIONS,
+      { id: adminOwnershipCategoryId, label: 'My Designs' },
+    ];
+  }, [adminOwnershipCategoryId, isAdmin]);
   const trimmedSearch = searchTerm.trim();
   const searchKey = trimmedSearch.toLowerCase();
   const rawCategory = typeof activeCategory === 'string' ? activeCategory.trim() : '';
   const categoryKey = rawCategory.toLowerCase();
   const cacheKey = createCacheKey(normalizedRole, categoryKey, searchKey);
+
+  useEffect(() => {
+    if (categoryOptions.length === 0) {
+      return;
+    }
+    const hasActiveCategory = categoryOptions.some((option) => option.id === activeCategory);
+    if (!hasActiveCategory) {
+      setActiveCategory(categoryOptions[0].id);
+    }
+  }, [activeCategory, categoryOptions]);
 
   const currentResult = listingsByKey[cacheKey];
   const listings = Array.isArray(currentResult?.data) ? currentResult.data : [];
@@ -153,25 +192,25 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
   }, [api, cacheKey, categoryKey, currentResult, isOpen, normalizedRole, trimmedSearch]);
 
   const handleKeyDown = (event, index) => {
-    if (CATEGORY_OPTIONS.length === 0) return;
+    if (categoryOptions.length === 0) return;
 
     const { key } = event;
 
     if (key === 'ArrowDown' || key === 'ArrowUp') {
       event.preventDefault();
       const direction = key === 'ArrowDown' ? 1 : -1;
-      const nextIndex = (index + direction + CATEGORY_OPTIONS.length) % CATEGORY_OPTIONS.length;
-      const nextCategory = CATEGORY_OPTIONS[nextIndex];
+      const nextIndex = (index + direction + categoryOptions.length) % categoryOptions.length;
+      const nextCategory = categoryOptions[nextIndex];
       setActiveCategory(nextCategory.id);
       tabRefs.current[nextIndex]?.focus();
     } else if (key === 'Home') {
       event.preventDefault();
-      setActiveCategory(CATEGORY_OPTIONS[0].id);
+      setActiveCategory(categoryOptions[0].id);
       tabRefs.current[0]?.focus();
     } else if (key === 'End') {
       event.preventDefault();
-      const lastIndex = CATEGORY_OPTIONS.length - 1;
-      setActiveCategory(CATEGORY_OPTIONS[lastIndex].id);
+      const lastIndex = categoryOptions.length - 1;
+      setActiveCategory(categoryOptions[lastIndex].id);
       tabRefs.current[lastIndex]?.focus();
     }
   };
@@ -210,7 +249,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
             role="tablist"
             aria-orientation="vertical"
           >
-            {CATEGORY_OPTIONS.map((category, index) => {
+            {categoryOptions.map((category, index) => {
               const isActive = activeCategory === category.id;
               return (
                 <li key={category.id || 'all'}>
