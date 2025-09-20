@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import Topbar from '../Topbar.jsx';
 import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
@@ -60,6 +60,13 @@ describe('Topbar', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
     expect(screen.getByText('Slide 1/1')).toBeInTheDocument();
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    const navLinks = within(nav).getAllByRole('link');
+    expect(navLinks.map((link) => link.textContent)).toEqual([
+      'Marketplace',
+      'Editor',
+    ]);
   });
 
   it('disables editing controls for consumer roles', () => {
@@ -84,5 +91,24 @@ describe('Topbar', () => {
     expect(onShareClick).toHaveBeenCalledTimes(1);
     expect(onPreviewClick).not.toHaveBeenCalled();
     expect(onTogglePanel).not.toHaveBeenCalled();
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    const consumerLinks = within(nav).getAllByRole('link');
+    expect(consumerLinks).toHaveLength(1);
+    expect(consumerLinks[0]).toHaveTextContent('Marketplace');
+    expect(() => within(nav).getByRole('link', { name: 'Editor' })).toThrow();
+  });
+
+  it('surfaces admin-only navigation links when available', () => {
+    renderWithRole('admin');
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    const links = within(nav).getAllByRole('link');
+
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Marketplace',
+      'Editor',
+      'Admin Dashboard',
+    ]);
   });
 });

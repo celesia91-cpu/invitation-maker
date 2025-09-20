@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useAppState, formatNavigationLabel } from '../context/AppStateContext.jsx';
+import { getRoleBreadcrumbWaypoints } from '../utils/navigationLinks.js';
 
 export default function Breadcrumbs() {
   const router = useRouter();
-  const { navigationHistory } = useAppState();
+  const { navigationHistory, userRole } = useAppState();
 
-  const items = useMemo(() => {
+  const historyItems = useMemo(() => {
     if (Array.isArray(navigationHistory) && navigationHistory.length > 0) {
       return navigationHistory;
     }
@@ -19,6 +20,41 @@ export default function Breadcrumbs() {
       },
     ];
   }, [navigationHistory, router?.asPath, router?.pathname]);
+
+  const roleWaypoints = useMemo(
+    () => getRoleBreadcrumbWaypoints(userRole),
+    [userRole]
+  );
+
+  const items = useMemo(() => {
+    const combined = [];
+    const seen = new Set();
+
+    const append = (entry) => {
+      if (!entry || typeof entry.href !== 'string') {
+        return;
+      }
+
+      const href = entry.href.trim();
+      if (!href || seen.has(href)) {
+        return;
+      }
+
+      seen.add(href);
+      combined.push({
+        href,
+        label:
+          typeof entry.label === 'string' && entry.label.trim()
+            ? entry.label
+            : formatNavigationLabel(href),
+      });
+    };
+
+    roleWaypoints.forEach(append);
+    historyItems.forEach(append);
+
+    return combined;
+  }, [historyItems, roleWaypoints]);
 
   return (
     <nav id="breadcrumbs" className="breadcrumbs" aria-label="Breadcrumb">
