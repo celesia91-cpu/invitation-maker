@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import userEvent from '@testing-library/user-event';
@@ -76,6 +76,8 @@ const createAuthValue = (overrides = {}) => {
   };
 };
 
+let observedHistory;
+
 function InitialRoleSetter({ role, children }) {
   const { setUserRole } = useAppState();
 
@@ -86,6 +88,32 @@ function InitialRoleSetter({ role, children }) {
   }, [role, setUserRole]);
 
   return children;
+}
+
+function HistorySeeder({ entries }) {
+  const { resetNavigationHistory, pushNavigationHistory } = useAppState();
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    resetNavigationHistory();
+    (entries || []).forEach((entry) => {
+      pushNavigationHistory(entry);
+    });
+  }, [entries, pushNavigationHistory, resetNavigationHistory]);
+
+  return null;
+}
+
+function HistoryObserver() {
+  const { navigationHistory } = useAppState();
+
+  useEffect(() => {
+    observedHistory = navigationHistory;
+  }, [navigationHistory]);
+
+  return null;
 }
 
 const renderPage = (
@@ -116,11 +144,33 @@ const renderPage = (
   return { ...result, router };
 };
 
+const renderPageWithHistory = (
+  routerOverrides,
+  { userRole = 'guest', initialHistory = [] } = {}
+) => {
+  const router = createMockRouter(routerOverrides);
+
+  const result = render(
+    <RouterContext.Provider value={router}>
+      <AppStateProvider>
+        <InitialRoleSetter role={userRole}>
+          <HistorySeeder entries={initialHistory} />
+          <HistoryObserver />
+          <MarketplacePage />
+        </InitialRoleSetter>
+      </AppStateProvider>
+    </RouterContext.Provider>
+  );
+
+  return { ...result, router };
+};
+
 describe('MarketplacePage', () => {
   beforeEach(() => {
     useModalFocusTrap.mockImplementation(() => ({ current: null }));
     previewModalProps = undefined;
     purchaseModalProps = undefined;
+    observedHistory = undefined;
   });
 
   afterEach(() => {
@@ -211,5 +261,50 @@ describe('MarketplacePage', () => {
 
     expect(router.push).toHaveBeenCalledWith(`/editor/${ownedId}`);
     expect(purchaseModalProps?.isOpen).not.toBe(true);
+  });
+
+  it('returns to the marketplace and records the navigation history when using the back handler', async () => {
+    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
+
+    const user = userEvent.setup();
+    const initialHistory = [{ href: '/inline-experience', label: 'Inline Experience' }];
+    const { router } = renderPageWithHistory(undefined, {
+      userRole: 'creator',
+      initialHistory,
+    });
+
+    await waitFor(() => {
+      expect(observedHistory).toEqual(initialHistory);
+    });
+
+    await user.click(screen.getByRole('button', { name: /open inline experience/i }));
+
+    const root = screen.getByTestId('marketplace-root');
+    await screen.findByTestId('inline-experience');
+    expect(root).toHaveAttribute('data-topbar-visible', 'true');
+    expect(root).toHaveAttribute('data-panel-open', 'true');
+
+    const backButton = screen.getByRole('button', { name: /back to marketplace/i });
+    await user.click(backButton);
+
+    await waitFor(() => {
+      expect(root).toHaveAttribute('data-topbar-visible', 'false');
+      expect(root).toHaveAttribute('data-panel-open', 'false');
+    });
+
+    expect(screen.queryByTestId('inline-experience')).not.toBeInTheDocument();
+
+    const marketplace = document.getElementById('marketplacePage');
+    expect(marketplace).toBeTruthy();
+    expect(marketplace?.className ?? '').not.toContain('hidden');
+
+    expect(router.push).toHaveBeenCalledWith('/');
+
+    await waitFor(() => {
+      expect(observedHistory).toEqual([
+        { href: '/inline-experience', label: 'Inline Experience' },
+        { href: '/', label: 'Marketplace' },
+      ]);
+    });
   });
 });
