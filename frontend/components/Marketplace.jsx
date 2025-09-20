@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminMarketplaceAnalytics from './admin/AdminMarketplaceAnalytics.jsx';
 import AdminMarketplaceCardExtras from './admin/AdminMarketplaceCardExtras.jsx';
 import useAuth from '../hooks/useAuth.js';
@@ -62,6 +62,35 @@ function formatConversionRate(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) return null;
   return `${Math.round(numeric * 100)}%`;
+}
+
+function isListingPublished(listing) {
+  if (!listing || typeof listing !== 'object') {
+    return false;
+  }
+
+  if (typeof listing.published === 'boolean') {
+    return listing.published;
+  }
+
+  if (typeof listing.isPublished === 'boolean') {
+    return listing.isPublished;
+  }
+
+  const status = typeof listing.status === 'string' ? listing.status.trim().toLowerCase() : '';
+  if (!status) {
+    return false;
+  }
+
+  if (['published', 'active', 'live', 'available'].includes(status)) {
+    return true;
+  }
+
+  if (['draft', 'pending', 'archived', 'disabled', 'inactive'].includes(status)) {
+    return false;
+  }
+
+  return status.includes('publish');
 }
 
 export default function Marketplace({ isOpen, onSkipToEditor }) {
@@ -244,6 +273,65 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
     : '';
   const adminErrorMessage = currentError ? resolvedErrorMessage : '';
 
+  const handleAdminListingAction = useCallback(
+    (action, listingId) => {
+      if (!listingId) {
+        return;
+      }
+
+      if (!api || typeof action !== 'string') {
+        return;
+      }
+
+      const actionKey = action.trim().toLowerCase();
+      if (!actionKey) {
+        return;
+      }
+
+      const methodMap = {
+        manage: 'manageMarketplaceListing',
+        publish: 'publishMarketplaceListing',
+        delete: 'deleteMarketplaceListing',
+      };
+
+      const directMethodName = methodMap[actionKey];
+      const directHandler = directMethodName && typeof api[directMethodName] === 'function'
+        ? api[directMethodName]
+        : null;
+
+      if (directHandler) {
+        return directHandler.call(api, listingId);
+      }
+
+      if (typeof api.handleAdminMarketplaceAction === 'function') {
+        return api.handleAdminMarketplaceAction({ action: actionKey, listingId });
+      }
+
+      if (typeof console !== 'undefined' && typeof console.info === 'function') {
+        // eslint-disable-next-line no-console
+        console.info(`[admin] ${actionKey} marketplace listing`, listingId);
+      }
+
+      return undefined;
+    },
+    [api]
+  );
+
+  const handleAdminManageListing = useCallback(
+    (listingId) => handleAdminListingAction('manage', listingId),
+    [handleAdminListingAction]
+  );
+
+  const handleAdminPublishListing = useCallback(
+    (listingId) => handleAdminListingAction('publish', listingId),
+    [handleAdminListingAction]
+  );
+
+  const handleAdminDeleteListing = useCallback(
+    (listingId) => handleAdminListingAction('delete', listingId),
+    [handleAdminListingAction]
+  );
+
   return (
     <div id="marketplacePage" className={`page${isOpen ? '' : ' hidden'}`}>
       <h2>Marketplace</h2>
@@ -318,10 +406,13 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
             <p className="marketplace-empty">No designs found for this selection.</p>
           )}
           {listings.map((listing, index) => {
-            const cardId = listing?.id ? String(listing.id) : `item-${index}`;
+            const normalizedListingId =
+              listing?.id === undefined || listing?.id === null ? null : String(listing.id);
+            const cardId = normalizedListingId ?? `item-${index}`;
             const designerName = toDesignerName(listing);
             const flagEntries = extractFlagEntries(listing?.flags);
             const conversionRateLabel = formatConversionRate(listing?.conversionRate);
+            const listingIsPublished = isListingPublished(listing);
 
             return (
               <article
@@ -345,8 +436,13 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
                 )}
                 {isAdmin && (
                   <AdminMarketplaceCardExtras
+                    listingId={normalizedListingId}
                     flagEntries={flagEntries}
                     conversionRateLabel={conversionRateLabel}
+                    isPublished={listingIsPublished}
+                    onManage={handleAdminManageListing}
+                    onPublish={handleAdminPublishListing}
+                    onDelete={handleAdminDeleteListing}
                   />
                 )}
               </article>
