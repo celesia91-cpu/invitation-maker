@@ -42,3 +42,46 @@ describe('APIClient.saveToken in non-browser environments', () => {
     expect(client.token).toBe('token-123');
   });
 });
+
+describe('APIClient marketplace endpoint resolution', () => {
+  const createFetchSpy = () => jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    headers: { get: () => 'application/json' },
+    json: async () => ({ items: [] }),
+    text: async () => ''
+  });
+
+  test('absolute base without /api yields /api/marketplace path', async () => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient('https://example.com', fetchSpy);
+
+    await client.listMarketplace();
+
+    expect(fetchSpy).toHaveBeenCalledWith('https://example.com/api/marketplace', expect.objectContaining({
+      method: 'GET'
+    }));
+  });
+
+  test('absolute base ending in /api avoids duplication', async () => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient('https://example.com/api', fetchSpy);
+
+    await client.listMarketplace();
+
+    expect(fetchSpy).toHaveBeenCalledWith('https://example.com/api/marketplace', expect.objectContaining({
+      method: 'GET'
+    }));
+  });
+
+  test('relative /api base keeps single /api prefix', async () => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient('/api', fetchSpy);
+
+    await client.listMarketplace();
+
+    expect(fetchSpy).toHaveBeenCalledWith('/api/marketplace', expect.objectContaining({
+      method: 'GET'
+    }));
+  });
+});
