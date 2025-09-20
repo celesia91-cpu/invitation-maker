@@ -411,7 +411,7 @@ class APIClient {
       params.mine = 'true';
     }
 
-    return this.get('/api/marketplace', params);
+    return this.get('/marketplace', params);
   }
 
   // Enhanced authentication methods with session management
