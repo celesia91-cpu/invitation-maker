@@ -448,41 +448,32 @@ class APIClient {
   }
 
   // Marketplace endpoints
-  async listMarketplace(filters = {}) {
-    const params = {};
-    const { role, category, search, ownerId, mine } = filters || {};
+async listMarketplace(filters = {}) {
+  const params = {};
+  const { role, category, search, ownerId, mine } = filters || {};
 
-    if (typeof role === 'string' && role.trim()) {
-      params.role = role.trim().toLowerCase();
-    }
+  if (typeof role === 'string' && role.trim()) params.role = role.trim().toLowerCase();
+  if (typeof category === 'string' && category.trim()) params.category = category.trim();
+  if (typeof search === 'string' && search.trim()) params.search = search.trim();
 
-    if (typeof category === 'string' && category.trim()) {
-      params.category = category.trim();
-    }
-
-    if (typeof search === 'string' && search.trim()) {
-      params.search = search.trim();
-    }
-
-    if (ownerId !== undefined && ownerId !== null) {
-      const owner = String(ownerId).trim();
-      if (owner) {
-        params.ownerId = owner;
-      }
-    }
-
-    const normalizedMine = typeof mine === 'string'
-      ? ['1', 'true', 'yes', 'y'].includes(mine.trim().toLowerCase())
-      : Boolean(mine);
-    if (normalizedMine) {
-      params.mine = 'true';
-    }
-
-    const endpoint = this._buildRequestUrl('/api/marketplace');
-    const queryString = new URLSearchParams(params).toString();
-    const url = queryString ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}${queryString}` : endpoint;
-    return this.request(url, { method: 'GET' });
+  if (ownerId !== undefined && ownerId !== null) {
+    const owner = String(ownerId).trim();
+    if (owner) params.ownerId = owner;
   }
+
+  const normalizedMine = typeof mine === 'string'
+    ? ['1', 'true', 'yes', 'y'].includes(mine.trim().toLowerCase())
+    : Boolean(mine);
+  if (normalizedMine) params.mine = 'true';
+
+  // NOTE: endpoint has NO /api prefix; request() + _buildRequestUrl() will add it if baseURL ends with /api
+  const qs = new URLSearchParams(params).toString();
+  const endpoint = '/marketplace';
+  const url = qs ? `${endpoint}?${qs}` : endpoint;
+
+  return this.request(url, { method: 'GET' });
+}
+
 
   // Enhanced authentication methods with session management
   async register(userData) {
