@@ -383,7 +383,7 @@ class APIClient {
   // Marketplace endpoints
   async listMarketplace(filters = {}) {
     const params = {};
-    const { role, category, search } = filters || {};
+    const { role, category, search, ownerId, mine } = filters || {};
 
     if (typeof role === 'string' && role.trim()) {
       params.role = role.trim().toLowerCase();
@@ -395,6 +395,20 @@ class APIClient {
 
     if (typeof search === 'string' && search.trim()) {
       params.search = search.trim();
+    }
+
+    if (ownerId !== undefined && ownerId !== null) {
+      const owner = String(ownerId).trim();
+      if (owner) {
+        params.ownerId = owner;
+      }
+    }
+
+    const normalizedMine = typeof mine === 'string'
+      ? ['1', 'true', 'yes', 'y'].includes(mine.trim().toLowerCase())
+      : Boolean(mine);
+    if (normalizedMine) {
+      params.mine = 'true';
     }
 
     return this.get('/api/marketplace', params);

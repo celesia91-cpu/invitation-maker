@@ -82,6 +82,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
 
   const auth = useAuth();
   const user = auth?.user;
+  const userId = user?.id ?? null;
   const api = auth?.api;
 
   const normalizedRole = normalizeRole(user?.role);
@@ -103,6 +104,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
   const searchKey = trimmedSearch.toLowerCase();
   const rawCategory = typeof activeCategory === 'string' ? activeCategory.trim() : '';
   const categoryKey = rawCategory.toLowerCase();
+  const isOwnershipCategoryActive = isAdmin && rawCategory === adminOwnershipCategoryId;
   const cacheKey = createCacheKey(normalizedRole, categoryKey, searchKey);
 
   useEffect(() => {
@@ -137,8 +139,9 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
     }
 
     const requestKey = cacheKey;
-    const requestCategory = categoryKey || undefined;
+    const requestCategory = isOwnershipCategoryActive ? undefined : categoryKey || undefined;
     const requestSearch = trimmedSearch || undefined;
+    const requestOwnerId = isOwnershipCategoryActive && userId !== null ? String(userId) : undefined;
 
     setLoadingByKey((prev) => ({ ...prev, [requestKey]: true }));
     setErrorsByKey((prev) => {
@@ -150,11 +153,20 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
 
     (async () => {
       try {
-        const response = await api.listMarketplace({
+        const requestPayload = {
           role: normalizedRole,
           category: requestCategory,
           search: requestSearch,
-        });
+        };
+
+        if (isOwnershipCategoryActive) {
+          if (requestOwnerId) {
+            requestPayload.ownerId = requestOwnerId;
+          }
+          requestPayload.mine = true;
+        }
+
+        const response = await api.listMarketplace(requestPayload);
 
         if (cancelled || !isMountedRef.current) return;
 
@@ -189,7 +201,17 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
     return () => {
       cancelled = true;
     };
-  }, [api, cacheKey, categoryKey, currentResult, isOpen, normalizedRole, trimmedSearch]);
+  }, [
+    api,
+    cacheKey,
+    categoryKey,
+    currentResult,
+    isOpen,
+    isOwnershipCategoryActive,
+    normalizedRole,
+    trimmedSearch,
+    userId,
+  ]);
 
   const handleKeyDown = (event, index) => {
     if (categoryOptions.length === 0) return;

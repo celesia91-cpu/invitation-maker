@@ -189,7 +189,7 @@ export async function getAdminDesigns(filters = {}) {
 }
 
 export async function getMarketplaceDesigns(filters = {}) {
-  const { role, category, search } = filters;
+  const { role, category, search, ownerId, mine, requestingUserId } = filters;
   const normalizedRole = typeof role === 'string' ? role.trim().toLowerCase() : '';
 
   if (!MARKETPLACE_ROLES.has(normalizedRole)) {
@@ -219,6 +219,30 @@ export async function getMarketplaceDesigns(filters = {}) {
         );
       });
     }
+  }
+
+  const normalizeOwnerValue = (value) => {
+    if (value === null || value === undefined) return '';
+    const raw = String(value).trim();
+    return raw ? raw.toLowerCase() : '';
+  };
+
+  const normalizedOwnerId = normalizeOwnerValue(ownerId);
+  const normalizedRequestingUserId = normalizeOwnerValue(requestingUserId);
+  const normalizedMine = typeof mine === 'string'
+    ? ['1', 'true', 'yes', 'y'].includes(mine.trim().toLowerCase())
+    : Boolean(mine);
+  const ownerFilterId = normalizedOwnerId || (normalizedMine ? normalizedRequestingUserId : '');
+
+  if (ownerFilterId) {
+    records = records.filter((design) => {
+      const ownership = designOwners.get(String(design.id));
+      if (!ownership) return false;
+      return normalizeOwnerValue(ownership.userId) === ownerFilterId;
+    });
+  } else if (normalizedMine) {
+    // A mine filter was requested but no owner identifier could be resolved.
+    records = [];
   }
 
   records.sort((a, b) => String(a.id).localeCompare(String(b.id)));

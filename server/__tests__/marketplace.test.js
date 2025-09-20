@@ -48,3 +48,23 @@ test('admin role includes visibility info and conversion rates', async () => {
 test('requesting an unsupported role rejects', async () => {
   await assert.rejects(() => getMarketplaceDesigns({ role: 'guest' }));
 });
+
+test('ownership filters restrict marketplace listings to matching designers', async () => {
+  const ownerResult = await getMarketplaceDesigns({ role: 'admin', ownerId: 'demo' });
+  assert.equal(ownerResult.role, 'admin');
+  assert.deepEqual(
+    ownerResult.data.map((entry) => entry.id),
+    ['1', '2']
+  );
+
+  const mineResult = await getMarketplaceDesigns({
+    role: 'admin',
+    mine: true,
+    requestingUserId: 'studio-omega',
+  });
+  assert.equal(mineResult.role, 'admin');
+  assert.deepEqual(
+    mineResult.data.map((entry) => entry.id),
+    ['3']
+  );
+});
