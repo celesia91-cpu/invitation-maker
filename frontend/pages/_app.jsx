@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { AppStateProvider, useAppState, formatNavigationLabel } from '../context/AppStateContext.jsx';
+import { AuthProvider } from '../context/AuthContext.jsx';
 import '../styles/globals.css';
 import '../styles/styles.css';
 
@@ -45,8 +46,10 @@ function AppStateRouterBridge() {
 export default function MyApp({ Component, pageProps }) {
   return (
     <AppStateProvider>
-      <AppStateRouterBridge />
-      <Component {...pageProps} />
+      <AuthProvider>
+        <AppStateRouterBridge />
+        <Component {...pageProps} />
+      </AuthProvider>
     </AppStateProvider>
   );
 }

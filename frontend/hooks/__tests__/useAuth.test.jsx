@@ -1,20 +1,15 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { AppStateProvider } from '../../context/AppStateContext.jsx';
+import { AuthProvider } from '../../context/AuthContext.jsx';
 import useAuth from '../useAuth.js';
-import useApiClient from '../useApiClient.js';
 
-jest.mock('../useApiClient.js', () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
-
-const wrapper = ({ children }) => <AppStateProvider>{children}</AppStateProvider>;
+const createWrapper = (apiClient) => ({ children }) => (
+  <AppStateProvider>
+    <AuthProvider apiClient={apiClient}>{children}</AuthProvider>
+  </AppStateProvider>
+);
 
 describe('useAuth', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('reports initialization progress and hydration results for persisted sessions', async () => {
     const getUser = jest.fn().mockReturnValue({ id: 'demo-user', role: 'creator' });
     const api = {
@@ -25,8 +20,6 @@ describe('useAuth', () => {
       getCurrentUser: jest.fn(),
     };
 
-    useApiClient.mockReturnValue(api);
-
     const states = [];
     const { result } = renderHook(() => {
       const value = useAuth();
@@ -35,7 +28,7 @@ describe('useAuth', () => {
         isInitialized: value.isInitialized,
       });
       return value;
-    }, { wrapper });
+    }, { wrapper: createWrapper(api) });
 
     expect(states[0]).toEqual({ isAuthenticated: false, isInitialized: false });
 
