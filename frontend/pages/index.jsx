@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import AuthModal from '../components/AuthModal.jsx';
 import SidePanel from '../components/SidePanel.jsx';
@@ -10,10 +10,124 @@ import PurchaseModal from '../components/PurchaseModal.jsx';
 import Marketplace from '../components/Marketplace.jsx';
 import ImageCanvas from '../components/ImageCanvas.jsx';
 import UploadBackgroundButton from '../components/UploadBackgroundButton.jsx';
+import withRoleGate from '../components/withRoleGate.jsx';
 import useAuth from '../hooks/useAuth.js';
 import useDesignOwnership from '../hooks/useDesignOwnership.js';
 
 const DEFAULT_MARKETPLACE_DESIGN_ID = 'demo-marketplace-design';
+
+const MARKETPLACE_ALLOWED_ROLES = ['guest', 'user', 'consumer', 'creator', 'admin'];
+const EDITOR_ALLOWED_ROLES = ['guest', 'user', 'consumer', 'creator', 'admin'];
+
+function MarketplaceForbidden({ isOpen, userRole }) {
+  const roleLabel = typeof userRole === 'string' && userRole.trim() ? userRole : 'unknown';
+  return (
+    <div id="marketplacePage" className={`page${isOpen ? '' : ' hidden'}`}>
+      <div className="forbidden-placeholder" role="alert" data-testid="marketplace-forbidden">
+        Marketplace access is unavailable for the “{roleLabel}” role.
+      </div>
+    </div>
+  );
+}
+
+function EditorForbidden({ isVisible, userRole }) {
+  const roleLabel = typeof userRole === 'string' && userRole.trim() ? userRole : 'unknown';
+  return (
+    <div id="editorPage" className={`page${isVisible ? '' : ' hidden'}`}>
+      <div className="forbidden-placeholder" role="alert" data-testid="editor-forbidden">
+        Editor access requires a creator-capable role. Current role: {roleLabel}.
+      </div>
+    </div>
+  );
+}
+
+function EditorShell({
+  isVisible,
+  panelOpen,
+  onTogglePanel,
+  onPreviewClick,
+  onShareClick,
+  onOpenAuth,
+  isTopbarVisible,
+  onToggleTopbar,
+  authApi,
+}) {
+  return (
+    <div id="editorPage" className={`page${isVisible ? '' : ' hidden'}`}>
+      <Topbar
+        onPreviewClick={onPreviewClick}
+        onShareClick={onShareClick}
+        onTogglePanel={onTogglePanel}
+        panelOpen={panelOpen}
+      />
+
+      {/* Example button to open Auth modal (not in original HTML) */}
+      <div style={{ padding: 8 }}>
+        <button className="btn" onClick={onOpenAuth}>Sign In</button>
+      </div>
+
+      {/* Mobile topbar toggle (hidden in viewer) */}
+      <button
+        id="topbarToggle"
+        className="iconbtn"
+        aria-controls="topbar"
+        aria-expanded={isTopbarVisible}
+        aria-label={isTopbarVisible ? 'Collapse top bar' : 'Expand top bar'}
+        onClick={onToggleTopbar}
+      >
+        {isTopbarVisible ? '▾' : '▴'}
+      </button>
+
+      {/* Fullscreen and rotate overlays */}
+      <FullscreenOverlay />
+      <RotateOverlay />
+
+      {/* Optional backdrop */}
+      <div className="backdrop" id="backdrop"></div>
+
+      <SidePanel />
+
+      <main className="stage">
+        <div className="wrap">
+          <ImageCanvas>
+            <div id="vGuide" className="guide v" aria-hidden="true"></div>
+            <div id="hGuide" className="guide h" aria-hidden="true"></div>
+            <video id="fxVideo" autoPlay muted loop playsInline>
+              <source src="/Comp 1.webm" type="video/webm" />
+            </video>
+
+            <div id="bgBox" className="hidden" aria-label="Background image transform box">
+              <div className="handle nw" data-handle="nw"></div>
+              <div className="handle ne" data-handle="ne"></div>
+              <div className="handle se" data-handle="se"></div>
+              <div className="handle sw" data-handle="sw"></div>
+              <div className="handle rotate" data-handle="rotate" title="Rotate"></div>
+            </div>
+
+            <div id="rsvpBar" className="rsvp" role="group" aria-label="RSVP">
+              <button id="rsvpYes" className="rsvp-btn">Yes</button>
+              <button id="rsvpMaybe" className="rsvp-btn">Maybe</button>
+              <button id="rsvpNo" className="rsvp-btn">No</button>
+              <button id="rsvpMap" className="rsvp-btn primary">View Map</button>
+            </div>
+
+            <UploadBackgroundButton api={authApi} />
+          </ImageCanvas>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+const RoleAwareMarketplace = withRoleGate(Marketplace, {
+  allowedRoles: MARKETPLACE_ALLOWED_ROLES,
+  fallback: MarketplaceForbidden,
+});
+
+const RoleAwareEditorShell = withRoleGate(EditorShell, {
+  allowedRoles: EDITOR_ALLOWED_ROLES,
+  fallback: EditorForbidden,
+});
 
 export default function MarketplacePage() {
   const auth = useAuth();
@@ -72,12 +186,33 @@ export default function MarketplacePage() {
     }
   }, [auth.isAuthenticated]);
 
-  const ensureDesignId = () => {
+  const ensureDesignId = useCallback(() => {
     setActiveDesignId((previous) => {
       if (previous) return previous;
       return currentDesignId || DEFAULT_MARKETPLACE_DESIGN_ID;
     });
+  }, [currentDesignId]);
+
+  const handlePreviewClick = () => {
+    ensureDesignId();
+    setShowPreview(true);
   };
+
+  const handleShareClick = () => {
+    ensureDesignId();
+    const designId = activeDesignId || currentDesignId || DEFAULT_MARKETPLACE_DESIGN_ID;
+    if (isDesignOwned(designId)) {
+      setView('editor');
+    } else {
+      setShowPurchase(true);
+    }
+  };
+
+  const handleTogglePanel = () => setPanelOpen((value) => !value);
+  const handleToggleTopbar = () => setIsTopbarVisible((value) => !value);
+  const handleOpenAuth = () => setShowAuth(true);
+
+  const isEditorView = view === 'editor';
 
   return (
     <div>
@@ -88,86 +223,23 @@ export default function MarketplacePage() {
       <Breadcrumbs />
 
       {/* Marketplace page (hidden by default) */}
-      <Marketplace
+      <RoleAwareMarketplace
         isOpen={view === 'marketplace'}
         onSkipToEditor={() => setView('editor')}
       />
 
       {/* Editor page wrapper */}
-      <div id="editorPage" className={`page${view === 'editor' ? '' : ' hidden'}`}>
-        <Topbar
-          onPreviewClick={() => {
-            ensureDesignId();
-            setShowPreview(true);
-          }}
-          onShareClick={() => {
-            ensureDesignId();
-            const designId = activeDesignId || currentDesignId || DEFAULT_MARKETPLACE_DESIGN_ID;
-            if (isDesignOwned(designId)) {
-              setView('editor');
-            } else {
-              setShowPurchase(true);
-            }
-          }}
-          onTogglePanel={() => setPanelOpen((v) => !v)}
-          panelOpen={panelOpen}
-        />
-
-        {/* Example button to open Auth modal (not in original HTML) */}
-        <div style={{ padding: 8 }}>
-          <button className="btn" onClick={() => setShowAuth(true)}>Sign In</button>
-        </div>
-
-        {/* Mobile topbar toggle (hidden in viewer) */}
-        <button
-          id="topbarToggle"
-          className="iconbtn"
-          aria-controls="topbar"
-          aria-expanded={isTopbarVisible}
-          aria-label={isTopbarVisible ? 'Collapse top bar' : 'Expand top bar'}
-          onClick={() => setIsTopbarVisible((value) => !value)}
-        >
-          {isTopbarVisible ? '▾' : '▴'}
-        </button>
-
-        {/* Fullscreen and rotate overlays */}
-        <FullscreenOverlay />
-        <RotateOverlay />
-
-        {/* Optional backdrop */}
-        <div className="backdrop" id="backdrop"></div>
-
-        <SidePanel />
-
-        <main className="stage">
-          <div className="wrap">
-            <ImageCanvas>
-              <div id="vGuide" className="guide v" aria-hidden="true"></div>
-              <div id="hGuide" className="guide h" aria-hidden="true"></div>
-              <video id="fxVideo" autoPlay muted loop playsInline>
-                <source src="/Comp 1.webm" type="video/webm" />
-              </video>
-
-              <div id="bgBox" className="hidden" aria-label="Background image transform box">
-                <div className="handle nw" data-handle="nw"></div>
-                <div className="handle ne" data-handle="ne"></div>
-                <div className="handle se" data-handle="se"></div>
-                <div className="handle sw" data-handle="sw"></div>
-                <div className="handle rotate" data-handle="rotate" title="Rotate"></div>
-              </div>
-
-              <div id="rsvpBar" className="rsvp" role="group" aria-label="RSVP">
-                <button id="rsvpYes" className="rsvp-btn">Yes</button>
-                <button id="rsvpMaybe" className="rsvp-btn">Maybe</button>
-                <button id="rsvpNo" className="rsvp-btn">No</button>
-                <button id="rsvpMap" className="rsvp-btn primary">View Map</button>
-              </div>
-
-              <UploadBackgroundButton api={auth.api} />
-            </ImageCanvas>
-          </div>
-        </main>
-      </div>
+      <RoleAwareEditorShell
+        isVisible={isEditorView}
+        panelOpen={panelOpen}
+        onTogglePanel={handleTogglePanel}
+        onPreviewClick={handlePreviewClick}
+        onShareClick={handleShareClick}
+        onOpenAuth={handleOpenAuth}
+        isTopbarVisible={isTopbarVisible}
+        onToggleTopbar={handleToggleTopbar}
+        authApi={auth.api}
+      />
 
       {/* Global modals */}
       <PreviewModal
