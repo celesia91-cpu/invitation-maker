@@ -468,7 +468,7 @@ async listMarketplace(filters = {}) {
 
   // Always target the API namespace so base URLs without /api still reach the marketplace route.
   const qs = new URLSearchParams(params).toString();
-  const endpoint = '/api/marketplace';
+  const endpoint = '/marketplace';
   const url = qs ? `${endpoint}?${qs}` : endpoint;
 
   return this.request(url, { method: 'GET' });
