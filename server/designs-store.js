@@ -98,6 +98,9 @@ function shapeMarketplaceRecord(design, role, conversionLookup) {
     const rate = conversionLookup?.get(String(design.id));
     base.conversionRate = typeof rate === 'number' && Number.isFinite(rate) ? rate : 0;
     base.managedByAdminId = design.managedByAdminId ? String(design.managedByAdminId) : null;
+    const normalizedStatus =
+      typeof design.status === 'string' ? design.status.trim().toLowerCase() : '';
+    base.status = normalizedStatus || 'draft';
   }
 
   return base;

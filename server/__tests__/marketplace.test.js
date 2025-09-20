@@ -43,6 +43,7 @@ test('admin role includes visibility info and conversion rates', async () => {
   assert.ok(entry.visibility);
   assert.equal(entry.visibility.consumer, true);
   assert.equal(entry.conversionRate, 0.5);
+  assert.equal(entry.status, 'published');
 });
 
 test('requesting an unsupported role rejects', async () => {

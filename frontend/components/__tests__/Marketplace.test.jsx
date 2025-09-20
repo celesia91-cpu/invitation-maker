@@ -274,6 +274,9 @@ describe('Marketplace', () => {
     expect(adminExtras).toHaveTextContent('Conversion Rate: 50%');
     expect(adminExtras).toHaveTextContent('managedBy: ops-team');
 
+    const statusBadge = await screen.findByTestId('marketplace-status-badge-1');
+    expect(statusBadge).toHaveTextContent('Draft');
+
     const manageButton = within(adminExtras).getByRole('button', { name: /manage listing/i });
     const publishButton = within(adminExtras).getByRole('button', { name: /publish listing/i });
     const deleteButton = within(adminExtras).getByRole('button', { name: /delete listing/i });
@@ -328,6 +331,34 @@ describe('Marketplace', () => {
 
     expect(publishButton).toBeDisabled();
     expect(publishMarketplaceListing).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(1));
+  });
+
+  it('renders status badges for draft and published admin listings', async () => {
+    const adminListings = [
+      {
+        id: '1',
+        title: 'Draft Template',
+        status: 'draft',
+        designer: { displayName: 'Design Studio' },
+      },
+      {
+        id: '2',
+        title: 'Published Template',
+        status: 'published',
+        designer: { displayName: 'Launch Team' },
+      },
+    ];
+    const { listMarketplace } = mockAuth({ role: 'admin', listings: adminListings });
+
+    render(<Marketplace isOpen onSkipToEditor={jest.fn()} />);
+
+    const draftBadge = await screen.findByTestId('marketplace-status-badge-1');
+    const publishedBadge = await screen.findByTestId('marketplace-status-badge-2');
+
+    expect(draftBadge).toHaveTextContent('Draft');
+    expect(publishedBadge).toHaveTextContent('Published');
 
     await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(1));
   });
