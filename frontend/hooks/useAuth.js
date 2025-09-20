@@ -9,6 +9,7 @@ export default function useAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const {
     setUserRole,
     resetUserRole,
@@ -64,6 +65,8 @@ export default function useAuth() {
       resetDesignOwnership();
       setCurrentDesignId(null);
     }
+
+    setIsInitialized(true);
   }, [
     api,
     applyUserRole,
@@ -178,6 +181,7 @@ export default function useAuth() {
     loading,
     error,
     isAuthenticated,
+    isInitialized,
 
     // actions
     login,
