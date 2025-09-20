@@ -1066,10 +1066,20 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const ownerIdParam = urlObj.searchParams.get('ownerId');
+      const ownerId = ownerIdParam ? ownerIdParam.trim() : '';
+      const mineParam = urlObj.searchParams.get('mine');
+      const mineRequested = typeof mineParam === 'string' && mineParam.trim()
+        ? ['1', 'true', 'yes', 'y'].includes(mineParam.trim().toLowerCase())
+        : false;
+
       const payload = await getMarketplaceDesigns({
         role: effectiveRole,
         category: category || undefined,
-        search: search || undefined
+        search: search || undefined,
+        ownerId: ownerId || undefined,
+        mine: mineRequested,
+        requestingUserId: authUser.id,
       });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });

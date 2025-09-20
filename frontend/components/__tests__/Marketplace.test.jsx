@@ -277,8 +277,10 @@ describe('Marketplace', () => {
     await waitFor(() => expect(listMarketplace).toHaveBeenCalledTimes(2));
     expect(listMarketplace.mock.calls[1][0]).toEqual({
       role: 'admin',
-      category: 'owned-by-42-admin',
+      category: undefined,
       search: undefined,
+      mine: true,
+      ownerId: '42-admin',
     });
     expect(myDesignsTab).toHaveAttribute('aria-selected', 'true');
   });
