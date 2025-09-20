@@ -466,9 +466,9 @@ async listMarketplace(filters = {}) {
     : Boolean(mine);
   if (normalizedMine) params.mine = 'true';
 
-  // NOTE: endpoint has NO /api prefix; request() + _buildRequestUrl() will add it if baseURL ends with /api
+  // Always target the API namespace so base URLs without /api still reach the marketplace route.
   const qs = new URLSearchParams(params).toString();
-  const endpoint = '/marketplace';
+  const endpoint = '/api/marketplace';
   const url = qs ? `${endpoint}?${qs}` : endpoint;
 
   return this.request(url, { method: 'GET' });
