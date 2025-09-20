@@ -19,7 +19,7 @@ class APIClient {
           // Local dev default backend port
           baseURL = 'http://localhost:3001';
         } else {
-          baseURL = 'https://invitation-maker-api.celesia91.workers.dev/api';
+          baseURL = 'https://invitation-maker-api.celesia91.workers.dev';
         }
       } else {
         baseURL = 'http://localhost:3001';
@@ -411,7 +411,7 @@ class APIClient {
       params.mine = 'true';
     }
 
-    return this.get('/marketplace', params);
+    return this.get('/api/marketplace', params);
   }
 
   // Enhanced authentication methods with session management
