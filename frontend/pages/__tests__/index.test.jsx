@@ -18,6 +18,25 @@ jest.mock('../../hooks/useModalFocusTrap.js', () => ({
   default: jest.fn(),
 }));
 
+let previewModalProps;
+let purchaseModalProps;
+
+jest.mock('../../components/PreviewModal.jsx', () => ({
+  __esModule: true,
+  default: (props) => {
+    previewModalProps = props;
+    return null;
+  },
+}));
+
+jest.mock('../../components/PurchaseModal.jsx', () => ({
+  __esModule: true,
+  default: (props) => {
+    purchaseModalProps = props;
+    return null;
+  },
+}));
+
 const createAuthValue = (overrides = {}) => {
   const {
     api: apiOverride,
@@ -69,13 +88,18 @@ function InitialRoleSetter({ role, children }) {
   return children;
 }
 
-const renderPage = (routerOverrides, { userRole = 'guest', useMockProvider = true } = {}) => {
+const renderPage = (
+  routerOverrides,
+  { userRole = 'guest', useMockProvider = true, providerValue } = {}
+) => {
   const router = createMockRouter(routerOverrides);
 
   const ProviderComponent = useMockProvider ? MockAppStateProvider : AppStateProvider;
-  const providerProps = useMockProvider ? { value: { userRole } } : {};
+  const providerProps = useMockProvider
+    ? { value: { userRole, ...(providerValue ?? {}) } }
+    : {};
 
-  return render(
+  const result = render(
     <RouterContext.Provider value={router}>
       <ProviderComponent {...providerProps}>
         {useMockProvider ? (
@@ -88,11 +112,15 @@ const renderPage = (routerOverrides, { userRole = 'guest', useMockProvider = tru
       </ProviderComponent>
     </RouterContext.Provider>
   );
+
+  return { ...result, router };
 };
 
 describe('MarketplacePage', () => {
   beforeEach(() => {
     useModalFocusTrap.mockImplementation(() => ({ current: null }));
+    previewModalProps = undefined;
+    purchaseModalProps = undefined;
   });
 
   afterEach(() => {
@@ -120,11 +148,11 @@ describe('MarketplacePage', () => {
     });
   });
 
-  it('switches to the editor view and toggles related UI when using the skip link', async () => {
+  it('navigates to the editor route when using the skip link', async () => {
     useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
 
     const user = userEvent.setup();
-    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+    const { router } = renderPage(undefined, { userRole: 'creator', useMockProvider: false });
 
     await screen.findByText(
       (content, element) =>
@@ -132,225 +160,56 @@ describe('MarketplacePage', () => {
         /Creator/i.test(element.textContent || '')
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Panel' })).not.toBeDisabled();
-    });
-
     await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
 
-    const marketplacePage = document.getElementById('marketplacePage');
-    const editorPage = document.getElementById('editorPage');
-
-    await waitFor(() => {
-      expect(marketplacePage).toHaveClass('hidden');
-      expect(editorPage).not.toHaveClass('hidden');
-    });
-
-    await waitFor(() => {
-      expect(document.body).toHaveClass('panel-open');
-    });
-
-    const topbarToggle = screen.getByRole('button', { name: /collapse top bar/i });
-    await user.click(topbarToggle);
-
-    await waitFor(() => {
-      expect(document.body).toHaveClass('topbar-hidden');
-    });
-
-    const previewButton = screen.getByRole('button', { name: 'Preview' });
-    await user.click(previewButton);
-
-    const useDesignButton = await screen.findByRole('button', { name: /use this design/i });
-    expect(useDesignButton).toBeInTheDocument();
-
-    await user.click(useDesignButton);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /use this design/i })).not.toBeInTheDocument();
-    });
-
-    const confirmPurchaseButton = await screen.findByRole('button', { name: /confirm purchase/i });
-    expect(confirmPurchaseButton).toBeInTheDocument();
-
-    const cancelPurchaseButton = await screen.findByRole('button', { name: /cancel/i });
-    expect(cancelPurchaseButton).toBeInTheDocument();
-
-    await user.click(cancelPurchaseButton);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/you need tokens to edit this design/i)).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /confirm purchase/i })).not.toBeInTheDocument();
-    });
+    expect(router.push).toHaveBeenCalledWith('/editor');
   });
 
-  it('updates the topbar toggle aria-expanded state and the panel-open body class', async () => {
-    useAuth.mockReturnValue(
-      createAuthValue({ isAuthenticated: true, userRole: 'creator' })
-    );
+  it('opens the purchase flow for unowned designs and navigates after confirmation', async () => {
+    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
 
-    const user = userEvent.setup();
-    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+    const { router } = renderPage(undefined, { userRole: 'creator' });
 
-    await screen.findByText(
-      (content, element) =>
-        element.classList?.contains('marketplace-role-summary') &&
-        /Creator/i.test(element.textContent || '')
-    );
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Panel' })).not.toBeDisabled();
-    });
-
-    await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
-
-    await waitFor(() => {
-      expect(document.body).toHaveClass('panel-open');
-    });
-
-    const topbarToggle = screen.getByRole('button', { name: /collapse top bar/i });
-    expect(topbarToggle).toHaveAttribute('aria-expanded', 'true');
-
-    await user.click(topbarToggle);
-
-    await waitFor(() => {
-      expect(topbarToggle).toHaveAttribute('aria-expanded', 'false');
-      expect(document.body).toHaveClass('topbar-hidden');
-    });
-
-    const expandTopbarButton = screen.getByRole('button', { name: /expand top bar/i });
-    await user.click(expandTopbarButton);
-
-    await waitFor(() => {
-      expect(expandTopbarButton).toHaveAttribute('aria-expanded', 'true');
-      expect(document.body).not.toHaveClass('topbar-hidden');
-    });
-
-    const panelButton = screen.getByRole('button', { name: 'Panel' });
-    expect(panelButton).toHaveAttribute('aria-expanded', 'true');
-
-    await user.click(panelButton);
-
-    await waitFor(() => {
-      expect(document.body).not.toHaveClass('panel-open');
-      expect(panelButton).toHaveAttribute('aria-expanded', 'false');
-    });
-
-    await user.click(panelButton);
-
-    await waitFor(() => {
-      expect(document.body).toHaveClass('panel-open');
-      expect(panelButton).toHaveAttribute('aria-expanded', 'true');
-    });
-  });
-
-  it('uploads a background image and updates the canvas on success', async () => {
-    const uploadResponse = {
-      image: {
-        id: 'uploaded',
-        url: 'https://example.com/uploaded.png',
-        thumbnailUrl: 'https://example.com/thumb.png',
-        width: 1024,
-        height: 576,
-      },
-    };
-    let resolveUpload;
-    const uploadImage = jest.fn().mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveUpload = resolve;
-        })
-    );
-
-    useAuth.mockReturnValue(
-      createAuthValue({ isAuthenticated: true, api: { uploadImage }, userRole: 'creator' })
-    );
-
-    const user = userEvent.setup();
-    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
-
-    await screen.findByText(
-      (content, element) =>
-        element.classList?.contains('marketplace-role-summary') &&
-        /Creator/i.test(element.textContent || '')
-    );
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Panel' })).not.toBeDisabled();
-    });
-
-    await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
-
-    const input = screen.getByLabelText(/upload background image/i);
-    const file = new File(['content'], 'background.png', { type: 'image/png' });
-
-    await user.upload(input, file);
-
-    expect(uploadImage).toHaveBeenCalledWith(file);
-
-    const uploadingButton = screen.getByRole('button', { name: /uploading/i });
-    expect(uploadingButton).toBeDisabled();
-
-    await screen.findByLabelText(/upload progress/i);
+    expect(typeof previewModalProps?.onUseDesign).toBe('function');
 
     await act(async () => {
-      resolveUpload(uploadResponse);
+      previewModalProps.onUseDesign?.({ designId: 'design-123', owned: false });
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent('background.png');
+      expect(purchaseModalProps?.isOpen).toBe(true);
     });
 
-    const image = await screen.findByAltText('Background');
-    expect(image).toHaveAttribute('src', expect.stringContaining('https://example.com/uploaded.png'));
+    await act(async () => {
+      purchaseModalProps.onConfirm?.({ designId: 'design-123', owned: true });
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/editor/design-123');
   });
 
-  it('displays an error message when the upload fails', async () => {
-    const uploadError = new Error('Network down');
-    let rejectUpload;
-    const uploadImage = jest.fn().mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          rejectUpload = reject;
-        })
-    );
+  it('navigates directly when an owned design is selected from the preview modal', async () => {
+    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
 
-    useAuth.mockReturnValue(
-      createAuthValue({ isAuthenticated: true, api: { uploadImage }, userRole: 'creator' })
-    );
+    const ownedId = 'demo-marketplace-design';
+    const { router } = renderPage(undefined, {
+      userRole: 'creator',
+      providerValue: {
+        designOwnership: {
+          currentDesignId: ownedId,
+          ownershipByDesignId: {
+            [ownedId]: { owned: true },
+          },
+        },
+      },
+    });
 
-    const user = userEvent.setup();
-    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+    expect(typeof previewModalProps?.onUseDesign).toBe('function');
 
-    await screen.findByText(
-      (content, element) =>
-        element.classList?.contains('marketplace-role-summary') &&
-        /Creator/i.test(element.textContent || '')
-    );
+    await act(async () => {
+      previewModalProps.onUseDesign?.({ designId: ownedId, owned: true });
+    });
 
-    await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
-
-    const input = screen.getByLabelText(/upload background image/i);
-    const file = new File(['oops'], 'failure.png', { type: 'image/png' });
-
-    await user.upload(input, file);
-
-    expect(uploadImage).toHaveBeenCalledWith(file);
-
-    try {
-      await act(async () => {
-        rejectUpload(uploadError);
-      });
-    } catch (_) {
-      // expected rejection from the mocked upload
-    }
-
-    const alert = await screen.findByText(/Network down/i);
-    expect(alert).toHaveAttribute('role', 'alert');
-
-    const placeholder = screen.getByText(/no image selected/i);
-    expect(placeholder).toBeInTheDocument();
-
-    const button = screen.getByRole('button', { name: /upload background/i });
-    expect(button).toBeEnabled();
+    expect(router.push).toHaveBeenCalledWith(`/editor/${ownedId}`);
+    expect(purchaseModalProps?.isOpen).not.toBe(true);
   });
 });
