@@ -8,6 +8,7 @@ export default function useAuth() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const {
     setUserRole,
     resetUserRole,
@@ -27,20 +28,35 @@ export default function useAuth() {
     [resetUserRole, setUserRole]
   );
 
+  const computeAuthState = useCallback(() => {
+    try {
+      return Boolean(api.isAuthenticated());
+    } catch (_) {
+      return false;
+    }
+  }, [api]);
+
   // Initialize from persisted session on mount
   useEffect(() => {
     let appliedRole = false;
     try {
-      if (api.isAuthenticated()) {
+      const authenticated = computeAuthState();
+      if (authenticated) {
         const sessionUser = api.getUser();
         if (sessionUser) {
           setUser(sessionUser);
           applyUserRole(sessionUser);
           appliedRole = true;
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
         }
+      } else {
+        setIsAuthenticated(false);
       }
     } catch (_) {
       // ignore initialization errors
+      setIsAuthenticated(false);
     }
 
     if (!appliedRole) {
@@ -48,7 +64,14 @@ export default function useAuth() {
       resetDesignOwnership();
       setCurrentDesignId(null);
     }
-  }, [api, applyUserRole, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
+  }, [
+    api,
+    applyUserRole,
+    computeAuthState,
+    resetDesignOwnership,
+    resetUserRole,
+    setCurrentDesignId,
+  ]);
 
   const login = useCallback(
     async ({ email, password, remember = false }) => {
@@ -59,7 +82,12 @@ export default function useAuth() {
         if (res?.user) {
           setUser(res.user);
           applyUserRole(res.user);
-        } else {
+        }
+
+        const authenticated = computeAuthState();
+        setIsAuthenticated(authenticated);
+
+        if (!res?.user || !authenticated) {
           resetUserRole();
           resetDesignOwnership();
           setCurrentDesignId(null);
@@ -67,12 +95,20 @@ export default function useAuth() {
         return res;
       } catch (e) {
         setError(e);
+        setIsAuthenticated(computeAuthState());
         throw e;
       } finally {
         setLoading(false);
       }
     },
-    [api, applyUserRole, resetDesignOwnership, resetUserRole, setCurrentDesignId]
+    [
+      api,
+      applyUserRole,
+      computeAuthState,
+      resetDesignOwnership,
+      resetUserRole,
+      setCurrentDesignId,
+    ]
   );
 
   const logout = useCallback(async () => {
@@ -80,6 +116,7 @@ export default function useAuth() {
     setError(null);
     try {
       await api.logout();
+      setIsAuthenticated(computeAuthState());
       setUser(null);
       resetUserRole();
       resetDesignOwnership();
@@ -91,10 +128,11 @@ export default function useAuth() {
       resetUserRole();
       resetDesignOwnership();
       setCurrentDesignId(null);
+      setIsAuthenticated(computeAuthState());
     } finally {
       setLoading(false);
     }
-  }, [api, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
+  }, [api, computeAuthState, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
 
   const refreshUser = useCallback(async () => {
     setLoading(true);
@@ -104,7 +142,12 @@ export default function useAuth() {
       if (res?.user) {
         setUser(res.user);
         applyUserRole(res.user);
-      } else {
+      }
+
+      const authenticated = computeAuthState();
+      setIsAuthenticated(authenticated);
+
+      if (!res?.user || !authenticated) {
         resetUserRole();
         resetDesignOwnership();
         setCurrentDesignId(null);
@@ -115,18 +158,26 @@ export default function useAuth() {
       resetUserRole();
       resetDesignOwnership();
       setCurrentDesignId(null);
+      setIsAuthenticated(computeAuthState());
       return null;
     } finally {
       setLoading(false);
     }
-  }, [api, applyUserRole, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
+  }, [
+    api,
+    applyUserRole,
+    computeAuthState,
+    resetDesignOwnership,
+    resetUserRole,
+    setCurrentDesignId,
+  ]);
 
   return {
     // state
     user,
     loading,
     error,
-    isAuthenticated: api.isAuthenticated(),
+    isAuthenticated,
 
     // actions
     login,
