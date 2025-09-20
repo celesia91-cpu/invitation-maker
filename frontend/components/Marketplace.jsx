@@ -413,6 +413,12 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
             const flagEntries = extractFlagEntries(listing?.flags);
             const conversionRateLabel = formatConversionRate(listing?.conversionRate);
             const listingIsPublished = isListingPublished(listing);
+            const rawStatus = typeof listing?.status === 'string' ? listing.status.trim() : '';
+            const normalizedStatus = rawStatus.toLowerCase();
+            const statusLabel = normalizedStatus
+              ? normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1)
+              : null;
+            const statusBadgeTestId = `marketplace-status-badge-${cardId}`;
 
             return (
               <article
@@ -420,7 +426,20 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
                 className="marketplace-card"
                 data-testid={`marketplace-card-${cardId}`}
               >
-                <h3>{listing?.title || `Design ${cardId}`}</h3>
+                <h3 className="marketplace-card-title">
+                  <span className="marketplace-card-title-text">
+                    {listing?.title || `Design ${cardId}`}
+                  </span>
+                  {isAdmin && statusLabel ? (
+                    <span
+                      className={`marketplace-status-badge status-${normalizedStatus}`}
+                      data-testid={statusBadgeTestId}
+                      aria-label={`Status: ${statusLabel}`}
+                    >
+                      {statusLabel}
+                    </span>
+                  ) : null}
+                </h3>
                 {designerName ? (
                   <p className="marketplace-designer">{designerName}</p>
                 ) : null}
