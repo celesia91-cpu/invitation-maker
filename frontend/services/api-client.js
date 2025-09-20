@@ -252,10 +252,77 @@ class APIClient {
     }
   }
 
+  _buildRequestUrl(endpoint) {
+    const base = this.baseURL || '';
+    const target = typeof endpoint === 'string' ? endpoint : '';
+
+    if (!target) {
+      return base;
+    }
+
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
+      return target;
+    }
+
+    const baseIsRoot = base === '/';
+    let normalizedBase = baseIsRoot ? '/' : String(base).replace(/\/+$/, '');
+
+    let path = target;
+    let query = '';
+    let hash = '';
+
+    const hashIndex = path.indexOf('#');
+    if (hashIndex !== -1) {
+      hash = path.slice(hashIndex);
+      path = path.slice(0, hashIndex);
+    }
+
+    const queryIndex = path.indexOf('?');
+    if (queryIndex !== -1) {
+      query = path.slice(queryIndex);
+      path = path.slice(0, queryIndex);
+    }
+
+    if (path) {
+      path = `/${path.replace(/^\/+/, '')}`;
+    } else {
+      path = '';
+    }
+
+    if (normalizedBase.toLowerCase().endsWith('/api')) {
+      path = path.replace(/^\/+api(?=\/|$|\?)/i, '');
+      if (path && !path.startsWith('/')) {
+        path = `/${path}`;
+      }
+    }
+
+    let combined;
+    if (!normalizedBase) {
+      combined = path || '';
+    } else if (baseIsRoot) {
+      combined = path ? `/${path.replace(/^\/+/, '')}` : '/';
+    } else if (!path) {
+      combined = normalizedBase;
+    } else {
+      combined = `${normalizedBase}${path}`;
+    }
+
+    const finalUrl = `${combined}${query}${hash}`;
+    if (finalUrl) {
+      return finalUrl;
+    }
+
+    if (!combined && (query || hash)) {
+      return `${query}${hash}`;
+    }
+
+    return combined;
+  }
+
   // Enhanced request method with session refresh and retry
   async request(endpoint, options = {}) {
     return this.retryRequest(async () => {
-      const url = `${this.baseURL}${endpoint}`;
+      const url = this._buildRequestUrl(endpoint);
 
       // Refresh session activity on each request
       this.refreshSession();
@@ -411,7 +478,10 @@ class APIClient {
       params.mine = 'true';
     }
 
-    return this.get('/api/marketplace', params);
+    const endpoint = this._buildRequestUrl('/api/marketplace');
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}${queryString}` : endpoint;
+    return this.request(url, { method: 'GET' });
   }
 
   // Enhanced authentication methods with session management
