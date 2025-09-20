@@ -1,13 +1,26 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { AppStateProvider } from '../../context/AppStateContext.jsx';
+import {
+  AppStateProvider,
+  MockAppStateProvider,
+} from '../../context/AppStateContext.jsx';
 import { AuthProvider } from '../../context/AuthContext.jsx';
 import useAuth from '../useAuth.js';
 
-const createWrapper = (apiClient) => ({ children }) => (
-  <AppStateProvider>
-    <AuthProvider apiClient={apiClient}>{children}</AuthProvider>
-  </AppStateProvider>
-);
+const createWrapper = (apiClient, { appStateValue } = {}) => ({ children }) => {
+  if (appStateValue) {
+    return (
+      <MockAppStateProvider value={appStateValue}>
+        <AuthProvider apiClient={apiClient}>{children}</AuthProvider>
+      </MockAppStateProvider>
+    );
+  }
+
+  return (
+    <AppStateProvider>
+      <AuthProvider apiClient={apiClient}>{children}</AuthProvider>
+    </AppStateProvider>
+  );
+};
 
 describe('useAuth', () => {
   it('reports initialization progress and hydration results for persisted sessions', async () => {
@@ -75,7 +88,7 @@ describe('useAuth', () => {
       expect(typeof resolveUser).toBe('function');
     });
 
-    act(() => {
+    await act(async () => {
       resolveUser({ user: { id: 'demo-user', role: 'creator' } });
     });
 
@@ -83,5 +96,56 @@ describe('useAuth', () => {
       expect(result.current.user).toEqual({ id: 'demo-user', role: 'creator' });
       expect(result.current.isAuthenticated).toBe(true);
     });
+  });
+
+  it('avoids wiping app state when authenticated sessions need a user refresh', async () => {
+    let resolveUser;
+    const resetDesignOwnership = jest.fn();
+    const setCurrentDesignId = jest.fn();
+    const resetUserRole = jest.fn();
+
+    const api = {
+      isAuthenticated: jest.fn().mockReturnValue(true),
+      getUser: jest.fn().mockReturnValue(null),
+      login: jest.fn(),
+      logout: jest.fn(),
+      getCurrentUser: jest.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveUser = resolve;
+          })
+      ),
+    };
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(api, {
+        appStateValue: {
+          resetDesignOwnership,
+          setCurrentDesignId,
+          resetUserRole,
+        },
+      }),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(result.current.user).toBeNull();
+    expect(resetDesignOwnership).not.toHaveBeenCalled();
+    expect(setCurrentDesignId).not.toHaveBeenCalled();
+    expect(resetUserRole).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveUser({ user: { id: 'demo-user', role: 'creator' } });
+    });
+
+    await waitFor(() => {
+      expect(result.current.user).toEqual({ id: 'demo-user', role: 'creator' });
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    expect(api.getCurrentUser).toHaveBeenCalled();
   });
 });
