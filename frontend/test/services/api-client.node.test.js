@@ -52,35 +52,18 @@ describe('APIClient marketplace endpoint resolution', () => {
     text: async () => ''
   });
 
-  test('absolute base without /api yields /api/marketplace path', async () => {
+  test.each([
+    ['absolute base without /api yields /api/marketplace path', 'https://example.com', 'https://example.com/api/marketplace'],
+    ['absolute base ending in /api avoids duplication', 'https://example.com/api', 'https://example.com/api/marketplace'],
+    ['absolute base with trailing slash still gains api prefix', 'https://example.com/', 'https://example.com/api/marketplace'],
+    ['relative /api base keeps single /api prefix', '/api', '/api/marketplace']
+  ])('%s', async (_label, baseUrl, expectedUrl) => {
     const fetchSpy = createFetchSpy();
-    const client = new APIClient('https://example.com', fetchSpy);
+    const client = new APIClient(baseUrl, fetchSpy);
 
     await client.listMarketplace();
 
-    expect(fetchSpy).toHaveBeenCalledWith('https://example.com/api/marketplace', expect.objectContaining({
-      method: 'GET'
-    }));
-  });
-
-  test('absolute base ending in /api avoids duplication', async () => {
-    const fetchSpy = createFetchSpy();
-    const client = new APIClient('https://example.com/api', fetchSpy);
-
-    await client.listMarketplace();
-
-    expect(fetchSpy).toHaveBeenCalledWith('https://example.com/api/marketplace', expect.objectContaining({
-      method: 'GET'
-    }));
-  });
-
-  test('relative /api base keeps single /api prefix', async () => {
-    const fetchSpy = createFetchSpy();
-    const client = new APIClient('/api', fetchSpy);
-
-    await client.listMarketplace();
-
-    expect(fetchSpy).toHaveBeenCalledWith('/api/marketplace', expect.objectContaining({
+    expect(fetchSpy).toHaveBeenCalledWith(expectedUrl, expect.objectContaining({
       method: 'GET'
     }));
   });
