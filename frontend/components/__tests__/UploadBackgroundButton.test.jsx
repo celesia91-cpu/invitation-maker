@@ -2,8 +2,16 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import UploadBackgroundButton from '../UploadBackgroundButton.jsx';
 import useFileUpload from '../../hooks/useFileUpload.js';
+import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
 jest.mock('../../hooks/useFileUpload.js');
+
+const renderWithRole = (role = 'creator', props = {}) =>
+  render(
+    <MockAppStateProvider value={{ userRole: role }}>
+      <UploadBackgroundButton api={{ uploadImage: jest.fn(), ...(props.api ?? {}) }} />
+    </MockAppStateProvider>
+  );
 
 describe('UploadBackgroundButton', () => {
   const setupHook = (overrides = {}) => {
@@ -25,7 +33,7 @@ describe('UploadBackgroundButton', () => {
   it('renders the upload button enabled by default', () => {
     setupHook();
 
-    render(<UploadBackgroundButton api={{ uploadImage: jest.fn() }} />);
+    renderWithRole();
 
     const button = screen.getByRole('button', { name: /upload background/i });
     expect(button).toBeEnabled();
@@ -34,7 +42,7 @@ describe('UploadBackgroundButton', () => {
   it('disables the button and shows progress while uploading', () => {
     setupHook({ status: 'uploading', progress: 42, isUploading: true });
 
-    render(<UploadBackgroundButton api={{ uploadImage: jest.fn() }} />);
+    renderWithRole();
 
     const button = screen.getByRole('button', { name: /uploading/i });
     expect(button).toBeDisabled();
@@ -50,7 +58,7 @@ describe('UploadBackgroundButton', () => {
       lastUpload: { status: 'success', fileName: 'party.png' },
     });
 
-    render(<UploadBackgroundButton api={{ uploadImage: jest.fn() }} />);
+    renderWithRole();
 
     expect(screen.getByRole('status')).toHaveTextContent('party.png');
   });
@@ -63,7 +71,7 @@ describe('UploadBackgroundButton', () => {
       lastUpload: { status: 'error', fileName: 'party.png', error },
     });
 
-    render(<UploadBackgroundButton api={{ uploadImage: jest.fn() }} />);
+    renderWithRole();
 
     expect(screen.getByRole('alert')).toHaveTextContent('Upload failed');
   });
@@ -72,11 +80,21 @@ describe('UploadBackgroundButton', () => {
     const handleInputChange = jest.fn();
     setupHook({ handleInputChange });
 
-    render(<UploadBackgroundButton api={{ uploadImage: jest.fn() }} />);
+    renderWithRole();
 
     const input = screen.getByLabelText(/upload background image/i);
     fireEvent.change(input, { target: { files: [new File(['a'], 'demo.png', { type: 'image/png' })] } });
 
     expect(handleInputChange).toHaveBeenCalled();
+  });
+
+  it('disables uploads for consumer roles', () => {
+    setupHook();
+
+    renderWithRole('consumer');
+
+    const button = screen.getByRole('button', { name: /upload background/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/uploads are disabled/i)).toBeInTheDocument();
   });
 });

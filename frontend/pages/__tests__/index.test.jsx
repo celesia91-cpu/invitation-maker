@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import userEvent from '@testing-library/user-event';
 import MarketplacePage from '../index.jsx';
-import { AppStateProvider } from '../../context/AppStateContext.jsx';
+import { AppStateProvider, MockAppStateProvider, useAppState } from '../../context/AppStateContext.jsx';
 import useAuth from '../../hooks/useAuth.js';
 import useModalFocusTrap from '../../hooks/useModalFocusTrap.js';
 import { createMockRouter } from '../../test/utils/createMockRouter.js';
@@ -19,12 +19,20 @@ jest.mock('../../hooks/useModalFocusTrap.js', () => ({
 }));
 
 const createAuthValue = (overrides = {}) => {
-  const { api: apiOverride, isAuthenticated: isAuthenticatedOverride, ...rest } = overrides;
+  const {
+    api: apiOverride,
+    isAuthenticated: isAuthenticatedOverride,
+    user: userOverride,
+    userRole: userRoleOverride,
+    ...rest
+  } = overrides;
   const isAuthenticated = isAuthenticatedOverride ?? false;
+  const resolvedUser = userOverride || (userRoleOverride ? { role: userRoleOverride } : null);
 
   const defaultApi = {
     isAuthenticated: () => isAuthenticated,
     getUserDesigns: jest.fn().mockResolvedValue({ designs: [] }),
+    getUser: jest.fn().mockReturnValue(resolvedUser),
     uploadImage: jest.fn().mockResolvedValue({
       image: {
         id: 'demo-image',
@@ -37,7 +45,7 @@ const createAuthValue = (overrides = {}) => {
   };
 
   return {
-    user: null,
+    user: resolvedUser,
     loading: false,
     error: null,
     isAuthenticated,
@@ -49,14 +57,35 @@ const createAuthValue = (overrides = {}) => {
   };
 };
 
-const renderPage = (routerOverrides) => {
+function InitialRoleSetter({ role, children }) {
+  const { setUserRole } = useAppState();
+
+  useEffect(() => {
+    if (role) {
+      setUserRole(role);
+    }
+  }, [role, setUserRole]);
+
+  return children;
+}
+
+const renderPage = (routerOverrides, { userRole = 'guest', useMockProvider = true } = {}) => {
   const router = createMockRouter(routerOverrides);
+
+  const ProviderComponent = useMockProvider ? MockAppStateProvider : AppStateProvider;
+  const providerProps = useMockProvider ? { value: { userRole } } : {};
 
   return render(
     <RouterContext.Provider value={router}>
-      <AppStateProvider>
-        <MarketplacePage />
-      </AppStateProvider>
+      <ProviderComponent {...providerProps}>
+        {useMockProvider ? (
+          <MarketplacePage />
+        ) : (
+          <InitialRoleSetter role={userRole}>
+            <MarketplacePage />
+          </InitialRoleSetter>
+        )}
+      </ProviderComponent>
     </RouterContext.Provider>
   );
 };
@@ -75,16 +104,16 @@ describe('MarketplacePage', () => {
   it('auto-opens the auth modal when the user is not authenticated', async () => {
     useAuth.mockReturnValue(createAuthValue({ isAuthenticated: false }));
 
-    renderPage();
+    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
 
     const dialog = await screen.findByRole('dialog', { name: /welcome to invitation maker/i });
     expect(dialog).toBeInTheDocument();
   });
 
   it('keeps the auth modal closed when the user is authenticated', async () => {
-    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true }));
+    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
 
-    renderPage();
+    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /welcome to invitation maker/i })).not.toBeInTheDocument();
@@ -92,10 +121,20 @@ describe('MarketplacePage', () => {
   });
 
   it('switches to the editor view and toggles related UI when using the skip link', async () => {
-    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true }));
+    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true, userRole: 'creator' }));
 
     const user = userEvent.setup();
-    renderPage();
+    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+
+    await screen.findByText(
+      (content, element) =>
+        element.classList?.contains('marketplace-role-summary') &&
+        /Creator/i.test(element.textContent || '')
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Panel' })).not.toBeDisabled();
+    });
 
     await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
 
@@ -145,10 +184,22 @@ describe('MarketplacePage', () => {
   });
 
   it('updates the topbar toggle aria-expanded state and the panel-open body class', async () => {
-    useAuth.mockReturnValue(createAuthValue({ isAuthenticated: true }));
+    useAuth.mockReturnValue(
+      createAuthValue({ isAuthenticated: true, userRole: 'creator' })
+    );
 
     const user = userEvent.setup();
-    renderPage();
+    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+
+    await screen.findByText(
+      (content, element) =>
+        element.classList?.contains('marketplace-role-summary') &&
+        /Creator/i.test(element.textContent || '')
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Panel' })).not.toBeDisabled();
+    });
 
     await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
 
@@ -211,11 +262,21 @@ describe('MarketplacePage', () => {
     );
 
     useAuth.mockReturnValue(
-      createAuthValue({ isAuthenticated: true, api: { uploadImage } })
+      createAuthValue({ isAuthenticated: true, api: { uploadImage }, userRole: 'creator' })
     );
 
     const user = userEvent.setup();
-    renderPage();
+    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+
+    await screen.findByText(
+      (content, element) =>
+        element.classList?.contains('marketplace-role-summary') &&
+        /Creator/i.test(element.textContent || '')
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Panel' })).not.toBeDisabled();
+    });
 
     await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
 
@@ -254,11 +315,17 @@ describe('MarketplacePage', () => {
     );
 
     useAuth.mockReturnValue(
-      createAuthValue({ isAuthenticated: true, api: { uploadImage } })
+      createAuthValue({ isAuthenticated: true, api: { uploadImage }, userRole: 'creator' })
     );
 
     const user = userEvent.setup();
-    renderPage();
+    renderPage(undefined, { userRole: 'creator', useMockProvider: false });
+
+    await screen.findByText(
+      (content, element) =>
+        element.classList?.contains('marketplace-role-summary') &&
+        /Creator/i.test(element.textContent || '')
+    );
 
     await user.click(screen.getByRole('link', { name: /skip to blank editor/i }));
 
@@ -277,9 +344,8 @@ describe('MarketplacePage', () => {
       // expected rejection from the mocked upload
     }
 
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Network down');
-    });
+    const alert = await screen.findByText(/Network down/i);
+    expect(alert).toHaveAttribute('role', 'alert');
 
     const placeholder = screen.getByText(/no image selected/i);
     expect(placeholder).toBeInTheDocument();
