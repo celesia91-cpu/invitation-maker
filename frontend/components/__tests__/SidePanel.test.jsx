@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SidePanel from '../SidePanel.jsx';
+import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
 const PANEL_GROUPS = [
   { name: 'slides', label: 'Slides' },
@@ -10,9 +11,17 @@ const PANEL_GROUPS = [
   { name: 'event', label: 'Event' },
 ];
 
+function renderPanel(role = 'creator') {
+  return render(
+    <MockAppStateProvider value={{ userRole: role }}>
+      <SidePanel />
+    </MockAppStateProvider>
+  );
+}
+
 describe('SidePanel', () => {
   it('renders each panel group expanded with connected aria attributes', () => {
-    render(<SidePanel />);
+    renderPanel();
 
     PANEL_GROUPS.forEach(({ name, label }) => {
       const section = screen.getByLabelText(label, { selector: 'section' });
@@ -34,7 +43,7 @@ describe('SidePanel', () => {
 
   it('collapses and expands groups when their toggles are clicked', async () => {
     const user = userEvent.setup();
-    render(<SidePanel />);
+    renderPanel();
 
     for (const { name, label } of PANEL_GROUPS) {
       const section = screen.getByLabelText(label, { selector: 'section' });
@@ -56,7 +65,7 @@ describe('SidePanel', () => {
   });
 
   it('exposes key control ids so downstream selectors remain stable', () => {
-    render(<SidePanel />);
+    renderPanel();
 
     const slidesSection = screen.getByLabelText('Slides', { selector: 'section' });
     const addSlideButton = within(slidesSection).getByRole('button', { name: 'Add' });
@@ -68,5 +77,15 @@ describe('SidePanel', () => {
     const imageSection = screen.getByLabelText('Image', { selector: 'section' });
     const fadeInButton = within(imageSection).getByRole('button', { name: 'Fade In' });
     expect(fadeInButton).toHaveAttribute('id', 'imgFadeInBtn');
+  });
+
+  it('disables editing controls for non-creator roles', () => {
+    renderPanel('consumer');
+
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: 'Add Text' })).toBeDisabled();
+    expect(screen.getByLabelText('Font Size')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Open' })).toBeDisabled();
+    expect(screen.getByText(/editing is disabled/i)).toHaveTextContent('consumer');
   });
 });

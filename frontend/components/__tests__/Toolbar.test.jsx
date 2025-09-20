@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Toolbar from '../Toolbar.jsx';
 import EditorProvider, { useEditor } from '../../context/EditorContext.jsx';
+import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
 jest.mock('../../context/EditorContext.jsx', () => {
   const React = require('react');
@@ -31,16 +32,18 @@ const createState = (overrides = {}) => {
   };
 };
 
-const renderToolbar = (stateOverrides) => {
+const renderToolbar = (stateOverrides, role = 'creator') => {
   const state = createState(stateOverrides);
   const dispatch = jest.fn();
 
   useEditor.mockReturnValue([state, dispatch]);
 
   const view = render(
-    <EditorProvider>
-      <Toolbar />
-    </EditorProvider>
+    <MockAppStateProvider value={{ userRole: role }}>
+      <EditorProvider>
+        <Toolbar />
+      </EditorProvider>
+    </MockAppStateProvider>
   );
 
   return { ...view, dispatch };
@@ -94,6 +97,22 @@ describe('Toolbar', () => {
 
     const deleteButton = screen.getByRole('button', { name: /delete/i });
     expect(deleteButton).toBeDisabled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('prevents editing actions for consumer roles', async () => {
+    const user = userEvent.setup();
+    const { dispatch } = renderToolbar({}, 'consumer');
+
+    const addText = screen.getByRole('button', { name: /add text/i });
+    const addImage = screen.getByRole('button', { name: /add image/i });
+
+    expect(addText).toBeDisabled();
+    expect(addImage).toBeDisabled();
+
+    await user.click(addText);
+    await user.click(addImage);
+
     expect(dispatch).not.toHaveBeenCalled();
   });
 });

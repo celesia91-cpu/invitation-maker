@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import EditorShell from '../EditorShell.jsx';
+import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
 describe('EditorShell', () => {
   const initialState = {
@@ -34,7 +35,11 @@ describe('EditorShell', () => {
   };
 
   it('renders the core editor layout when provided with an initial state', () => {
-    render(<EditorShell initial={initialState} />);
+    render(
+      <MockAppStateProvider value={{ userRole: 'creator' }}>
+        <EditorShell initial={initialState} />
+      </MockAppStateProvider>
+    );
 
     expect(screen.getByRole('button', { name: /add text/i })).toBeInTheDocument();
     expect(screen.getByText('Slides')).toBeInTheDocument();

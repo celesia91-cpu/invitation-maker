@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import AuthModal from '../components/AuthModal.jsx';
 import SidePanel from '../components/SidePanel.jsx';
@@ -13,6 +13,8 @@ import UploadBackgroundButton from '../components/UploadBackgroundButton.jsx';
 import withRoleGate from '../components/withRoleGate.jsx';
 import useAuth from '../hooks/useAuth.js';
 import useDesignOwnership from '../hooks/useDesignOwnership.js';
+import { useAppState } from '../context/AppStateContext.jsx';
+import { resolveCapabilities } from '../utils/roleCapabilities.js';
 
 const DEFAULT_MARKETPLACE_DESIGN_ID = 'demo-marketplace-design';
 
@@ -51,6 +53,7 @@ function EditorShell({
   isTopbarVisible,
   onToggleTopbar,
   authApi,
+  roleCapabilities,
 }) {
   return (
     <div id="editorPage" className={`page${isVisible ? '' : ' hidden'}`}>
@@ -59,6 +62,7 @@ function EditorShell({
         onShareClick={onShareClick}
         onTogglePanel={onTogglePanel}
         panelOpen={panelOpen}
+        roleCapabilities={roleCapabilities}
       />
 
       {/* Example button to open Auth modal (not in original HTML) */}
@@ -85,7 +89,7 @@ function EditorShell({
       {/* Optional backdrop */}
       <div className="backdrop" id="backdrop"></div>
 
-      <SidePanel />
+      <SidePanel roleCapabilities={roleCapabilities} />
 
       <main className="stage">
         <div className="wrap">
@@ -111,7 +115,7 @@ function EditorShell({
               <button id="rsvpMap" className="rsvp-btn primary">View Map</button>
             </div>
 
-            <UploadBackgroundButton api={authApi} />
+            <UploadBackgroundButton api={authApi} roleCapabilities={roleCapabilities} />
           </ImageCanvas>
         </div>
       </main>
@@ -131,6 +135,11 @@ const RoleAwareEditorShell = withRoleGate(EditorShell, {
 
 export default function MarketplacePage() {
   const auth = useAuth();
+  const { userRole } = useAppState();
+  const roleCapabilities = useMemo(
+    () => resolveCapabilities({ role: userRole }, userRole),
+    [userRole]
+  );
   const {
     setCurrentDesignId,
     isDesignOwned,
@@ -239,6 +248,7 @@ export default function MarketplacePage() {
         isTopbarVisible={isTopbarVisible}
         onToggleTopbar={handleToggleTopbar}
         authApi={auth.api}
+        roleCapabilities={roleCapabilities}
       />
 
       {/* Global modals */}

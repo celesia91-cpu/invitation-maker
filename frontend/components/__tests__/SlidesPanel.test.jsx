@@ -27,6 +27,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SlidesPanel from '../SlidesPanel.jsx';
 import EditorProvider from '../../context/EditorContext.jsx';
+import { MockAppStateProvider } from '../../context/AppStateContext.jsx';
 
 const createInitialState = () => ({
   slides: [
@@ -41,9 +42,11 @@ function renderSlidesPanel(initial = createInitialState()) {
   currentDispatchSpy = dispatchSpy;
 
   const view = render(
-    <EditorProvider initial={initial}>
-      <SlidesPanel />
-    </EditorProvider>
+    <MockAppStateProvider value={{ userRole: 'creator' }}>
+      <EditorProvider initial={initial}>
+        <SlidesPanel />
+      </EditorProvider>
+    </MockAppStateProvider>
   );
 
   return { ...view, dispatchSpy };
@@ -88,5 +91,24 @@ describe('SlidesPanel', () => {
       expect(introButton).toHaveStyle('background: #eef2ff');
       expect(detailsButton).toHaveStyle('background: white');
     });
+  });
+
+  it('disables adding slides for consumer roles', async () => {
+    const user = userEvent.setup();
+    currentDispatchSpy = undefined;
+
+    render(
+      <MockAppStateProvider value={{ userRole: 'consumer' }}>
+        <EditorProvider initial={createInitialState()}>
+          <SlidesPanel />
+        </EditorProvider>
+      </MockAppStateProvider>
+    );
+
+    const addButton = screen.getByRole('button', { name: /\+ add/i });
+    expect(addButton).toBeDisabled();
+
+    await user.click(addButton);
+    expect(currentDispatchSpy).toBeUndefined();
   });
 });
