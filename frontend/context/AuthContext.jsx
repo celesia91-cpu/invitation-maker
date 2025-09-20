@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { APIClient } from '../services/api-client.js';
 import { useAppState } from './AppStateContext.jsx';
 
@@ -11,6 +11,7 @@ export function AuthProvider({ children, apiClient = null }) {
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const pendingUserRefresh = useRef(false);
   const {
     setUserRole,
     resetUserRole,
@@ -37,43 +38,6 @@ export function AuthProvider({ children, apiClient = null }) {
       return false;
     }
   }, [api]);
-
-  useEffect(() => {
-    let appliedRole = false;
-    try {
-      const authenticated = computeAuthState();
-      if (authenticated) {
-        const sessionUser = api.getUser();
-        if (sessionUser) {
-          setUser(sessionUser);
-          applyUserRole(sessionUser);
-          appliedRole = true;
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-        }
-      } else {
-        setIsAuthenticated(false);
-      }
-    } catch (_) {
-      setIsAuthenticated(false);
-    }
-
-    if (!appliedRole) {
-      resetUserRole();
-      resetDesignOwnership();
-      setCurrentDesignId(null);
-    }
-
-    setIsInitialized(true);
-  }, [
-    api,
-    applyUserRole,
-    computeAuthState,
-    resetDesignOwnership,
-    resetUserRole,
-    setCurrentDesignId,
-  ]);
 
   const login = useCallback(
     async ({ email, password, remember = false }) => {
@@ -171,6 +135,76 @@ export function AuthProvider({ children, apiClient = null }) {
     resetDesignOwnership,
     resetUserRole,
     setCurrentDesignId,
+  ]);
+
+  useEffect(() => {
+    let shouldResetAppState = false;
+
+    const queueRefreshUser = () => {
+      if (pendingUserRefresh.current) {
+        return;
+      }
+
+      pendingUserRefresh.current = true;
+      refreshUser().finally(() => {
+        pendingUserRefresh.current = false;
+      });
+    };
+
+    const clearUserState = () => {
+      setUser(null);
+      resetUserRole();
+      resetDesignOwnership();
+      setCurrentDesignId(null);
+    };
+
+    try {
+      const authenticated = computeAuthState();
+      if (authenticated) {
+        setIsAuthenticated(true);
+        try {
+          const sessionUser = api.getUser();
+          if (sessionUser) {
+            setUser(sessionUser);
+            applyUserRole(sessionUser);
+          } else if (!user) {
+            clearUserState();
+            queueRefreshUser();
+          }
+        } catch (_) {
+          if (!user) {
+            clearUserState();
+            queueRefreshUser();
+          }
+        }
+      } else {
+        shouldResetAppState = true;
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    } catch (_) {
+      shouldResetAppState = true;
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+
+    if (shouldResetAppState) {
+      resetUserRole();
+      resetDesignOwnership();
+      setCurrentDesignId(null);
+      pendingUserRefresh.current = false;
+    }
+
+    setIsInitialized(true);
+  }, [
+    api,
+    applyUserRole,
+    computeAuthState,
+    refreshUser,
+    resetDesignOwnership,
+    resetUserRole,
+    setCurrentDesignId,
+    user,
   ]);
 
   const value = useMemo(
