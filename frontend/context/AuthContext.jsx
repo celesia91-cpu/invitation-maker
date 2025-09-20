@@ -151,11 +151,16 @@ export function AuthProvider({ children, apiClient = null }) {
       });
     };
 
-    const clearUserState = () => {
+    const clearUserProfileState = () => {
       setUser(null);
       resetUserRole();
+    };
+
+    const resetAppState = () => {
+      clearUserProfileState();
       resetDesignOwnership();
       setCurrentDesignId(null);
+      pendingUserRefresh.current = false;
     };
 
     try {
@@ -168,31 +173,26 @@ export function AuthProvider({ children, apiClient = null }) {
             setUser(sessionUser);
             applyUserRole(sessionUser);
           } else if (!user) {
-            clearUserState();
+            clearUserProfileState();
             queueRefreshUser();
           }
         } catch (_) {
           if (!user) {
-            clearUserState();
+            clearUserProfileState();
             queueRefreshUser();
           }
         }
       } else {
         shouldResetAppState = true;
         setIsAuthenticated(false);
-        setUser(null);
       }
     } catch (_) {
       shouldResetAppState = true;
       setIsAuthenticated(false);
-      setUser(null);
     }
 
     if (shouldResetAppState) {
-      resetUserRole();
-      resetDesignOwnership();
-      setCurrentDesignId(null);
-      pendingUserRefresh.current = false;
+      resetAppState();
     }
 
     setIsInitialized(true);
