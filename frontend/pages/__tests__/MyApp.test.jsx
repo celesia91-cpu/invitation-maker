@@ -59,10 +59,22 @@ describe('MyApp', () => {
       emitRouteChange(router, '/initial/invite');
     });
 
+    await act(async () => {
+      router.asPath = '/editor';
+      emitRouteChange(router, '/editor');
+    });
+
+    await act(async () => {
+      router.asPath = '/editor/design-123';
+      emitRouteChange(router, '/editor/design-123');
+    });
+
     await waitFor(() => {
       expect(recordedContext.navigationHistory).toEqual([
         { href: '/initial', label: 'Initial' },
         { href: '/initial/invite', label: 'Invite' },
+        { href: '/editor', label: 'Editor' },
+        { href: '/editor/design-123', label: 'Design 123' },
       ]);
     });
   });
