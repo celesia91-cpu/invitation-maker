@@ -4,8 +4,7 @@
 
 import { designs, designOwners } from './database.js';
 import { getConversionRates } from './analytics-store.js';
-
-const MARKETPLACE_ROLES = new Set(['creator', 'consumer', 'admin']);
+import { MARKETPLACE_ROLES } from '../shared/marketplace.js';
 
 function toDisplayName(userId) {
   const value = String(userId || '').trim();

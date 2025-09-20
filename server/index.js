@@ -20,6 +20,7 @@ import {
   updateWebmFile
 } from './webm-store.js';
 import { getNavigationState, saveNavigationState } from './navigation-state-store.js';
+import { isAdminRole, resolveMarketplaceRole, MARKETPLACE_ROLES } from '../shared/marketplace.js';
 
 const port = process.env.PORT || 3001;
 
@@ -56,25 +57,6 @@ function rateLimit(req, res) {
 const forbidden = ['admin', 'administrator', 'root', 'superuser'];
 const users = new Map();
 let nextUserId = 1;
-
-function normalizeRole(role = '') {
-  return String(role || '').trim().toLowerCase();
-}
-
-function isAdminRole(role = '') {
-  return normalizeRole(role) === 'admin';
-}
-
-const MARKETPLACE_ROLE_ALIASES = new Map([
-  ['user', 'consumer']
-]);
-const MARKETPLACE_ROLES = new Set(['creator', 'consumer', 'admin']);
-
-function resolveMarketplaceRole(role = '') {
-  const normalized = normalizeRole(role);
-  if (!normalized) return '';
-  return MARKETPLACE_ROLE_ALIASES.get(normalized) || normalized;
-}
 
 function getStoredUser(userId) {
   return users.get(String(userId));
