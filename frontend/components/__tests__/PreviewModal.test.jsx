@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PreviewModal from '../PreviewModal.jsx';
+import { useAppState } from '../../context/AppStateContext.jsx';
 import useModalFocusTrap from '../../hooks/useModalFocusTrap.js';
 import useDesignOwnership from '../../hooks/useDesignOwnership.js';
 
@@ -12,6 +13,11 @@ jest.mock('../../hooks/useModalFocusTrap.js', () => ({
 jest.mock('../../hooks/useDesignOwnership.js', () => ({
   __esModule: true,
   default: jest.fn(),
+}));
+
+jest.mock('../../context/AppStateContext.jsx', () => ({
+  __esModule: true,
+  useAppState: jest.fn(),
 }));
 
 const createDesignOwnershipValue = (overrides = {}) => ({
@@ -30,6 +36,8 @@ describe('PreviewModal', () => {
     useModalFocusTrap.mockImplementation(() => ({ current: null }));
     useDesignOwnership.mockReset();
     useDesignOwnership.mockReturnValue(createDesignOwnershipValue());
+    useAppState.mockReset();
+    useAppState.mockReturnValue({ userRole: 'guest' });
   });
 
   it('does not render when the modal is closed', () => {
@@ -59,6 +67,7 @@ describe('PreviewModal', () => {
     expect(screen.getByRole('button', { name: /use this design/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
     expect(screen.getByText(/preview this design/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('admin-preview-actions')).not.toBeInTheDocument();
   });
 
   it('invokes the provided callbacks when buttons are clicked', async () => {
@@ -87,5 +96,23 @@ describe('PreviewModal', () => {
 
     expect(screen.getByRole('button', { name: /edit this design/i })).toBeInTheDocument();
     expect(screen.getByText(/you already own this design/i)).toBeInTheDocument();
+  });
+
+  it('renders admin controls when the user role is admin', () => {
+    useAppState.mockReturnValue({ userRole: 'admin' });
+
+    render(<PreviewModal isOpen designId="123" onClose={() => {}} onUseDesign={() => {}} />);
+
+    expect(screen.getByTestId('admin-preview-actions')).toBeInTheDocument();
+    expect(screen.getByText(/admin controls/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark as featured/i })).toBeEnabled();
+  });
+
+  it('does not render admin controls for non-admin roles', () => {
+    useAppState.mockReturnValue({ userRole: 'creator' });
+
+    render(<PreviewModal isOpen designId="123" onClose={() => {}} onUseDesign={() => {}} />);
+
+    expect(screen.queryByTestId('admin-preview-actions')).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import AdminMarketplaceAnalytics from './admin/AdminMarketplaceAnalytics.jsx';
+import AdminMarketplaceCardExtras from './admin/AdminMarketplaceCardExtras.jsx';
 import useAuth from '../hooks/useAuth.js';
 
 const CATEGORY_OPTIONS = [
@@ -67,6 +69,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
   const api = auth?.api;
 
   const normalizedRole = normalizeRole(user?.role);
+  const isAdmin = normalizedRole === 'admin';
   const trimmedSearch = searchTerm.trim();
   const searchKey = trimmedSearch.toLowerCase();
   const rawCategory = typeof activeCategory === 'string' ? activeCategory.trim() : '';
@@ -178,6 +181,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
       ? api.handleError(currentError)
       : currentError.message || 'Unable to load marketplace.'
     : '';
+  const adminErrorMessage = currentError ? resolvedErrorMessage : '';
 
   return (
     <div id="marketplacePage" className={`page${isOpen ? '' : ' hidden'}`}>
@@ -232,6 +236,13 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
           <div className="marketplace-role-summary" aria-live="polite">
             Viewing as <strong>{displayRole}</strong>
           </div>
+          {isAdmin && (
+            <AdminMarketplaceAnalytics
+              listings={listings}
+              isLoading={isLoading}
+              errorMessage={adminErrorMessage}
+            />
+          )}
           {isLoading && (
             <div className="marketplace-status" role="status">
               Loading marketplace…
@@ -261,15 +272,21 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
                 {designerName ? (
                   <p className="marketplace-designer">{designerName}</p>
                 ) : null}
-                {flagEntries.length > 0 && (
+                {!isAdmin && flagEntries.length > 0 && (
                   <ul className="marketplace-flags">
                     {flagEntries.map(([flagKey, flagValue]) => (
                       <li key={flagKey}>{`${flagKey}: ${String(flagValue)}`}</li>
                     ))}
                   </ul>
                 )}
-                {conversionRateLabel !== null && (
+                {!isAdmin && conversionRateLabel !== null && (
                   <p className="marketplace-conversion">{`Conversion Rate: ${conversionRateLabel}`}</p>
+                )}
+                {isAdmin && (
+                  <AdminMarketplaceCardExtras
+                    flagEntries={flagEntries}
+                    conversionRateLabel={conversionRateLabel}
+                  />
                 )}
               </article>
             );
