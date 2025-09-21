@@ -516,28 +516,33 @@ class APIClient {
     return Boolean(this.token && this.isSessionValid());
   }
   _buildRequestUrl(endpoint) {
-    const target = typeof endpoint === 'string' ? endpoint.trim() : '';
-    if (!target) {
-      return this.apiBaseURL || this.baseURL || '';
-    }
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
-      return target;
-    }
-
-    const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
-    const preferApiNamespace =
-      this._baseIncludesApi ?? this._preferApiNamespace ?? false;
-    const shouldUseApiNamespace =
-      normalizedTarget.startsWith('/api') ||
-      (preferApiNamespace &&
-        (normalizedTarget === '/health' ||
-          normalizedTarget === '/auth' ||
-          normalizedTarget === '/auth/me' ||
-          normalizedTarget.startsWith('/auth/')));
-
-    const base = shouldUseApiNamespace ? this.apiBaseURL : this.baseURL;
-    return joinUrl(base, target);
+  const target = typeof endpoint === 'string' ? endpoint.trim() : '';
+  if (!target) {
+    return this.apiBaseURL || this.baseURL || '';
   }
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
+    return target;
+  }
+
+  const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+  
+  // Fix: If target already includes /api, use base URL without /api
+  if (normalizedTarget.startsWith('/api/')) {
+    return joinUrl(this.baseURL, target);
+  }
+  
+  const preferApiNamespace =
+    this._baseIncludesApi ?? this._preferApiNamespace ?? false;
+  const shouldUseApiNamespace =
+    (preferApiNamespace &&
+      (normalizedTarget === '/health' ||
+       normalizedTarget === '/auth' ||
+       normalizedTarget === '/auth/me' ||
+       normalizedTarget.startsWith('/auth/')));
+
+  const base = shouldUseApiNamespace ? this.apiBaseURL : this.baseURL;
+  return joinUrl(base, target);
+}
 
   _prepareRequestOptions(endpoint, options = {}) {
     const url = this._buildRequestUrl(endpoint);
