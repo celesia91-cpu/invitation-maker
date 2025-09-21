@@ -157,8 +157,6 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
     : 'Guest';
 
   useEffect(() => {
-    let cancelled = false;
-
     if (!isOpen) {
       return undefined;
     }
@@ -209,7 +207,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
 
         const response = await api.listMarketplace(requestPayload);
 
-        if (cancelled || !isMountedRef.current) return;
+        if (!isMountedRef.current) return;
 
         const normalizedResponse = {
           role: typeof response?.role === 'string' ? response.role : normalizedRole,
@@ -221,7 +219,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
           [requestKey]: normalizedResponse,
         }));
       } catch (error) {
-        if (cancelled || !isMountedRef.current) return;
+        if (!isMountedRef.current) return;
         setErrorsByKey((prev) => ({
           ...prev,
           [requestKey]: error,
@@ -239,9 +237,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return undefined;
   }, [
     api,
     cacheKey,
