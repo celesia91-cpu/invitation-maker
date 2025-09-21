@@ -1,6 +1,8 @@
 import nextOnPages from 'next-on-pages';
 
 /** @type {import('next').NextConfig} */
+const resolvedAssetPrefix = process.env.NEXT_PUBLIC_ASSET_PREFIX || (process.env.NODE_ENV === 'production' ? 'https://celesia.app' : '');
+
 const baseConfig = {
   output: 'export',
   trailingSlash: true,
@@ -22,5 +24,12 @@ export default nextOnPages({
   swcMinify: true,
   // Configure paths
   basePath: '',
-  assetPrefix: process.env.NEXT_PUBLIC_ASSET_PREFIX || '',
+  assetPrefix: resolvedAssetPrefix,
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push(/\.test\.js$/, /\.test\.jsx$/, /\.spec\.js$/, /\.spec\.jsx$/);
+    }
+    return config;
+  },
 });

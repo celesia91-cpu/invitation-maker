@@ -954,6 +954,59 @@ class APIClient {
     return this.get('/admin/designs', params);
   }
 
+  async manageMarketplaceListing(listingId) {
+    if (listingId === undefined || listingId === null) {
+      throw new Error('listingId is required');
+    }
+    const normalizedId = String(listingId);
+    const results = await this.listAdminDesigns({ search: normalizedId });
+    if (Array.isArray(results)) {
+      const exact = results.find((item) => String(item?.id ?? '') === normalizedId);
+      return exact ?? results[0] ?? null;
+    }
+    return results ?? null;
+  }
+
+  async publishMarketplaceListing(listingId, options = {}) {
+    if (listingId === undefined || listingId === null) {
+      throw new Error('listingId is required');
+    }
+    const status = typeof options.status === 'string' && options.status.trim() ? options.status.trim() : 'published';
+    const payload = { status };
+    if (options.notes) {
+      payload.notes = options.notes;
+    }
+    return this.patchAdminDesign(String(listingId), payload);
+  }
+
+  async deleteMarketplaceListing(listingId, options = {}) {
+    if (listingId === undefined || listingId === null) {
+      throw new Error('listingId is required');
+    }
+    return this.archiveAdminDesign(String(listingId), options);
+  }
+
+  async handleAdminMarketplaceAction({ action, listingId, payload, options } = {}) {
+    const normalizedAction = typeof action === 'string' ? action.trim().toLowerCase() : '';
+    if (!normalizedAction) {
+      throw new Error('action is required');
+    }
+    if (listingId === undefined || listingId === null) {
+      throw new Error('listingId is required');
+    }
+    switch (normalizedAction) {
+      case 'manage':
+        return this.manageMarketplaceListing(listingId);
+      case 'publish':
+        return this.publishMarketplaceListing(listingId, payload || {});
+      case 'delete':
+      case 'archive':
+        return this.deleteMarketplaceListing(listingId, options || {});
+      default:
+        throw new Error(`Unsupported admin marketplace action: ${normalizedAction}`);
+    }
+  }
+
   async createAdminDesign(payload) {
     return this.post('/admin/designs', payload);
   }
@@ -988,6 +1041,10 @@ class APIClient {
       throw new Error('Design id is required');
     }
     return this.put(`/admin/designs/${encodeURIComponent(id)}/price`, { price });
+  }
+
+  async getUserDesigns(params = {}) {
+    return this.get('/designs', params);
   }
 
   async getDesigns(params = {}) {
