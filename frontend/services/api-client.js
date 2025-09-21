@@ -215,7 +215,7 @@ function joinUrl(base, path) {
 
   // Ensure single slash between base and path, but avoid trailing slash if path is empty
   if (normalizedPath) {
-    return `${normalizedBase}/${normalizedPath}`.replace(/\/+/g, '/');
+    return `${normalizedBase}/${normalizedPath}`;
   } else {
     return normalizedBase;
   }
@@ -249,34 +249,35 @@ function appendQuery(endpoint, params) {
 }
 class APIClient {
   constructor(baseURL, fetchImpl) {
-  const resolvedBase = resolveBaseInput(baseURL);
-  this.baseURL = resolvedBase;
-  this.apiBaseURL = resolvedBase; // Keep same for compatibility
-  this._baseIncludesApi = false;
-  this._preferApiNamespace = false;
-  this.fetch = this._resolveFetch(fetchImpl);
-  this.sessionKey = SESSION_STORAGE_KEY;
-  this._storageKey = this.sessionKey;
-  this.sessionDuration = SESSION_TTL;
-  this.persistentDuration = PERSISTENT_TTL;
-  this._storages = {
-    local: getWebStorage('localStorage'),
-    session: getWebStorage('sessionStorage'),
-  };
-  this.storage = this._storages.session ?? this._storages.local ?? null;
-  this._storage = this.storage;
-  this.currentDuration =
-    this.storage === this._storages.local
-      ? this.persistentDuration
-      : this.sessionDuration;
-  this.token = null;
-  this.user = null;
-  this.sessionInfo = { lastActivity: 0 };
-  this.isRetrying = false;
-  this._debug = false;
+    this.baseURL = '';
+    this.apiBaseURL = '';
+    this._baseIncludesApi = false;
+    this._preferApiNamespace = true;
+    this.fetch = this._resolveFetch(fetchImpl);
+    this.sessionKey = SESSION_STORAGE_KEY;
+    this._storageKey = this.sessionKey;
+    this.sessionDuration = SESSION_TTL;
+    this.persistentDuration = PERSISTENT_TTL;
+    this._storages = {
+      local: getWebStorage('localStorage'),
+      session: getWebStorage('sessionStorage'),
+    };
+    this.storage = this._storages.session ?? this._storages.local ?? null;
+    this._storage = this.storage;
+    this.currentDuration =
+      this.storage === this._storages.local
+        ? this.persistentDuration
+        : this.sessionDuration;
+    this.token = null;
+    this.user = null;
+    this.sessionInfo = { lastActivity: 0 };
+    this.isRetrying = false;
+    this._debug = false;
 
-  this.loadSession();
-}
+    this.setBaseURL(baseURL);
+
+    this.loadSession();
+  }
 
   _resolveFetch(fetchImpl) {
     if (typeof fetchImpl === 'function') {
@@ -525,40 +526,32 @@ class APIClient {
     return Boolean(this.token && this.isSessionValid());
   }
   _buildRequestUrl(endpoint) {
-  const target = typeof endpoint === 'string' ? endpoint.trim() : '';
-  if (!target) {
-    return this.baseURL || '';
-  }
-  
-  // If it's already a full URL, return as-is
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
-    return target;
-  }
+    const target = typeof endpoint === 'string' ? endpoint.trim() : '';
+    if (!target) {
+      return this.baseURL || '';
+    }
 
-  // Normalize the endpoint to have a leading slash
-  const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
-  
-  // Remove trailing slashes from base URL
-  const base = this.baseURL.replace(/\/+$/, '');
-  
-  // Check if base already includes /api
-  const baseHasApi = /\/api$/i.test(base);
-  
-  // Check if endpoint starts with /api
-  const targetHasApi = /^\/api/i.test(normalizedTarget);
-  
-  if (baseHasApi && targetHasApi) {
-    // Both have /api, remove it from the endpoint
-    const pathWithoutApi = normalizedTarget.replace(/^\/api/i, '');
-    return `${base}${pathWithoutApi}`;
-  } else if (!baseHasApi && !targetHasApi) {
-    // Neither has /api, add it between base and path
-    return `${base}/api${normalizedTarget}`;
-  } else {
-    // One has /api, join them directly
-    return `${base}${normalizedTarget}`;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
+      return target;
+    }
+
+    const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+    const lowerTarget = normalizedTarget.toLowerCase();
+    const prefersApi = this._preferApiNamespace !== false;
+    const isApiNamespace = lowerTarget.startsWith('/api');
+    const isBaseScoped = /^\/(auth|health)(\/|$)/i.test(normalizedTarget);
+
+    if (isApiNamespace) {
+      const withoutApi = normalizedTarget.replace(/^\/api/i, '') || '/';
+      return joinUrl(this.apiBaseURL, withoutApi);
+    }
+
+    if (prefersApi && !isBaseScoped) {
+      return joinUrl(this.apiBaseURL, normalizedTarget);
+    }
+
+    return joinUrl(this.baseURL, normalizedTarget);
   }
-}
 
   _prepareRequestOptions(endpoint, options = {}) {
     const url = this._buildRequestUrl(endpoint);
@@ -1094,10 +1087,12 @@ class APIClient {
       typeof resolvedBase === 'string' &&
       resolvedBase.trim().replace(/\/+$/, '').toLowerCase().endsWith('/api');
     const { base, api } = normalizeBaseURLs(resolvedBase);
-    this.baseURL = base;
-    this.apiBaseURL = api;
+    const normalizedBase = base || '';
+    const normalizedApi = api || '/api';
+    this.baseURL = normalizedBase;
+    this.apiBaseURL = joinUrl(normalizedBase, normalizedApi);
     this._baseIncludesApi = baseIncludesApi;
-    this._preferApiNamespace = baseIncludesApi;
+    this._preferApiNamespace = this.apiBaseURL !== this.baseURL;
   }
 
   getBaseURL() {
