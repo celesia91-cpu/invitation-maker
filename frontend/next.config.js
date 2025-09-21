@@ -1,25 +1,18 @@
-/** @type {import('next').NextConfig} */
+﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
   trailingSlash: true,
   images: {
     unoptimized: true,
   },
-  // Optimize for Cloudflare Pages
-  experimental: {
-    // This will help with client-side routing
-    scrollRestoration: true,
-  },
-  // Disable unnecessary features for static export
-  productionBrowserSourceMaps: false,
-  optimizeFonts: false,
-  // Configure paths for static export
-  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://invitation-maker-api.celesia91.workers.dev' : '',
+  // Force empty asset prefix for static exports
+  assetPrefix: '',
   basePath: '',
-  // Debug mode for development
-  webpack: (config, { dev, isServer }) => {
-    if (dev && !isServer) {
-      config.devtool = 'source-map';
+  
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push(/\.test\.js$/, /\.test\.jsx$/, /\.spec\.js$/, /\.spec\.jsx$/);
     }
     return config;
   },
