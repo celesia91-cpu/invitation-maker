@@ -69,7 +69,7 @@ describe('APIClient marketplace endpoint resolution', () => {
   });
 });
 
-describe('APIClient auth and health endpoint resolution with /api base', () => {
+describe('APIClient auth and health endpoint resolution', () => {
   const createFetchSpy = (payload = {}) =>
     jest.fn().mockResolvedValue({
       ok: true,
@@ -79,19 +79,39 @@ describe('APIClient auth and health endpoint resolution with /api base', () => {
       text: async () => JSON.stringify(payload),
     });
 
-  test('uses api namespace for auth endpoints when constructed with /api base', async () => {
+  test.each([
+    ['absolute base routes auth to host root', 'https://example.com', 'https://example.com/auth/login'],
+    ['absolute base ending in /api routes auth to host root', 'https://example.com/api', 'https://example.com/auth/login'],
+    ['relative /api base routes auth to host root', '/api', '/auth/login'],
+  ])('%s', async (_label, baseUrl, expectedUrl) => {
     const fetchSpy = createFetchSpy();
-    const client = new APIClient('/api', fetchSpy);
+    const client = new APIClient(baseUrl, fetchSpy);
 
     await client.request('/auth/login', { method: 'POST' });
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/auth/login',
+      expectedUrl,
       expect.objectContaining({ method: 'POST' }),
     );
   });
 
-  test('login helper preserves api namespace when base includes /api', async () => {
+  test.each([
+    ['absolute base routes health to host root', 'https://example.com', 'https://example.com/health'],
+    ['absolute base ending in /api routes health to host root', 'https://example.com/api', 'https://example.com/health'],
+    ['relative /api base routes health to host root', '/api', '/health'],
+  ])('%s', async (_label, baseUrl, expectedUrl) => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient(baseUrl, fetchSpy);
+
+    await client.request('/health');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expectedUrl,
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  test('login helper posts to base auth namespace when base includes /api', async () => {
     const responsePayload = { token: 'token-123', user: { id: 'user-1' } };
     const fetchSpy = createFetchSpy(responsePayload);
     const client = new APIClient('/api', fetchSpy);
@@ -99,31 +119,35 @@ describe('APIClient auth and health endpoint resolution with /api base', () => {
     await client.login({ email: 'user@example.com', password: 'secret' });
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/auth/login',
+      '/auth/login',
       expect.objectContaining({ method: 'POST' }),
     );
   });
 
-  test('uses api namespace for health endpoint when constructed with /api base', async () => {
-    const fetchSpy = createFetchSpy();
-    const client = new APIClient('/api', fetchSpy);
-
-    await client.request('/health');
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/health',
-      expect.objectContaining({ method: 'GET' }),
-    );
-  });
-
-  test('healthCheck helper preserves api namespace when base includes /api', async () => {
+  test('healthCheck helper queries base health endpoint when base includes /api', async () => {
     const fetchSpy = createFetchSpy({ status: 'ok' });
     const client = new APIClient('/api', fetchSpy);
 
     await client.healthCheck();
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/health',
+      '/health',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  test.each([
+    ['absolute base routes designs to API namespace', 'https://example.com', 'https://example.com/api/designs'],
+    ['absolute base ending in /api routes designs to API namespace', 'https://example.com/api', 'https://example.com/api/designs'],
+    ['relative /api base routes designs to API namespace', '/api', '/api/designs'],
+  ])('%s', async (_label, baseUrl, expectedUrl) => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient(baseUrl, fetchSpy);
+
+    await client.request('/designs');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expectedUrl,
       expect.objectContaining({ method: 'GET' }),
     );
   });
