@@ -142,6 +142,7 @@ function resolveBaseInput(providedBase) {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001';
     }
+    // Base URL should not include /api since endpoints already include it
     return 'https://invitation-maker-api.celesia91.workers.dev';
   }
 
@@ -516,26 +517,18 @@ class APIClient {
     return Boolean(this.token && this.isSessionValid());
   }
   _buildRequestUrl(endpoint) {
-  const target = typeof endpoint === 'string' ? endpoint.trim() : '';
-  if (!target) {
-    return this.apiBaseURL || this.baseURL || '';
-  }
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
-    return target;
-  }
+    const target = typeof endpoint === 'string' ? endpoint.trim() : '';
+    if (!target) {
+      return this.baseURL || '';
+    }
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
+      return target;
+    }
 
-  const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
-  
-  // Fix: If target already includes /api, use base URL without /api
-  if (normalizedTarget.startsWith('/api/')) {
-    // Strip the /api prefix since it will be added by the base URL
-    const pathWithoutApi = normalizedTarget.slice(4); // Remove '/api' (4 characters)
-    return joinUrl(this.apiBaseURL || this.baseURL, pathWithoutApi);
+    // Keep target as-is since we're handling /api paths at the endpoint level
+    const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+    return joinUrl(this.baseURL, normalizedTarget);
   }
-  
-  // For paths without /api prefix, append to base URL directly
-  return joinUrl(this.baseURL, normalizedTarget);
-}
 
   _prepareRequestOptions(endpoint, options = {}) {
     const url = this._buildRequestUrl(endpoint);
