@@ -22,5 +22,5 @@ export default nextOnPages({
   swcMinify: true,
   // Configure paths
   basePath: '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://invitation-maker-api.celesia91.workers.dev' : '',
+  assetPrefix: process.env.NEXT_PUBLIC_ASSET_PREFIX || '',
 });
