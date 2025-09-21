@@ -142,7 +142,7 @@ function resolveBaseInput(providedBase) {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001';
     }
-    // Base URL should not include /api since endpoints already include it
+    // Use the exact worker URL without any /api suffix
     return 'https://invitation-maker-api.celesia91.workers.dev';
   }
 
@@ -253,12 +253,11 @@ class APIClient {
     const basePointsToApiNamespace =
       typeof resolvedBase === 'string' &&
       resolvedBase.trim().replace(/\/+$/, '').toLowerCase().endsWith('/api');
-    const { base, api } = normalizeBaseURLs(resolvedBase);
-
-    this.baseURL = base;
-    this.apiBaseURL = api;
-    this._baseIncludesApi = basePointsToApiNamespace;
-    this._preferApiNamespace = basePointsToApiNamespace;
+    this.baseURL = resolvedBase;
+    // In a static export, we don't need separate API base URL handling
+    this.apiBaseURL = resolvedBase;
+    this._baseIncludesApi = false;
+    this._preferApiNamespace = false;
     this.fetch = this._resolveFetch(fetchImpl);
     this.sessionKey = SESSION_STORAGE_KEY;
     this._storageKey = this.sessionKey;
@@ -525,9 +524,12 @@ class APIClient {
       return target;
     }
 
-    // Keep target as-is since we're handling /api paths at the endpoint level
+    // Ensure we always have a leading slash for the endpoint
     const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
-    return joinUrl(this.baseURL, normalizedTarget);
+    
+    // Simple URL join that preserves the /api path
+    const base = this.baseURL.replace(/\/+$/, '');
+    return `${base}${normalizedTarget}`;
   }
 
   _prepareRequestOptions(endpoint, options = {}) {
