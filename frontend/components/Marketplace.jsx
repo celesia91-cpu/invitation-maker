@@ -118,7 +118,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
   const isAdmin = normalizedRole === 'admin';
   const adminOwnershipCategoryId = useMemo(
     () => getAdminOwnershipCategoryId(user || {}),
-    [user?.email, user?.id, user?.username]
+    [user]
   );
   const categoryOptions = useMemo(() => {
     if (!isAdmin) {

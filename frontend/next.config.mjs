@@ -1,7 +1,8 @@
-import nextOnPages from 'next-on-pages';
+import path from 'node:path';
 
 /** @type {import('next').NextConfig} */
 const resolvedAssetPrefix = process.env.NEXT_PUBLIC_ASSET_PREFIX || (process.env.NODE_ENV === 'production' ? 'https://celesia.app' : '');
+const outputFileTracingRoot = path.resolve(process.cwd(), '..');
 
 const baseConfig = {
   output: 'export',
@@ -18,10 +19,25 @@ const baseConfig = {
   }
 };
 
-export default nextOnPages({
+let withCloudflare = (config) => config;
+
+if (!process.env.NEXT_DISABLE_CLOUDFLARE_ADAPTER) {
+  try {
+    const mod = await import('@cloudflare/next-on-pages');
+    if (typeof mod?.default === 'function') {
+      withCloudflare = mod.default;
+    }
+  } catch (error) {
+    const reason = error?.message ?? error;
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[next-on-pages] adapter unavailable, using base Next config. Reason:', reason);
+    }
+  }
+}
+
+export default withCloudflare({
   ...baseConfig,
-  // Additional Cloudflare Pages specific configuration
-  swcMinify: true,
+  outputFileTracingRoot,
   // Configure paths
   basePath: '',
   assetPrefix: resolvedAssetPrefix,
