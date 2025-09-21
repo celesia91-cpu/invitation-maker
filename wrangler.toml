@@ -2,6 +2,10 @@ name = "invitation-maker"
 compatibility_date = "2024-01-15"
 pages_build_output_dir = "frontend/out"
 
+[build]
+command = "cd frontend && npm install && npm run build"
+output_directory = "out"
+
 [env.production]
 name = "invitation-maker-production"
 pages_build_output_dir = "frontend/out"

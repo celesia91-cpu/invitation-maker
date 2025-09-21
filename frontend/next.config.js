@@ -5,8 +5,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Force empty asset prefix for static exports
-  assetPrefix: '',
+  // Configure asset prefix based on environment
+  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://celesia.app' : '',
   basePath: '',
   
   webpack: (config, { isServer }) => {
