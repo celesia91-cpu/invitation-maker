@@ -1,10 +1,37 @@
+# OS artifacts
 .DS_Store
-node_modules/
-*.log
 Thumbs.db
+
+# Logs
+*.log
+
+# Dependency directories
+node_modules/
+frontend/node_modules/
+worker/node_modules/
+
+# Build output
 frontend/.next/
 frontend/out/
 frontend/dist/
+
+# Wrangler local state
 .wrangler/
+worker/.wrangler/
+
+# Local environment files
 .env
 .env.local
+.env.development
+.env.production
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+worker/.env
+worker/.env.local
+worker/.env.development
+worker/.env.production
+
+# Tool-specific configs
+.claude/
+
