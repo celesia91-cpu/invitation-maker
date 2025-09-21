@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import AuthModal from '../components/AuthModal.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
@@ -39,6 +39,12 @@ export default function MarketplacePage() {
     isDesignOwned,
     currentDesignId,
   } = useDesignOwnership();
+
+  const setCurrentDesignIdRef = useRef(setCurrentDesignId);
+
+  useEffect(() => {
+    setCurrentDesignIdRef.current = setCurrentDesignId;
+  }, [setCurrentDesignId]);
   // Auto-open auth if there is no active session
   const [showAuth, setShowAuth] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -53,9 +59,15 @@ export default function MarketplacePage() {
     setShowAuth(!auth.isAuthenticated);
   }, [auth.isAuthenticated, auth.isInitialized]);
 
+  const isUserAuthenticated = Boolean(auth?.isAuthenticated);
+
   const syncDesignSelection = useCallback(
     (designId, options = {}) => {
       const allowBlank = Boolean(options.allowBlank);
+      const shouldUpdateGlobal =
+        options && Object.prototype.hasOwnProperty.call(options, 'updateGlobal')
+          ? Boolean(options.updateGlobal)
+          : isUserAuthenticated;
       const candidate =
         designId !== undefined
           ? designId
@@ -66,8 +78,15 @@ export default function MarketplacePage() {
       if (allowBlank) {
         const blank = candidate === null || candidate === undefined || `${candidate}`.trim() === '';
         if (blank) {
-          setActiveDesignId(null);
-          setCurrentDesignId(null);
+          if (activeDesignId !== null) {
+            setActiveDesignId(null);
+          }
+          if (shouldUpdateGlobal) {
+            const updateCurrentDesignId = setCurrentDesignIdRef.current;
+            if (typeof updateCurrentDesignId === 'function') {
+              updateCurrentDesignId(null);
+            }
+          }
           return null;
         }
       }
@@ -79,23 +98,49 @@ export default function MarketplacePage() {
       const normalized = `${fallback}`.trim();
 
       if (!normalized) {
-        setActiveDesignId(null);
-        setCurrentDesignId(null);
+        if (activeDesignId !== null) {
+          setActiveDesignId(null);
+        }
+        if (shouldUpdateGlobal) {
+          const updateCurrentDesignId = setCurrentDesignIdRef.current;
+          if (typeof updateCurrentDesignId === 'function') {
+            updateCurrentDesignId(null);
+          }
+        }
         return null;
       }
 
-      setActiveDesignId(normalized);
-      setCurrentDesignId(normalized);
+      if (activeDesignId !== normalized) {
+        setActiveDesignId(normalized);
+      }
+
+      if (shouldUpdateGlobal && currentDesignId !== normalized) {
+        const updateCurrentDesignId = setCurrentDesignIdRef.current;
+        if (typeof updateCurrentDesignId === 'function') {
+          updateCurrentDesignId(normalized);
+        }
+      }
+
       return normalized;
     },
-    [activeDesignId, currentDesignId, setCurrentDesignId]
+    [activeDesignId, currentDesignId, isUserAuthenticated]
   );
 
+
   useEffect(() => {
-    if (!auth.isAuthenticated) {
-      syncDesignSelection(DEFAULT_MARKETPLACE_DESIGN_ID);
+    if (auth.isAuthenticated) {
+      return;
     }
-  }, [auth.isAuthenticated, syncDesignSelection]);
+
+    if (
+      activeDesignId === DEFAULT_MARKETPLACE_DESIGN_ID &&
+      currentDesignId === DEFAULT_MARKETPLACE_DESIGN_ID
+    ) {
+      return;
+    }
+
+    syncDesignSelection(DEFAULT_MARKETPLACE_DESIGN_ID);
+  }, [auth.isAuthenticated, activeDesignId, currentDesignId, syncDesignSelection]);
 
   const ensureDesignId = useCallback(
     () => syncDesignSelection(undefined),

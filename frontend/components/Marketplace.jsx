@@ -114,6 +114,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
   const userId = user?.id ?? null;
   const api = auth?.api;
 
+  const isAuthenticated = Boolean(auth?.isAuthenticated);
   const normalizedRole = normalizeRole(user?.role);
   const isAdmin = normalizedRole === 'admin';
   const adminOwnershipCategoryId = useMemo(
@@ -147,10 +148,13 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
   }, [activeCategory, categoryOptions]);
 
   const currentResult = listingsByKey[cacheKey];
+  const isRequestPending = Boolean(loadingByKey[cacheKey]);
   const listings = Array.isArray(currentResult?.data) ? currentResult.data : [];
-  const isLoading = Boolean(loadingByKey[cacheKey]);
+  const isLoading = isRequestPending;
   const currentError = errorsByKey[cacheKey] ?? null;
-  const displayRole = normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1);
+  const displayRole = isAuthenticated
+    ? normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1)
+    : 'Guest';
 
   useEffect(() => {
     let cancelled = false;
@@ -159,11 +163,19 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
       return undefined;
     }
 
+    if (!isAuthenticated) {
+      return undefined;
+    }
+
     if (!api || typeof api.listMarketplace !== 'function') {
       return undefined;
     }
 
     if (currentResult) {
+      return undefined;
+    }
+
+    if (isRequestPending) {
       return undefined;
     }
 
@@ -235,12 +247,31 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
     cacheKey,
     categoryKey,
     currentResult,
+    isAuthenticated,
     isOpen,
     isOwnershipCategoryActive,
+    isRequestPending,
     normalizedRole,
     trimmedSearch,
     userId,
   ]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      return;
+    }
+
+    const hasListings = Object.keys(listingsByKey).length > 0;
+    const hasLoading = Object.keys(loadingByKey).length > 0;
+    const hasErrors = Object.keys(errorsByKey).length > 0;
+    if (!hasListings && !hasLoading && !hasErrors) {
+      return;
+    }
+
+    setListingsByKey({});
+    setLoadingByKey({});
+    setErrorsByKey({});
+  }, [errorsByKey, isAuthenticated, listingsByKey, loadingByKey]);
 
   const handleKeyDown = (event, index) => {
     if (categoryOptions.length === 0) return;
@@ -394,7 +425,7 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
           )}
           {isLoading && (
             <div className="marketplace-status" role="status">
-              Loading marketplace…
+              Loading marketplace...
             </div>
           )}
           {currentError && (
@@ -402,7 +433,12 @@ export default function Marketplace({ isOpen, onSkipToEditor }) {
               {resolvedErrorMessage}
             </div>
           )}
-          {!isLoading && !currentError && listings.length === 0 && (
+          {!isAuthenticated && !isLoading && !currentError && (
+            <p className="marketplace-status" role="status">
+              Sign in to browse the marketplace.
+            </p>
+          )}
+          {isAuthenticated && !isLoading && !currentError && listings.length === 0 && (
             <p className="marketplace-empty">No designs found for this selection.</p>
           )}
           {listings.map((listing, index) => {

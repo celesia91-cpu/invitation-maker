@@ -12,6 +12,10 @@ export function AuthProvider({ children, apiClient = null }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const pendingUserRefresh = useRef(false);
+  const lastAuthStateRef = useRef(null);
+  const lastUserIdRef = useRef(null);
+  const initializedRef = useRef(false);
+
   const {
     setUserRole,
     resetUserRole,
@@ -39,6 +43,28 @@ export function AuthProvider({ children, apiClient = null }) {
     }
   }, [api]);
 
+  const ensureUserState = useCallback((nextUser) => {
+    const nextId = nextUser && typeof nextUser === 'object' ? nextUser.id ?? nextUser.userId ?? null : null;
+    const nextKey = nextId !== null && nextId !== undefined ? String(nextId) : null;
+    const prevKey = lastUserIdRef.current;
+
+    if (prevKey === nextKey) {
+      return false;
+    }
+
+    lastUserIdRef.current = nextKey;
+
+    if (nextUser) {
+      setUser(nextUser);
+      applyUserRole(nextUser);
+    } else {
+      setUser(null);
+      resetUserRole();
+    }
+
+    return true;
+  }, [applyUserRole, resetUserRole]);
+
   const login = useCallback(
     async ({ email, password, remember = false }) => {
       setLoading(true);
@@ -46,8 +72,7 @@ export function AuthProvider({ children, apiClient = null }) {
       try {
         const res = await api.login({ email, password, remember });
         if (res?.user) {
-          setUser(res.user);
-          applyUserRole(res.user);
+          ensureUserState(res.user);
         }
 
         const authenticated = computeAuthState();
@@ -83,14 +108,12 @@ export function AuthProvider({ children, apiClient = null }) {
     try {
       await api.logout();
       setIsAuthenticated(computeAuthState());
-      setUser(null);
-      resetUserRole();
+      ensureUserState(null);
       resetDesignOwnership();
       setCurrentDesignId(null);
     } catch (e) {
       setError(e);
-      setUser(null);
-      resetUserRole();
+      ensureUserState(null);
       resetDesignOwnership();
       setCurrentDesignId(null);
       setIsAuthenticated(computeAuthState());
@@ -105,8 +128,7 @@ export function AuthProvider({ children, apiClient = null }) {
     try {
       const res = await api.getCurrentUser();
       if (res?.user) {
-        setUser(res.user);
-        applyUserRole(res.user);
+        ensureUserState(res.user);
       }
 
       const authenticated = computeAuthState();
@@ -120,7 +142,7 @@ export function AuthProvider({ children, apiClient = null }) {
       return res?.user ?? null;
     } catch (e) {
       setError(e);
-      resetUserRole();
+      ensureUserState(null);
       resetDesignOwnership();
       setCurrentDesignId(null);
       setIsAuthenticated(computeAuthState());
