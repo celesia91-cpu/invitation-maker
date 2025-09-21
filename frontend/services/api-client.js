@@ -243,10 +243,14 @@ function appendQuery(endpoint, params) {
 class APIClient {
   constructor(baseURL, fetchImpl) {
     const resolvedBase = resolveBaseInput(baseURL);
+    const basePointsToApiNamespace =
+      typeof resolvedBase === 'string' &&
+      resolvedBase.trim().replace(/\/+$/, '').toLowerCase().endsWith('/api');
     const { base, api } = normalizeBaseURLs(resolvedBase);
 
     this.baseURL = base;
     this.apiBaseURL = api;
+    this._preferApiNamespace = basePointsToApiNamespace;
     this.fetch = this._resolveFetch(fetchImpl);
     this.sessionKey = SESSION_STORAGE_KEY;
     this._storageKey = this.sessionKey;
@@ -513,7 +517,16 @@ class APIClient {
       return target;
     }
 
-    const base = target.startsWith('/api') ? this.apiBaseURL : this.baseURL;
+    const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+    const shouldUseApiNamespace =
+      normalizedTarget.startsWith('/api') ||
+      (this._preferApiNamespace &&
+        (normalizedTarget === '/health' ||
+          normalizedTarget === '/auth' ||
+          normalizedTarget === '/auth/me' ||
+          normalizedTarget.startsWith('/auth/')));
+
+    const base = shouldUseApiNamespace ? this.apiBaseURL : this.baseURL;
     return joinUrl(base, target);
   }
 
