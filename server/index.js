@@ -1346,6 +1346,16 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify(userDesigns));
       return;
     }
+
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        version: '2.0.0'
+      }));
+      return;
+    }
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
