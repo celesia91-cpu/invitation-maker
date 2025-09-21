@@ -142,7 +142,7 @@ function resolveBaseInput(providedBase) {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001';
     }
-    // Use the exact worker URL without any /api suffix
+    // Worker URL for production
     return 'https://invitation-maker-api.celesia91.workers.dev';
   }
 
@@ -524,12 +524,13 @@ class APIClient {
       return target;
     }
 
-    // Ensure we always have a leading slash for the endpoint
+    // Ensure we have a leading slash and add /api prefix
     const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+    const apiPath = `/api${normalizedTarget}`;
     
-    // Simple URL join that preserves the /api path
+    // Join with base URL
     const base = this.baseURL.replace(/\/+$/, '');
-    return `${base}${normalizedTarget}`;
+    return `${base}${apiPath}`;
   }
 
   _prepareRequestOptions(endpoint, options = {}) {
@@ -822,11 +823,11 @@ class APIClient {
   }
 
   async getUserTokens() {
-    return this.get('/api/user/tokens');
+    return this.get('/user/tokens');
   }
 
   async updateTokens(amount, extra = {}) {
-    return this.post('/api/purchase', { tokens: amount, ...extra });
+    return this.post('/purchase', { tokens: amount, ...extra });
   }
 
   async purchaseTokens(amount, extra = {}) {
@@ -834,11 +835,11 @@ class APIClient {
   }
 
   async getNavigationState() {
-    return this.get('/api/navigation/state');
+    return this.get('/navigation/state');
   }
 
   async updateNavigationState(patch) {
-    return this.request('/api/navigation/state', {
+    return this.request('/navigation/state', {
       method: 'PATCH',
       body: patch,
     });
@@ -863,7 +864,8 @@ class APIClient {
     if (mineNormalized) params.set('mine', 'true');
 
     const query = params.toString();
-    const endpoint = query ? `/api/marketplace?${query}` : '/api/marketplace';
+    // Remove the /api prefix since it's already handled by the base URL
+    const endpoint = query ? `/marketplace?${query}` : '/marketplace';
 
     return this.request(endpoint, { method: 'GET' });
   }
