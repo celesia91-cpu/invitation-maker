@@ -68,3 +68,38 @@ describe('APIClient marketplace endpoint resolution', () => {
     }));
   });
 });
+
+describe('APIClient auth and health endpoint resolution with /api base', () => {
+  const createFetchSpy = () =>
+    jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => ({}),
+      text: async () => '',
+    });
+
+  test('uses api namespace for auth endpoints when constructed with /api base', async () => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient('/api', fetchSpy);
+
+    await client.request('/auth/login', { method: 'POST' });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/auth/login',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  test('uses api namespace for health endpoint when constructed with /api base', async () => {
+    const fetchSpy = createFetchSpy();
+    const client = new APIClient('/api', fetchSpy);
+
+    await client.request('/health');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/health',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+});
