@@ -25,12 +25,8 @@ export default function PurchaseModal({ isOpen, designId, onConfirm, onCancel })
   useEffect(() => {
     if (!isOpen) {
       setConfirming(false);
-      return;
     }
-    if (resolvedDesignId && currentDesignId !== resolvedDesignId) {
-      setCurrentDesignId(resolvedDesignId);
-    }
-  }, [isOpen, resolvedDesignId, currentDesignId, setCurrentDesignId]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
