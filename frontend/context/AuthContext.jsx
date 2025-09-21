@@ -14,6 +14,7 @@ export function AuthProvider({ children, apiClient = null }) {
   const pendingUserRefresh = useRef(false);
   const lastAuthStateRef = useRef(null);
   const lastUserIdRef = useRef(null);
+  const lastUserFingerprintRef = useRef(null);
   const initializedRef = useRef(false);
 
   const {
@@ -46,13 +47,16 @@ export function AuthProvider({ children, apiClient = null }) {
   const ensureUserState = useCallback((nextUser) => {
     const nextId = nextUser && typeof nextUser === 'object' ? nextUser.id ?? nextUser.userId ?? null : null;
     const nextKey = nextId !== null && nextId !== undefined ? String(nextId) : null;
+    const nextFingerprint = nextUser ? JSON.stringify(nextUser) : null;
     const prevKey = lastUserIdRef.current;
+    const prevFingerprint = lastUserFingerprintRef.current;
 
-    if (prevKey === nextKey) {
+    if (prevKey === nextKey && prevFingerprint === nextFingerprint) {
       return false;
     }
 
     lastUserIdRef.current = nextKey;
+    lastUserFingerprintRef.current = nextFingerprint;
 
     if (nextUser) {
       setUser(nextUser);
@@ -94,8 +98,8 @@ export function AuthProvider({ children, apiClient = null }) {
     },
     [
       api,
-      applyUserRole,
       computeAuthState,
+      ensureUserState,
       resetDesignOwnership,
       resetUserRole,
       setCurrentDesignId,
@@ -120,7 +124,7 @@ export function AuthProvider({ children, apiClient = null }) {
     } finally {
       setLoading(false);
     }
-  }, [api, computeAuthState, resetDesignOwnership, resetUserRole, setCurrentDesignId]);
+  }, [api, computeAuthState, ensureUserState, resetDesignOwnership, setCurrentDesignId]);
 
   const refreshUser = useCallback(async () => {
     setLoading(true);
@@ -152,15 +156,20 @@ export function AuthProvider({ children, apiClient = null }) {
     }
   }, [
     api,
-    applyUserRole,
     computeAuthState,
+    ensureUserState,
     resetDesignOwnership,
     resetUserRole,
     setCurrentDesignId,
   ]);
 
   useEffect(() => {
-    let shouldResetAppState = false;
+    const updateAuthState = (nextState) => {
+      if (lastAuthStateRef.current !== nextState) {
+        lastAuthStateRef.current = nextState;
+        setIsAuthenticated(nextState);
+      }
+    };
 
     const queueRefreshUser = () => {
       if (pendingUserRefresh.current) {
@@ -168,65 +177,62 @@ export function AuthProvider({ children, apiClient = null }) {
       }
 
       pendingUserRefresh.current = true;
-      refreshUser().finally(() => {
-        pendingUserRefresh.current = false;
-      });
+      refreshUser()
+        .catch(() => undefined)
+        .finally(() => {
+          pendingUserRefresh.current = false;
+        });
     };
 
-    const clearUserProfileState = () => {
-      setUser(null);
-      resetUserRole();
-    };
-
-    const resetAppState = () => {
-      clearUserProfileState();
-      resetDesignOwnership();
-      setCurrentDesignId(null);
+    const handleUnauthenticated = () => {
+      const userChanged = ensureUserState(null);
+      if (userChanged || lastAuthStateRef.current !== false) {
+        resetDesignOwnership();
+        setCurrentDesignId(null);
+      }
+      updateAuthState(false);
       pendingUserRefresh.current = false;
     };
 
     try {
       const authenticated = computeAuthState();
       if (authenticated) {
-        setIsAuthenticated(true);
+        updateAuthState(true);
+        let sessionUser = null;
         try {
-          const sessionUser = api.getUser();
-          if (sessionUser) {
-            setUser(sessionUser);
-            applyUserRole(sessionUser);
-          } else if (!user) {
-            clearUserProfileState();
-            queueRefreshUser();
-          }
+          sessionUser = api.getUser();
         } catch (_) {
-          if (!user) {
-            clearUserProfileState();
-            queueRefreshUser();
+          sessionUser = null;
+        }
+
+        if (sessionUser) {
+          ensureUserState(sessionUser);
+        } else {
+          const cleared = ensureUserState(null);
+          if (cleared) {
+            resetDesignOwnership();
+            setCurrentDesignId(null);
           }
+          queueRefreshUser();
         }
       } else {
-        shouldResetAppState = true;
-        setIsAuthenticated(false);
+        handleUnauthenticated();
       }
     } catch (_) {
-      shouldResetAppState = true;
-      setIsAuthenticated(false);
+      handleUnauthenticated();
     }
 
-    if (shouldResetAppState) {
-      resetAppState();
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      setIsInitialized(true);
     }
-
-    setIsInitialized(true);
   }, [
     api,
-    applyUserRole,
     computeAuthState,
+    ensureUserState,
     refreshUser,
     resetDesignOwnership,
-    resetUserRole,
     setCurrentDesignId,
-    user,
   ]);
 
   const value = useMemo(

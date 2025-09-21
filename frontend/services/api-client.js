@@ -539,7 +539,7 @@ class APIClient {
     const lowerTarget = normalizedTarget.toLowerCase();
     const prefersApi = this._preferApiNamespace !== false;
     const isApiNamespace = lowerTarget.startsWith('/api');
-    const isBaseScoped = /^\/(auth|health)(\/|$)/i.test(normalizedTarget);
+    const isBaseScoped = /^\/(health)(\/|$)/i.test(normalizedTarget);
 
     if (isApiNamespace) {
       const withoutApi = normalizedTarget.replace(/^\/api/i, '') || '/';
