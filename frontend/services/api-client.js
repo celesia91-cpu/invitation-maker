@@ -202,14 +202,19 @@ function joinUrl(base, path) {
   // Prevent double /api if both base and path include it
   if (
     normalizedBase.toLowerCase().endsWith('/api') &&
-    normalizedPath.toLowerCase().startsWith('api')
+    (normalizedPath.toLowerCase().startsWith('api/') || normalizedPath.toLowerCase() === 'api')
   ) {
     normalizedPath = normalizedPath.replace(/^api\/?/i, '');
   }
 
-  // Ensure single slash between base and path
+  // If normalizedBase ends with /api and normalizedPath is empty, just return normalizedBase
+  if (normalizedBase.toLowerCase().endsWith('/api') && !normalizedPath) {
+    return normalizedBase;
+  }
+
+  // Ensure single slash between base and path, but avoid trailing slash if path is empty
   if (normalizedPath) {
-    return `${normalizedBase}/${normalizedPath}`;
+    return `${normalizedBase}/${normalizedPath}`.replace(/\/+/g, '/');
   } else {
     return normalizedBase;
   }
