@@ -27,10 +27,10 @@ export default function PurchaseModal({ isOpen, designId, onConfirm, onCancel })
       setConfirming(false);
       return;
     }
-    if (resolvedDesignId) {
+    if (resolvedDesignId && currentDesignId !== resolvedDesignId) {
       setCurrentDesignId(resolvedDesignId);
     }
-  }, [isOpen, resolvedDesignId, setCurrentDesignId]);
+  }, [isOpen, resolvedDesignId, currentDesignId, setCurrentDesignId]);
 
   if (!isOpen) return null;
 
