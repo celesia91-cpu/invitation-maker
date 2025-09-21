@@ -162,10 +162,11 @@ function normalizeBaseURLs(baseInput) {
     return { base: '', api: '/api' };
   }
 
+  // If already ends with /api, do not append another /api
   if (withoutTrailing.toLowerCase().endsWith('/api')) {
     const root = withoutTrailing.slice(0, -4);
     const base = root || (withoutTrailing.startsWith('/') ? '/' : '');
-    return { base, api: withoutTrailing };
+    return { base, api: '/api' };
   }
 
   const api = withoutTrailing === '/' ? '/api' : `${withoutTrailing}/api`;
