@@ -79,7 +79,7 @@ async function handleMarketplaceRequest(request) {
 export default {
   async fetch(request) {
     const url = new URL(request.url);
-    if (request.method === 'GET' && url.pathname === '/api/marketplace') {
+    if (request.method === 'GET' && url.pathname === '/marketplace') {
       return handleMarketplaceRequest(request);
     }
     return new Response('Not Found', { status: 404 });
