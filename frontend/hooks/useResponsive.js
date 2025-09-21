@@ -1,21 +1,34 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppState } from '../context/AppStateContext.jsx';
 
 // Minimal responsive hook inspired by responsive-manager.js
 export function useResponsive() {
   const { workSize, setWorkSize } = useAppState();
+  const setWorkSizeRef = useRef(setWorkSize);
+
+  useEffect(() => {
+    setWorkSizeRef.current = setWorkSize;
+  }, [setWorkSize]);
 
   useEffect(() => {
     const onResize = () => {
-      // Example: keep a 16:9 work area that fits viewport width
+      if (typeof window === 'undefined') {
+        return;
+      }
       const w = Math.max(320, Math.min(window.innerWidth - 32, 1280));
       const h = Math.round((w / 16) * 9);
-      setWorkSize(w, h);
+      const updater = setWorkSizeRef.current;
+      if (typeof updater === 'function') {
+        updater(w, h);
+      }
     };
+
     onResize();
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [setWorkSize]);
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
 
   return workSize;
 }
