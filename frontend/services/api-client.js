@@ -142,7 +142,7 @@ function resolveBaseInput(providedBase) {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001';
     }
-    return 'https://invitation-maker-api.celesia91.workers.dev/api';
+    return 'https://invitation-maker-api.celesia91.workers.dev';
   }
 
   return 'http://localhost:3001';
