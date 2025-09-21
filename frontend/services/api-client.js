@@ -528,20 +528,13 @@ class APIClient {
   
   // Fix: If target already includes /api, use base URL without /api
   if (normalizedTarget.startsWith('/api/')) {
-    return joinUrl(this.baseURL, target);
+    // Strip the /api prefix since it will be added by the base URL
+    const pathWithoutApi = normalizedTarget.slice(4); // Remove '/api' (4 characters)
+    return joinUrl(this.apiBaseURL || this.baseURL, pathWithoutApi);
   }
   
-  const preferApiNamespace =
-    this._baseIncludesApi ?? this._preferApiNamespace ?? false;
-  const shouldUseApiNamespace =
-    (preferApiNamespace &&
-      (normalizedTarget === '/health' ||
-       normalizedTarget === '/auth' ||
-       normalizedTarget === '/auth/me' ||
-       normalizedTarget.startsWith('/auth/')));
-
-  const base = shouldUseApiNamespace ? this.apiBaseURL : this.baseURL;
-  return joinUrl(base, target);
+  // For paths without /api prefix, append to base URL directly
+  return joinUrl(this.baseURL, normalizedTarget);
 }
 
   _prepareRequestOptions(endpoint, options = {}) {
