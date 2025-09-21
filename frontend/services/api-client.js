@@ -1182,6 +1182,10 @@ class APIClient {
 
 const apiClient = new APIClient();
 
+if (typeof window !== 'undefined') {
+  window.apiClient = apiClient;
+}
+
 export { APIClient };
 export { apiClient };
 export default apiClient;
