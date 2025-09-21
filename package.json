@@ -2,9 +2,10 @@
     "version": "1.0.0",
     "name": "invitation-maker",
     "scripts": {
-        "build": "npm --prefix frontend run build",
+        "build": "cross-env NODE_ENV=production npm --prefix frontend run build",
+        "build:debug": "cross-env NODE_ENV=development DEBUG=true npm --prefix frontend run build",
         "test": "npm --prefix frontend test",
-        "deploy:staging": "npm run build && wrangler pages deploy frontend/out --project-name=invitation-maker",
+        "deploy:staging": "npm run build:debug && wrangler pages deploy frontend/out --project-name=invitation-maker",
         "deploy": "npm run build && wrangler pages deploy frontend/out --project-name=invitation-maker-production",
         "start": "node server/index.js"
     },

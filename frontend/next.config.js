@@ -5,7 +5,24 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Note: rewrites don't work with static export, API calls will need to be handled differently
+  // Optimize for Cloudflare Pages
+  experimental: {
+    // This will help with client-side routing
+    scrollRestoration: true,
+  },
+  // Disable unnecessary features for static export
+  productionBrowserSourceMaps: false,
+  optimizeFonts: false,
+  // Configure paths for static export
+  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://invitation-maker-api.celesia91.workers.dev' : '',
+  basePath: '',
+  // Debug mode for development
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      config.devtool = 'source-map';
+    }
+    return config;
+  },
 };
 
-module.exports = nextConfig
+module.exports = nextConfig;
