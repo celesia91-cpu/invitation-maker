@@ -1,6 +1,7 @@
 // server/index.js
 // Minimal HTTP server exposing GET /api/designs
 
+import 'dotenv/config';
 import http from 'node:http';
 import { createHmac, randomUUID } from 'node:crypto';
 import { authenticate, authorizeRoles, DEFAULT_USER_ROLE } from './auth.js';
