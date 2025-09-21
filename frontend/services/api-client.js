@@ -249,38 +249,34 @@ function appendQuery(endpoint, params) {
 }
 class APIClient {
   constructor(baseURL, fetchImpl) {
-    const resolvedBase = resolveBaseInput(baseURL);
-    const basePointsToApiNamespace =
-      typeof resolvedBase === 'string' &&
-      resolvedBase.trim().replace(/\/+$/, '').toLowerCase().endsWith('/api');
-    this.baseURL = resolvedBase;
-    // In a static export, we don't need separate API base URL handling
-    this.apiBaseURL = resolvedBase;
-    this._baseIncludesApi = false;
-    this._preferApiNamespace = false;
-    this.fetch = this._resolveFetch(fetchImpl);
-    this.sessionKey = SESSION_STORAGE_KEY;
-    this._storageKey = this.sessionKey;
-    this.sessionDuration = SESSION_TTL;
-    this.persistentDuration = PERSISTENT_TTL;
-    this._storages = {
-      local: getWebStorage('localStorage'),
-      session: getWebStorage('sessionStorage'),
-    };
-    this.storage = this._storages.session ?? this._storages.local ?? null;
-    this._storage = this.storage;
-    this.currentDuration =
-      this.storage === this._storages.local
-        ? this.persistentDuration
-        : this.sessionDuration;
-    this.token = null;
-    this.user = null;
-    this.sessionInfo = { lastActivity: 0 };
-    this.isRetrying = false;
-    this._debug = false;
+  const resolvedBase = resolveBaseInput(baseURL);
+  this.baseURL = resolvedBase;
+  this.apiBaseURL = resolvedBase; // Keep same for compatibility
+  this._baseIncludesApi = false;
+  this._preferApiNamespace = false;
+  this.fetch = this._resolveFetch(fetchImpl);
+  this.sessionKey = SESSION_STORAGE_KEY;
+  this._storageKey = this.sessionKey;
+  this.sessionDuration = SESSION_TTL;
+  this.persistentDuration = PERSISTENT_TTL;
+  this._storages = {
+    local: getWebStorage('localStorage'),
+    session: getWebStorage('sessionStorage'),
+  };
+  this.storage = this._storages.session ?? this._storages.local ?? null;
+  this._storage = this.storage;
+  this.currentDuration =
+    this.storage === this._storages.local
+      ? this.persistentDuration
+      : this.sessionDuration;
+  this.token = null;
+  this.user = null;
+  this.sessionInfo = { lastActivity: 0 };
+  this.isRetrying = false;
+  this._debug = false;
 
-    this.loadSession();
-  }
+  this.loadSession();
+}
 
   _resolveFetch(fetchImpl) {
     if (typeof fetchImpl === 'function') {
@@ -529,22 +525,40 @@ class APIClient {
     return Boolean(this.token && this.isSessionValid());
   }
   _buildRequestUrl(endpoint) {
-    const target = typeof endpoint === 'string' ? endpoint.trim() : '';
-    if (!target) {
-      return this.baseURL || '';
-    }
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
-      return target;
-    }
-
-    // Ensure we have a leading slash and add /api prefix
-    const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
-    const apiPath = `/api${normalizedTarget}`;
-    
-    // Join with base URL
-    const base = this.baseURL.replace(/\/+$/, '');
-    return `${base}${apiPath}`;
+  const target = typeof endpoint === 'string' ? endpoint.trim() : '';
+  if (!target) {
+    return this.baseURL || '';
   }
+  
+  // If it's already a full URL, return as-is
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith('//')) {
+    return target;
+  }
+
+  // Normalize the endpoint to have a leading slash
+  const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+  
+  // Remove trailing slashes from base URL
+  const base = this.baseURL.replace(/\/+$/, '');
+  
+  // Check if base already includes /api
+  const baseHasApi = /\/api$/i.test(base);
+  
+  // Check if endpoint starts with /api
+  const targetHasApi = /^\/api/i.test(normalizedTarget);
+  
+  if (baseHasApi && targetHasApi) {
+    // Both have /api, remove it from the endpoint
+    const pathWithoutApi = normalizedTarget.replace(/^\/api/i, '');
+    return `${base}${pathWithoutApi}`;
+  } else if (!baseHasApi && !targetHasApi) {
+    // Neither has /api, add it between base and path
+    return `${base}/api${normalizedTarget}`;
+  } else {
+    // One has /api, join them directly
+    return `${base}${normalizedTarget}`;
+  }
+}
 
   _prepareRequestOptions(endpoint, options = {}) {
     const url = this._buildRequestUrl(endpoint);
@@ -910,59 +924,59 @@ class APIClient {
     if (!designId) {
       return { ok: false };
     }
-    return this.post('/api/analytics/view', { designId });
+    return this.post('/analytics/view', { designId });
   }
 
   async recordConversion(designId) {
     if (!designId) {
       return { ok: false };
     }
-    return this.post('/api/analytics/convert', { designId });
+    return this.post('/analytics/convert', { designId });
   }
 
   async getPopularDesigns() {
-    return this.get('/api/analytics/popular');
+    return this.get('/analytics/popular');
   }
 
   async getConversionRates() {
-    return this.get('/api/analytics/conversions');
+    return this.get('/analytics/conversions');
   }
 
   async getAdminCategories() {
-    return this.get('/api/admin/categories');
+    return this.get('/admin/categories');
   }
 
   async createAdminCategory(payload) {
-    return this.post('/api/admin/categories', payload);
+    return this.post('/admin/categories', payload);
   }
 
   async deleteAdminCategory(id) {
     if (!id) {
       throw new Error('Category id is required');
     }
-    return this.delete(`/api/admin/categories/${encodeURIComponent(id)}`);
+    return this.delete(`/admin/categories/${encodeURIComponent(id)}`);
   }
 
   async listAdminDesigns(params = {}) {
-    return this.get('/api/admin/designs', params);
+    return this.get('/admin/designs', params);
   }
 
   async createAdminDesign(payload) {
-    return this.post('/api/admin/designs', payload);
+    return this.post('/admin/designs', payload);
   }
 
   async updateAdminDesign(id, payload) {
     if (!id) {
       throw new Error('Design id is required');
     }
-    return this.put(`/api/admin/designs/${encodeURIComponent(id)}`, payload);
+    return this.put(`/admin/designs/${encodeURIComponent(id)}`, payload);
   }
 
   async patchAdminDesign(id, payload) {
     if (!id) {
       throw new Error('Design id is required');
     }
-    return this.patch(`/api/admin/designs/${encodeURIComponent(id)}`, payload);
+    return this.patch(`/admin/designs/${encodeURIComponent(id)}`, payload);
   }
 
   async archiveAdminDesign(id, { ifUnmodifiedSince } = {}) {
@@ -973,67 +987,67 @@ class APIClient {
     if (ifUnmodifiedSince) {
       headers['If-Unmodified-Since'] = ifUnmodifiedSince;
     }
-    return this.delete(`/api/admin/designs/${encodeURIComponent(id)}`, { headers });
+    return this.delete(`/admin/designs/${encodeURIComponent(id)}`, { headers });
   }
 
   async updateAdminDesignPrice(id, price) {
     if (!id) {
       throw new Error('Design id is required');
     }
-    return this.put(`/api/admin/designs/${encodeURIComponent(id)}/price`, { price });
+    return this.put(`/admin/designs/${encodeURIComponent(id)}/price`, { price });
   }
 
   async getDesigns(params = {}) {
-    return this.get('/api/designs', params);
+    return this.get('/designs', params);
   }
 
   async getDesign(designId) {
     if (designId === undefined || designId === null) {
       throw new Error('designId is required');
     }
-    return this.get(`/api/designs/${encodeURIComponent(designId)}`);
+    return this.get(`/designs/${encodeURIComponent(designId)}`);
   }
 
   async getDesignsByCategory(category, params = {}) {
     if (!category) {
       throw new Error('category is required');
     }
-    return this.get(`/api/designs/${encodeURIComponent(category)}`, params);
+    return this.get(`/designs/${encodeURIComponent(category)}`, params);
   }
 
   async listDesignWebm(designId) {
     if (designId === undefined || designId === null) {
       throw new Error('designId is required');
     }
-    return this.get(`/api/designs/${encodeURIComponent(designId)}/webm`);
+    return this.get(`/designs/${encodeURIComponent(designId)}/webm`);
   }
 
   async createWebmAsset(payload) {
-    return this.post('/api/webm', payload);
+    return this.post('/webm', payload);
   }
 
   async getWebmAsset(id) {
     if (!id) {
       throw new Error('WebM id is required');
     }
-    return this.get(`/api/webm/${encodeURIComponent(id)}`);
+    return this.get(`/webm/${encodeURIComponent(id)}`);
   }
 
   async updateWebmAsset(id, payload) {
     if (!id) {
       throw new Error('WebM id is required');
     }
-    return this.patch(`/api/webm/${encodeURIComponent(id)}`, payload);
+    return this.patch(`/webm/${encodeURIComponent(id)}`, payload);
   }
 
   async deleteWebmAsset(id) {
     if (!id) {
       throw new Error('WebM id is required');
     }
-    return this.delete(`/api/webm/${encodeURIComponent(id)}`);
+    return this.delete(`/webm/${encodeURIComponent(id)}`);
   }
 
-  async uploadImage(file, { endpoint = '/api/images/upload', fields = {} } = {}) {
+  async uploadImage(file, { endpoint = '/images/upload', fields = {} } = {}) {
     if (!file) {
       throw new Error('No file provided');
     }
