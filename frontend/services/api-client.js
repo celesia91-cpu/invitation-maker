@@ -195,24 +195,24 @@ function joinUrl(base, path) {
     return `${baseStr}${target}`;
   }
 
-  const normalizedBase = baseStr === '/' ? '' : baseStr.replace(/\/+$/, '');
-  let normalizedPath = target.startsWith('/') ? target : `/${target}`;
+  // Remove trailing slashes from base and leading slashes from path
+  let normalizedBase = baseStr.replace(/\/+$/, '');
+  let normalizedPath = target.replace(/^\/+/, '');
 
+  // Prevent double /api if both base and path include it
   if (
     normalizedBase.toLowerCase().endsWith('/api') &&
-    normalizedPath.toLowerCase().startsWith('/api')
+    normalizedPath.toLowerCase().startsWith('api')
   ) {
-    normalizedPath = normalizedPath.replace(/^\/+api/i, '');
-    normalizedPath = normalizedPath.startsWith('/')
-      ? normalizedPath
-      : `/${normalizedPath}`;
+    normalizedPath = normalizedPath.replace(/^api\/?/i, '');
   }
 
-  if (!normalizedBase) {
-    return normalizedPath;
+  // Ensure single slash between base and path
+  if (normalizedPath) {
+    return `${normalizedBase}/${normalizedPath}`;
+  } else {
+    return normalizedBase;
   }
-
-  return `${normalizedBase}${normalizedPath}`;
 }
 
 function appendQuery(endpoint, params) {
