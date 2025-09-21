@@ -297,6 +297,19 @@ class APIClient {
     };
   }
 
+  async updateLastActivity() {
+    if (!this.token || !this.storage) return false;
+    
+    const record = readSessionRecord(this.storage, this.currentDuration);
+    if (!record) return false;
+    
+    const now = Date.now();
+    return writeSessionRecord(this.storage, {
+      ...record,
+      lastActivity: now,
+    });
+  }
+
   loadSession() {
     const storages = [
       { storage: this._storages.local, ttl: this.persistentDuration },
@@ -604,26 +617,49 @@ class APIClient {
     const parsePreference = options.parse;
     const maxRetries = options.maxRetries ?? 3;
     const retryDelay = options.retryDelay ?? 1000;
+    let lastError = null;
 
-    const performRequest = async () => {
-      this._log('Request', fetchOptions.method, url);
-      const response = await this.fetch(url, fetchOptions);
-      return this._handleResponse(response, { parse: parsePreference, url });
+    const performRequest = async (retryCount = 0) => {
+      this._log('Request', fetchOptions.method, url, retryCount > 0 ? `(retry ${retryCount})` : '');
+      
+      try {
+        const response = await this.fetch(url, fetchOptions);
+        
+        // Update last activity on successful authenticated requests
+        if (this.token && response.ok) {
+          await this.updateLastActivity();
+        }
+        
+        const result = await this._handleResponse(response, { parse: parsePreference, url });
+        this._log('Response', fetchOptions.method, url, result);
+        return result;
+      } catch (error) {
+        lastError = error;
+        const status = error?.status ?? 0;
+        
+        // Clear token on 401 and retry without auth if possible
+        if (status === 401 && this.token && !options.skipAuthRetry) {
+          this.clearToken();
+          const { url: retryUrl, fetchOptions: retryOptions } = this._prepareRequestOptions(endpoint, {
+            ...options,
+            skipAuthRetry: true
+          });
+          return this.fetch(retryUrl, retryOptions).then(response => 
+            this._handleResponse(response, { parse: parsePreference, url: retryUrl })
+          );
+        }
+        
+        throw error;
+      }
     };
 
     try {
-      const result = await this.retryRequest(performRequest, maxRetries, retryDelay);
-      this._log('Response', fetchOptions.method, url, result);
-      return result;
+      return await this.retryRequest(performRequest, maxRetries, retryDelay);
     } catch (error) {
-      const status = error?.status ?? 0;
-      if (status === 401) {
-        this.clearToken();
-      }
       if (error?.name === 'TypeError' && String(error.message || '').includes('fetch')) {
         throw new Error('Network error - please check your connection');
       }
-      throw error;
+      throw lastError || error;
     }
   }
 
