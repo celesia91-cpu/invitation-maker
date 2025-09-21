@@ -2,15 +2,17 @@ name = "invitation-maker"
 compatibility_date = "2024-01-15"
 pages_build_output_dir = "frontend/out"
 
+[vars]
+CF_SECURITY_HEADERS = "enabled"
+CF_COOP = "same-origin"
+CF_COEP = "require-corp"
+CF_CORP = "cross-origin"
+
 [env.production]
 name = "invitation-maker-production"
-pages_build_output_dir = "frontend/out"
 
-[build]
-command = "npm run build"
-
-[build.upload]
-dir = "frontend/out"
-
-[build.environment]
+[env.production.vars]
 CF_SECURITY_HEADERS = "enabled"
+CF_COOP = "same-origin"
+CF_COEP = "require-corp"
+CF_CORP = "cross-origin"
