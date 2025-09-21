@@ -251,6 +251,7 @@ class APIClient {
 
     this.baseURL = base;
     this.apiBaseURL = api;
+    this._baseIncludesApi = basePointsToApiNamespace;
     this._preferApiNamespace = basePointsToApiNamespace;
     this.fetch = this._resolveFetch(fetchImpl);
     this.sessionKey = SESSION_STORAGE_KEY;
@@ -519,9 +520,11 @@ class APIClient {
     }
 
     const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+    const preferApiNamespace =
+      this._baseIncludesApi ?? this._preferApiNamespace ?? false;
     const shouldUseApiNamespace =
       normalizedTarget.startsWith('/api') ||
-      (this._preferApiNamespace &&
+      (preferApiNamespace &&
         (normalizedTarget === '/health' ||
           normalizedTarget === '/auth' ||
           normalizedTarget === '/auth/me' ||
@@ -1037,9 +1040,14 @@ class APIClient {
 
   setBaseURL(baseURL) {
     const resolvedBase = resolveBaseInput(baseURL);
+    const baseIncludesApi =
+      typeof resolvedBase === 'string' &&
+      resolvedBase.trim().replace(/\/+$/, '').toLowerCase().endsWith('/api');
     const { base, api } = normalizeBaseURLs(resolvedBase);
     this.baseURL = base;
     this.apiBaseURL = api;
+    this._baseIncludesApi = baseIncludesApi;
+    this._preferApiNamespace = baseIncludesApi;
   }
 
   getBaseURL() {

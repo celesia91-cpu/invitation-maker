@@ -70,13 +70,13 @@ describe('APIClient marketplace endpoint resolution', () => {
 });
 
 describe('APIClient auth and health endpoint resolution with /api base', () => {
-  const createFetchSpy = () =>
+  const createFetchSpy = (payload = {}) =>
     jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
       headers: { get: () => 'application/json' },
-      json: async () => ({}),
-      text: async () => '',
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
     });
 
   test('uses api namespace for auth endpoints when constructed with /api base', async () => {
@@ -91,11 +91,36 @@ describe('APIClient auth and health endpoint resolution with /api base', () => {
     );
   });
 
+  test('login helper preserves api namespace when base includes /api', async () => {
+    const responsePayload = { token: 'token-123', user: { id: 'user-1' } };
+    const fetchSpy = createFetchSpy(responsePayload);
+    const client = new APIClient('/api', fetchSpy);
+
+    await client.login({ email: 'user@example.com', password: 'secret' });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/auth/login',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   test('uses api namespace for health endpoint when constructed with /api base', async () => {
     const fetchSpy = createFetchSpy();
     const client = new APIClient('/api', fetchSpy);
 
     await client.request('/health');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/health',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  test('healthCheck helper preserves api namespace when base includes /api', async () => {
+    const fetchSpy = createFetchSpy({ status: 'ok' });
+    const client = new APIClient('/api', fetchSpy);
+
+    await client.healthCheck();
 
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/health',
