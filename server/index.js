@@ -1356,6 +1356,35 @@ const server = http.createServer(async (req, res) => {
       }));
       return;
     }
+
+    if (req.method === 'GET' && req.url.startsWith('/api/marketplace')) {
+      const user = authenticate(req);
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const requestedRole = resolveMarketplaceRole(urlObj.searchParams.get('role'));
+      const defaultRole = resolveMarketplaceRole(user.role) || 'consumer';
+
+      if (!MARKETPLACE_ROLES.has(requestedRole)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid role parameter' }));
+        return;
+      }
+
+      // Only admins can view marketplace as other roles
+      if (requestedRole !== defaultRole && !isAdminRole(user.role)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized role access' }));
+        return;
+      }
+
+      const designs = await getMarketplaceDesigns({
+        role: requestedRole,
+        userId: user.id
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(designs));
+      return;
+    }
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
