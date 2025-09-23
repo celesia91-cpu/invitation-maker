@@ -1,10 +1,11 @@
 ﻿name = "invitation-maker"
 compatibility_date = "2024-01-15"
 
+pages_build_output_dir = "frontend/out"
+
 [build]
 command = "npm install && npm run build"
 cwd = "frontend"
-pages_build_output_dir = "frontend/out"
 
 [vars]
 CF_SECURITY_HEADERS = "enabled"
