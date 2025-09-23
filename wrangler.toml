@@ -13,8 +13,8 @@ CF_COOP = "same-origin"
 CF_COEP = "require-corp"
 CF_CORP = "cross-origin"
 
-[env.staging]
-name = "invitation-maker-staging"
+[env.preview]
+name = "invitation-maker-preview"
 
 [env.production]
 name = "invitation-maker-production"
