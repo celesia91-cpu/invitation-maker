@@ -35,3 +35,4 @@ worker/.env.production
 # Tool-specific configs
 .claude/
 
+frontend/.env.staging
