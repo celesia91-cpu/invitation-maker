@@ -1,12 +1,12 @@
 import path from 'node:path';
 
 /** @type {import('next').NextConfig} */
-const resolvedAssetPrefix = process.env.NEXT_PUBLIC_ASSET_PREFIX || (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_BUILD_TYPE !== 'preview' ? 'https://celesia.app' : '');
+const resolvedAssetPrefix = process.env.NEXT_PUBLIC_ASSET_PREFIX || '';
 const outputFileTracingRoot = path.resolve(process.cwd(), '..');
 
 const baseConfig = {
   output: 'export',
-  trailingSlash: true,
+  trailingSlash: false,
   images: {
     unoptimized: true,
   },
