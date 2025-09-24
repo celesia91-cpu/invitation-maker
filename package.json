@@ -1,21 +1,22 @@
 {
-    "version": "1.0.0",
-    "name": "invitation-maker",
-    "scripts": {
-        "build": "cross-env NODE_ENV=production NEXT_PUBLIC_ASSET_PREFIX=https://celesia.app npm --prefix frontend run build",
-        "build:debug": "cross-env NODE_ENV=development DEBUG=true npm --prefix frontend run build",
-        "test": "npm --prefix frontend test",
-        "deploy:staging": "npm run build:debug && wrangler pages deploy frontend/out --project-name=invitation-maker",
-        "deploy": "npm run build && wrangler pages deploy frontend/out --project-name=invitation-maker-production",
-        "start": "node server/index.js"
-    },
-    "type": "module",
-    "dependencies": {
-        "dotenv": "^17.2.2",
-        "pg": "^8.11.0"
-    },
-    "devDependencies": {
-        "cross-env": "^10.0.0",
-        "wrangler": "^4.33.1"
-    }
+    "version":  "1.0.0",
+    "name":  "invitation-maker",
+    "scripts":  {
+                    "build":  "cross-env NODE_ENV=production NEXT_PUBLIC_ASSET_PREFIX=https://celesia.app npm --prefix frontend run build",
+                    "build:debug":  "cross-env NODE_ENV=development DEBUG=true npm --prefix frontend run build",
+                    "test":  "npm --prefix frontend test",
+                    "deploy:staging":  "npm run build:debug \u0026\u0026 wrangler pages deploy frontend/out --project-name=invitation-maker",
+                    "deploy":  "npm run build \u0026\u0026 wrangler pages deploy frontend/out --project-name=invitation-maker-production",
+                    "start":  "node server/index.js",
+                    "build:preview":  "cross-env NODE_ENV=preview NEXT_PUBLIC_API_BASE_URL=https://invitation-maker-api.celesia91.workers.dev/api NEXT_PUBLIC_ASSET_PREFIX=https://preview.invitation-maker.pages.dev npm --prefix frontend run build"
+                },
+    "type":  "module",
+    "dependencies":  {
+                         "dotenv":  "^17.2.2",
+                         "pg":  "^8.11.0"
+                     },
+    "devDependencies":  {
+                            "cross-env":  "^10.0.0",
+                            "wrangler":  "^4.33.1"
+                        }
 }
