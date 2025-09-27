@@ -959,12 +959,35 @@ class APIClient {
       throw new Error('listingId is required');
     }
     const normalizedId = String(listingId);
-    const results = await this.listAdminDesigns({ search: normalizedId });
-    if (Array.isArray(results)) {
-      const exact = results.find((item) => String(item?.id ?? '') === normalizedId);
-      return exact ?? results[0] ?? null;
+
+    try {
+      // Try to get the specific design first
+      const design = await this.get(`/admin/designs/${encodeURIComponent(normalizedId)}`);
+      if (design) {
+        return design;
+      }
+    } catch (error) {
+      // Debug info removed for production
     }
-    return results ?? null;
+
+    try {
+      // Fallback to searching through all designs
+      const results = await this.listAdminDesigns({ search: normalizedId });
+      if (Array.isArray(results)) {
+        const exact = results.find((item) => String(item?.id ?? '') === normalizedId);
+        return exact ?? results[0] ?? null;
+      }
+      return results ?? null;
+    } catch (error) {
+      // Debug info removed for production
+      // Return a placeholder object to prevent complete failure
+      return {
+        id: normalizedId,
+        title: `Design ${normalizedId}`,
+        status: 'unknown',
+        error: 'Could not fetch design details'
+      };
+    }
   }
 
   async publishMarketplaceListing(listingId, options = {}) {
@@ -999,6 +1022,19 @@ class APIClient {
         return this.manageMarketplaceListing(listingId);
       case 'publish':
         return this.publishMarketplaceListing(listingId, payload || {});
+      case 'edit':
+        return this.updateAdminDesign(listingId, payload || {});
+      case 'duplicate':
+        // Get the original design first, then create a copy
+        return this.get(`/admin/designs/${encodeURIComponent(listingId)}`)
+          .then(original => this.createAdminDesign({
+            ...original,
+            title: `${original.title} (Copy)`,
+            id: undefined // Let backend assign new ID
+          }));
+      case 'analytics':
+      case 'viewanalytics':
+        return this.get(`/analytics/design/${encodeURIComponent(listingId)}`);
       case 'delete':
       case 'archive':
         return this.deleteMarketplaceListing(listingId, options || {});

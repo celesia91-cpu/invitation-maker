@@ -8,6 +8,7 @@ import FullscreenOverlay from '../../components/FullscreenOverlay.jsx';
 import RotateOverlay from '../../components/RotateOverlay.jsx';
 import PreviewModal from '../../components/PreviewModal.jsx';
 import PurchaseModal from '../../components/PurchaseModal.jsx';
+import DesignPublishModal from '../../components/DesignPublishModal.jsx';
 import SlidesPanel from '../../components/SlidesPanel.jsx';
 import DragHandler from '../../components/DragHandler.jsx';
 import CollapsibleGroup from '../../components/CollapsibleGroup.jsx';
@@ -15,12 +16,15 @@ import ImageCanvas from '../../components/ImageCanvas.jsx';
 import TextControls from '../../components/TextControls.jsx';
 import PlaybackControls from '../../components/PlaybackControls.jsx';
 import UploadBackgroundButton from '../../components/UploadBackgroundButton.jsx';
+import UploadMusicButton from '../../components/UploadMusicButton.jsx';
 import { useResponsive } from '../../hooks/useResponsive.js';
 import { useAppState } from '../../context/AppStateContext.jsx';
 import { EditorProvider, useEditorState } from '../../context/EditorContext.jsx';
 import useAuth from '../../hooks/useAuth.js';
 import useDesignOwnership from '../../hooks/useDesignOwnership.js';
 import { resolveCapabilities } from '../../utils/roleCapabilities.js';
+import { usePageNavigation } from '../../utils/navigationManager.js';
+import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
 
 const DEFAULT_EDITOR_DESIGN_ID = 'demo-marketplace-design';
 
@@ -43,8 +47,15 @@ function EditorContent() {
   const [isTopbarVisible, setIsTopbarVisible] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [activeDesignId, setActiveDesignId] = useState(null);
   useResponsive();
+  const navigation = usePageNavigation();
+  const unsavedChanges = useUnsavedChanges({
+    trackSlideChanges: true,
+    trackImageChanges: true,
+    autoSave: false,
+  });
   const {
     setCurrentDesignId,
     isDesignOwned,
@@ -81,7 +92,7 @@ function EditorContent() {
       return first ? String(first) : null;
     }
     return token ? String(token) : null;
-  }, [router.isReady, token]);
+  }, [router, token]);
 
   const syncDesignSelection = useCallback(
     (designId, options = {}) => {
@@ -266,6 +277,53 @@ function EditorContent() {
     }
   }, [ensureDesignId, isDesignOwned]);
 
+  const handleSaveToMarketplace = useCallback(() => {
+    if (userRole !== 'admin') {
+      // Debug info removed for production
+      return;
+    }
+
+    setShowPublishModal(true);
+  }, [userRole]);
+
+  const handlePublishModalSave = useCallback(async (publishData) => {
+    try {
+      // Save using the unsaved changes hook
+      const result = await unsavedChanges.saveChanges(async (data) => {
+        if (auth?.api?.saveDesignToMarketplace) {
+          return await auth.api.saveDesignToMarketplace({
+            designId: activeDesignId,
+            designData: data,
+            ...publishData,
+          });
+        }
+
+        // Mock save for development
+        // Debug info removed for production
+        return {
+          success: true,
+          designId: activeDesignId || `design-${Date.now()}`,
+          message: `Design "${publishData.title}" saved as ${publishData.status}`,
+        };
+      });
+
+      if (result.success) {
+        // Update the design ID if a new one was created
+        if (result.designId && result.designId !== activeDesignId) {
+          syncDesignSelection(result.designId);
+        }
+
+        // Show success feedback (you might want to use a toast instead of alert)
+        // Debug info removed for production
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error saving to marketplace:', error);
+      return { success: false, error };
+    }
+  }, [unsavedChanges, auth?.api, activeDesignId, syncDesignSelection]);
+
   const togglePanel = useCallback(() => {
     setPanelOpen((prev) => !prev);
   }, []);
@@ -295,8 +353,11 @@ function EditorContent() {
         onPreviewClick={handlePreviewClick}
         onShareClick={handleShareClick}
         onTogglePanel={togglePanel}
+        onSaveToMarketplace={handleSaveToMarketplace}
         panelOpen={panelOpen}
         roleCapabilities={roleCapabilities}
+        showBackToMarketplace={true}
+        hasUnsavedChanges={unsavedChanges.hasUnsavedChanges}
       />
 
       <div style={{ padding: 8 }}>
@@ -346,6 +407,7 @@ function EditorContent() {
             </div>
 
             <UploadBackgroundButton api={auth.api} roleCapabilities={roleCapabilities} />
+            <UploadMusicButton api={auth.api} roleCapabilities={roleCapabilities} />
           </ImageCanvas>
 
           <div
@@ -428,6 +490,18 @@ function EditorContent() {
           }
         }}
         onCancel={() => setShowPurchase(false)}
+      />
+
+      <DesignPublishModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onSave={handlePublishModalSave}
+        designData={{ slides, workSize: { w: 800, h: 450 } }}
+        initialValues={{
+          title: activeDesignId ? `Design ${activeDesignId}` : 'New Design',
+          category: 'Birthday',
+          status: 'draft',
+        }}
       />
     </div>
   );

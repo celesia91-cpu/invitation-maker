@@ -4,11 +4,14 @@ import AuthModal from '../components/AuthModal.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import PreviewModal from '../components/PreviewModal.jsx';
 import PurchaseModal from '../components/PurchaseModal.jsx';
+import DesignSelectionModal from '../components/DesignSelectionModal.jsx';
+import TransitionLoader from '../components/TransitionLoader.jsx';
 import Marketplace from '../components/Marketplace.jsx';
 import withRoleGate from '../components/withRoleGate.jsx';
 import { useAppState } from '../context/AppStateContext.jsx';
 import useAuth from '../hooks/useAuth.js';
 import useDesignOwnership from '../hooks/useDesignOwnership.js';
+import { usePageNavigation } from '../utils/navigationManager.js';
 
 const DEFAULT_MARKETPLACE_DESIGN_ID = 'demo-marketplace-design';
 
@@ -34,6 +37,7 @@ export default function MarketplacePage() {
   const router = useRouter();
   const auth = useAuth();
   const { pushNavigationHistory } = useAppState();
+  const { goToEditor } = usePageNavigation();
   const {
     setCurrentDesignId,
     isDesignOwned,
@@ -49,10 +53,15 @@ export default function MarketplacePage() {
   const [showAuth, setShowAuth] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
+  const [showDesignSelection, setShowDesignSelection] = useState(false);
   const [activeDesignId, setActiveDesignId] = useState(DEFAULT_MARKETPLACE_DESIGN_ID);
   const [panelOpen, setPanelOpen] = useState(false);
   const [isTopbarVisible, setIsTopbarVisible] = useState(false);
   const [currentSurface, setCurrentSurface] = useState('marketplace');
+  const [recentDesigns, setRecentDesigns] = useState([]);
+  const [myDesigns, setMyDesigns] = useState([]);
+  const [showTransitionLoader, setShowTransitionLoader] = useState(false);
+  const [transitionInfo, setTransitionInfo] = useState({ title: '', subtitle: '' });
 
   useEffect(() => {
     if (!auth.isInitialized) return;
@@ -60,6 +69,7 @@ export default function MarketplacePage() {
   }, [auth.isAuthenticated, auth.isInitialized]);
 
   const isUserAuthenticated = Boolean(auth?.isAuthenticated);
+  const userRole = auth?.user?.role || 'guest';
 
   const syncDesignSelection = useCallback(
     (designId, options = {}) => {
@@ -150,13 +160,9 @@ export default function MarketplacePage() {
   const navigateToEditor = useCallback(
     (designId, options = {}) => {
       const resolvedDesignId = syncDesignSelection(designId, options);
-      const href =
-        resolvedDesignId && resolvedDesignId.length > 0
-          ? `/editor/${encodeURIComponent(resolvedDesignId)}`
-          : '/editor';
-      router.push(href);
+      goToEditor(resolvedDesignId, { preserveState: true });
     },
-    [router, syncDesignSelection]
+    [goToEditor, syncDesignSelection]
   );
 
   const openInlineExperience = useCallback(() => {
@@ -206,6 +212,102 @@ export default function MarketplacePage() {
       setShowPurchase(true);
     }
   }, [ensureDesignId, isDesignOwned, navigateToEditor]);
+
+  // Load recent designs and my designs for authenticated users
+  useEffect(() => {
+    if (!isUserAuthenticated || !auth?.api) return;
+
+    const loadUserDesigns = async () => {
+      try {
+        // Load recent designs (mock data for now)
+        const recentMockData = [
+          {
+            id: 'recent-1',
+            title: 'Birthday Party Invitation',
+            thumbnail: '/images/recent-1.png',
+            lastOpened: Date.now() - 24 * 60 * 60 * 1000, // 1 day ago
+            owned: true,
+          },
+          {
+            id: 'recent-2',
+            title: 'Wedding Save the Date',
+            thumbnail: '/images/recent-2.png',
+            lastOpened: Date.now() - 3 * 24 * 60 * 60 * 1000, // 3 days ago
+            owned: false,
+          },
+        ];
+        setRecentDesigns(recentMockData);
+
+        // Load my designs for creators/admins (mock data)
+        if (userRole === 'creator' || userRole === 'admin') {
+          const myDesignsMockData = [
+            {
+              id: 'my-design-1',
+              title: 'Corporate Event Template',
+              thumbnail: '/images/my-design-1.png',
+              status: 'published',
+              lastModified: Date.now() - 7 * 24 * 60 * 60 * 1000, // 1 week ago
+              views: 245,
+              downloads: 12,
+            },
+            {
+              id: 'my-design-2',
+              title: 'Holiday Celebration',
+              thumbnail: '/images/my-design-2.png',
+              status: 'draft',
+              lastModified: Date.now() - 2 * 24 * 60 * 60 * 1000, // 2 days ago
+              views: 0,
+              downloads: 0,
+            },
+          ];
+          setMyDesigns(myDesignsMockData);
+        }
+      } catch (error) {
+        // Error logged for debugging
+      }
+    };
+
+    loadUserDesigns();
+  }, [isUserAuthenticated, auth?.api, userRole]);
+
+  const handleDesignSelection = useCallback((designId, options = {}) => {
+    setShowDesignSelection(false);
+
+    // Set up transition loader based on selection type
+    let title = 'Loading Editor...';
+    let subtitle = '';
+
+    if (options.type === 'blank') {
+      title = 'Creating Blank Canvas';
+      subtitle = 'Setting up your workspace';
+    } else if (options.type === 'template') {
+      title = 'Loading Template';
+      subtitle = `Preparing "${options.template?.name || 'template'}"`;
+    } else if (options.type === 'my_design') {
+      title = 'Opening Your Design';
+      subtitle = `Loading "${options.design?.title || 'your design'}"`;
+    } else if (options.type === 'recent') {
+      title = 'Resuming Work';
+      subtitle = `Opening "${options.design?.title || 'recent design'}"`;
+    }
+
+    setTransitionInfo({ title, subtitle });
+    setShowTransitionLoader(true);
+
+    // Simulate loading delay and then navigate
+    setTimeout(() => {
+      if (options.type === 'blank') {
+        navigateToEditor(null, { allowBlank: true });
+      } else if (options.type === 'template') {
+        navigateToEditor(designId, { template: options.template });
+      } else if (options.type === 'my_design' || options.type === 'recent') {
+        navigateToEditor(designId, { owned: options.owned });
+      } else {
+        navigateToEditor(designId, options);
+      }
+      setShowTransitionLoader(false);
+    }, 1800);
+  }, [navigateToEditor]);
 
   return (
     <div
@@ -307,7 +409,7 @@ export default function MarketplacePage() {
       {/* Marketplace page (hidden by default) */}
       <RoleAwareMarketplace
         isOpen={isMarketplaceOpen}
-        onSkipToEditor={() => navigateToEditor(null, { allowBlank: true })}
+        onSkipToEditor={() => setShowDesignSelection(true)}
       />
 
       {/* Global modals */}
@@ -337,6 +439,24 @@ export default function MarketplacePage() {
           }
         }}
         onCancel={() => setShowPurchase(false)}
+      />
+
+      {/* Design Selection Modal */}
+      <DesignSelectionModal
+        isOpen={showDesignSelection}
+        onClose={() => setShowDesignSelection(false)}
+        onSelectDesign={handleDesignSelection}
+        userRole={userRole}
+        recentDesigns={recentDesigns}
+        myDesigns={myDesigns}
+      />
+
+      {/* Transition Loader */}
+      <TransitionLoader
+        isVisible={showTransitionLoader}
+        title={transitionInfo.title}
+        subtitle={transitionInfo.subtitle}
+        onComplete={() => setShowTransitionLoader(false)}
       />
     </div>
   );

@@ -1396,6 +1396,7 @@ body.viewer #topbarToggle,
 body.viewer .sidepanel,
 body.viewer #bgBox,
 body.viewer #uploadBgBtn,
+body.viewer #uploadMusicBtn,
 body.viewer .handle,
 body.viewer .guide {
   display: none !important;
@@ -1516,6 +1517,37 @@ body.viewer .layer:hover {
   display: none;
 }
 
+/* Music upload button */
+#uploadMusicBtn {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  transform: translate(-50%, -50%);
+  z-index: 40;  /* Above FX video */
+  background: rgba(124, 58, 237, 0.8);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 28px rgba(124, 58, 237, 0.4);
+  transition: all var(--transition-fast);
+}
+
+#uploadMusicBtn:hover {
+  background: rgba(124, 58, 237, 0.9);
+  transform: translate(-50%, -50%) translateY(-2px);
+  box-shadow: 0 10px 36px rgba(124, 58, 237, 0.6);
+}
+
+#uploadMusicBtn:active {
+  transform: translate(-50%, -50%);
+}
+
 /* ===== STATE CLASSES ===== */
 /* Preview/View-only modes */
 body.preview .sidepanel {
@@ -1540,7 +1572,8 @@ body.preview .layer:hover {
   outline: none !important;
 }
 
-body.preview #uploadBgBtn {
+body.preview #uploadBgBtn,
+body.preview #uploadMusicBtn {
   display: none !important;
 }
 
@@ -2158,6 +2191,7 @@ body.resizing {
   .handle,
   .guide,
   #uploadBgBtn,
+  #uploadMusicBtn,
   .layer.text-layer::before,
   .layer.text-layer::after {
     display: none !important;
@@ -2520,4 +2554,288 @@ body.resizing {
 .preview-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* ===== UPLOAD MODAL STYLES ===== */
+.upload-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2700;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.upload-modal {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+}
+
+.upload-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 20px;
+}
+
+.upload-modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.upload-modal-content {
+  padding: 0 24px 24px;
+}
+
+.upload-tips {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.upload-tips h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upload-tips ul {
+  margin: 0 0 12px 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.upload-tips li {
+  margin-bottom: 4px;
+}
+
+.upload-tips .tip {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ===== MUSIC UPLOADER STYLES ===== */
+.music-uploader {
+  width: 100%;
+}
+
+.music-uploader .upload-area {
+  border: 2px dashed rgba(124, 58, 237, 0.3);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: rgba(124, 58, 237, 0.05);
+}
+
+.music-uploader.drag-active .upload-area {
+  border-color: rgba(124, 58, 237, 0.6);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.music-uploader.uploading .upload-area {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.music-uploader.disabled .upload-area {
+  cursor: not-allowed;
+  opacity: 0.5;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.music-uploader .upload-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.music-uploader .upload-text .primary-text {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.music-uploader .upload-text .secondary-text {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0 0 4px 0;
+}
+
+.music-uploader .upload-text .hint-text {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.music-uploader .upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.music-uploader .progress-info {
+  flex: 1;
+}
+
+.music-uploader .progress-info p {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.music-uploader .progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.music-uploader .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  transition: width var(--transition-fast);
+  border-radius: 4px;
+}
+
+.music-uploader .progress-text {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.music-uploader .cancel-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all var(--transition-fast);
+}
+
+.music-uploader .cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--error);
+}
+
+.music-uploader .audio-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.music-uploader .audio-controls {
+  width: 100%;
+}
+
+.music-uploader .audio-controls audio {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.music-uploader .file-info {
+  text-align: left;
+}
+
+.music-uploader .file-info .file-name {
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.music-uploader .file-info .file-details {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.music-uploader .clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+}
+
+.music-uploader .clear-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--error);
+}
+
+.music-uploader .upload-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  color: var(--success);
+  font-size: 13px;
+}
+
+.music-uploader .upload-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  color: var(--error);
+  font-size: 13px;
 }

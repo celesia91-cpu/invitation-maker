@@ -439,7 +439,7 @@ const server = http.createServer(async (req, res) => {
   if (rateLimit(req, res)) return;
   try {
     // Simple auth endpoints for local development
-    if (req.method === 'POST' && req.url === '/auth/login') {
+    if (req.method === 'POST' && (req.url === '/auth/login' || req.url === '/api/auth/login')) {
       const body = await readBody(req);
       const email = String(body.email || '').trim();
       const password = String(body.password || '').trim();
@@ -456,6 +456,11 @@ const server = http.createServer(async (req, res) => {
         users.set(id, userRecord);
         userTokens.set(id, 5);
         userPurchases.set(id, []);
+
+        // Temporary admin user setup for local development
+        if (email === 'admin@test.com') {
+          userRecord.role = 'admin';
+        }
       }
       const storedRole =
         userRecord && typeof userRecord.role === 'string' ? userRecord.role.trim() : '';
@@ -474,13 +479,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/auth/logout') {
+    if (req.method === 'POST' && (req.url === '/auth/logout' || req.url === '/api/auth/logout')) {
       res.writeHead(204, { 'Set-Cookie': 'session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax' });
       res.end();
       return;
     }
 
-    if (req.method === 'GET' && req.url === '/auth/me') {
+    if (req.method === 'GET' && (req.url === '/auth/me' || req.url === '/api/auth/me')) {
       try {
         const authUser = authenticate(req);
         const storedProfile = users.get(authUser.id);
@@ -510,7 +515,7 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
-    if (req.method === 'POST' && req.url === '/auth/register') {
+    if (req.method === 'POST' && (req.url === '/auth/register' || req.url === '/api/auth/register')) {
       const body = await readBody(req);
       const username = typeof body.username === 'string' ? body.username.trim() : '';
       const role = typeof body.role === 'string' ? body.role.trim() : '';

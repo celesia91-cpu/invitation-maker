@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { AppStateProvider, useAppState, formatNavigationLabel } from '../context/AppStateContext.jsx';
 import { AuthProvider } from '../context/AuthContext.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import '../styles/globals.css';
 import '../styles/styles.css';
 
@@ -44,12 +45,33 @@ function AppStateRouterBridge() {
 }
 
 export default function MyApp({ Component, pageProps }) {
+  const handleError = (error, errorInfo) => {
+    // In production, send to error reporting service
+    console.error('Application Error:', error, errorInfo);
+  };
+
   return (
-    <AppStateProvider>
-      <AuthProvider>
-        <AppStateRouterBridge />
-        <Component {...pageProps} />
-      </AuthProvider>
-    </AppStateProvider>
+    <ErrorBoundary
+      message="The application encountered an unexpected error. Please try refreshing the page."
+      showReload={true}
+      onError={handleError}
+    >
+      <AppStateProvider>
+        <ErrorBoundary
+          message="There was an error with the application state. Some features may not work correctly."
+          onError={handleError}
+        >
+          <AuthProvider>
+            <ErrorBoundary
+              message="There was an authentication error. Please try logging in again."
+              onError={handleError}
+            >
+              <AppStateRouterBridge />
+              <Component {...pageProps} />
+            </ErrorBoundary>
+          </AuthProvider>
+        </ErrorBoundary>
+      </AppStateProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useAppState } from '../context/AppStateContext.jsx';
 import { resolveCapabilities, resolveRole } from '../utils/roleCapabilities.js';
-import WebMUploader from './WebMUploader.jsx';
+import MusicUploader from './MusicUploader.jsx';
 import FeatureErrorBoundary from './FeatureErrorBoundary.jsx';
 
-export default function UploadBackgroundButton({ api, roleCapabilities }) {
-  const { userRole, updateImgState } = useAppState();
+export default function UploadMusicButton({ api, roleCapabilities }) {
+  const { userRole, updateMusicState } = useAppState();
   const [showUploader, setShowUploader] = useState(false);
 
   const { role: resolvedRole, canEdit } = useMemo(() => {
@@ -19,34 +19,39 @@ export default function UploadBackgroundButton({ api, roleCapabilities }) {
   const readOnly = !canEdit;
   const disabled = !api || readOnly;
   const editLockTitle = readOnly
-    ? 'Uploading backgrounds is limited to creator or admin roles.'
+    ? 'Uploading music is limited to creator or admin roles.'
     : undefined;
 
   const handleUploadComplete = useCallback((result) => {
-    // Debug info removed for production
-
-    // Update image state with uploaded file
+    // Update music state with uploaded file
     if (result.url) {
-      updateImgState({
-        has: true,
-        backendImageId: result.fileId,
-        backendImageUrl: result.url,
-        backendThumbnailUrl: result.thumbnailUrl || result.url,
-      });
+      if (typeof updateMusicState === 'function') {
+        updateMusicState({
+          has: true,
+          musicId: result.fileId,
+          musicUrl: result.url,
+          fileName: result.fileName,
+          duration: result.duration,
+        });
+      } else {
+        // Fallback: store in localStorage or use existing image state structure
+        console.log('Music uploaded:', result);
+        // You might want to extend the app state to handle music separately
+      }
     }
 
     setShowUploader(false);
-  }, [updateImgState]);
+  }, [updateMusicState]);
 
   const handleUploadError = useCallback((error) => {
-    console.error('Upload error:', error);
-    // Error handling is managed by the WebMUploader component
+    console.error('Music upload error:', error);
+    // Error handling is managed by the MusicUploader component
   }, []);
 
   return (
     <>
       <button
-        id="uploadBgBtn"
+        id="uploadMusicBtn"
         type="button"
         className="btn"
         onClick={() => setShowUploader(true)}
@@ -54,7 +59,7 @@ export default function UploadBackgroundButton({ api, roleCapabilities }) {
         title={editLockTitle}
         data-role={resolvedRole}
       >
-        📁 Upload Media
+        🎵 Upload Music
       </button>
 
       {readOnly && (
@@ -66,7 +71,7 @@ export default function UploadBackgroundButton({ api, roleCapabilities }) {
             color: '#94a3b8',
           }}
         >
-          Uploads are disabled for the &quot;{resolvedRole}&quot; role.
+          Music uploads are disabled for the &quot;{resolvedRole}&quot; role.
         </p>
       )}
 
@@ -74,7 +79,7 @@ export default function UploadBackgroundButton({ api, roleCapabilities }) {
         <div className="upload-modal-backdrop" onClick={(e) => e.target === e.currentTarget && setShowUploader(false)}>
           <div className="upload-modal" role="dialog" aria-labelledby="upload-modal-title">
             <header className="upload-modal-header">
-              <h3 id="upload-modal-title">Upload Background Media</h3>
+              <h3 id="upload-modal-title">Upload Background Music</h3>
               <button
                 type="button"
                 className="close-btn"
@@ -87,25 +92,24 @@ export default function UploadBackgroundButton({ api, roleCapabilities }) {
 
             <div className="upload-modal-content">
               <FeatureErrorBoundary
-                featureName="File Uploader"
-                fallbackMessage="The file uploader is temporarily unavailable. Please try closing and reopening the upload dialog."
+                featureName="Music Uploader"
+                fallbackMessage="The music uploader is temporarily unavailable. Please try closing and reopening the upload dialog."
               >
-                <WebMUploader
+                <MusicUploader
                   onUploadComplete={handleUploadComplete}
                   onUploadError={handleUploadError}
                   disabled={disabled}
-                  className="background-uploader"
+                  className="music-uploader"
                 />
               </FeatureErrorBoundary>
 
               <div className="upload-tips">
-                <h4>Supported Formats:</h4>
+                <h4>Supported Audio Formats:</h4>
                 <ul>
-                  <li>📹 <strong>Videos:</strong> WebM, MP4 (max 30 seconds, 50MB)</li>
-                  <li>🖼️ <strong>Images:</strong> PNG, JPG, GIF, WebP (max 50MB)</li>
+                  <li>🎵 <strong>Audio:</strong> MP3, WAV, OGG, AAC, M4A, FLAC (max 5 min, 20MB)</li>
                 </ul>
                 <p className="tip">
-                  💡 <strong>Tip:</strong> Videos will loop automatically in your design
+                  💡 <strong>Tip:</strong> Background music will loop automatically in your design
                 </p>
               </div>
             </div>

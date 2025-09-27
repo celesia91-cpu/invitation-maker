@@ -41,6 +41,17 @@ export const initialState = {
     backendThumbnailUrl: null,
   },
 
+  // Music state
+  musicState: {
+    has: false,
+    musicId: null,
+    musicUrl: null,
+    fileName: null,
+    duration: null,
+    volume: 0.5,
+    loop: true,
+  },
+
   fileUpload: {
     status: 'idle',
     progress: 0,
@@ -120,6 +131,8 @@ export function reducer(state, action) {
       return { ...state, workSize: { w: action.w | 0, h: action.h | 0 } };
     case 'UPDATE_IMG_STATE':
       return { ...state, imgState: { ...state.imgState, ...(action.patch ?? {}) } };
+    case 'UPDATE_MUSIC_STATE':
+      return { ...state, musicState: { ...state.musicState, ...(action.patch ?? {}) } };
     case 'START_FILE_UPLOAD': {
       const prevUpload = state.fileUpload || initialState.fileUpload;
       return {
@@ -412,6 +425,9 @@ export function createAppStateValue(state, dispatch) {
 
     // Image state
     updateImgState: (patch) => dispatch({ type: 'UPDATE_IMG_STATE', patch }),
+
+    // Music state
+    updateMusicState: (patch) => dispatch({ type: 'UPDATE_MUSIC_STATE', patch }),
 
     // File upload helpers
     startFileUpload: (options) => {
